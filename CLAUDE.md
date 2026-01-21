@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code when working on the Document Q&A Platform.
 
+## Project Information
+
+**GitHub Repository**: https://github.com/tarangdeep-goel-by/doc-qa-platform
+**Owner**: tarangdeep-goel-by
+
 ## Project Overview
 
 A RAG (Retrieval Augmented Generation) platform for uploading documents and answering questions using semantic search + LLM generation.
