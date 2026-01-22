@@ -32,14 +32,17 @@ def client():
 @pytest.fixture
 def uploaded_doc(client):
     """Upload a test document and return its ID."""
-    # Use the test PDF from fixtures
+    import uuid
+    # Use unique filename to avoid duplicate detection
+    unique_name = f"test_doc_{uuid.uuid4().hex[:8]}.pdf"
+
     with open("tests/fixtures/test.pdf", "rb") as f:
         response = client.post(
             "/api/admin/upload",
-            files={"file": ("test_doc.pdf", f, "application/pdf")}
+            files={"file": (unique_name, f, "application/pdf")}
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Upload failed: {response.json()}"
     return response.json()["doc_id"]
 
 
@@ -143,18 +146,21 @@ class TestDeletedDocuments:
 
     def test_chat_with_mixed_documents(self, client):
         """Test chat with some deleted and some existing documents."""
-        # Upload two documents
+        import uuid
+        # Upload two documents with unique names
+        unique_id = uuid.uuid4().hex[:8]
+
         with open("tests/fixtures/test.pdf", "rb") as f:
             doc1_response = client.post(
                 "/api/admin/upload",
-                files={"file": ("doc1.pdf", f, "application/pdf")}
+                files={"file": (f"doc1_{unique_id}.pdf", f, "application/pdf")}
             )
         doc1_id = doc1_response.json()["doc_id"]
 
         with open("tests/fixtures/test.pdf", "rb") as f:
             doc2_response = client.post(
                 "/api/admin/upload",
-                files={"file": ("doc2.pdf", f, "application/pdf")}
+                files={"file": (f"doc2_{unique_id}.pdf", f, "application/pdf")}
             )
         doc2_id = doc2_response.json()["doc_id"]
 
@@ -293,14 +299,18 @@ class TestDeletedDocuments:
 
     def test_multiple_document_deletions(self, client):
         """Test multiple sequential document deletions."""
-        # Upload multiple documents
+        import uuid
+        # Upload multiple documents with unique names
         doc_ids = []
+        unique_id = uuid.uuid4().hex[:8]
+
         for i in range(3):
             with open("tests/fixtures/test.pdf", "rb") as f:
                 response = client.post(
                     "/api/admin/upload",
-                    files={"file": (f"doc{i}.pdf", f, "application/pdf")}
+                    files={"file": (f"doc{i}_{unique_id}.pdf", f, "application/pdf")}
                 )
+            assert response.status_code == 200, f"Upload {i} failed: {response.json()}"
             doc_ids.append(response.json()["doc_id"])
 
         # Create chat with all documents
