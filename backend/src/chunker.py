@@ -1,7 +1,7 @@
 """Text chunking utilities for splitting documents into semantic chunks."""
 
 import re
-from typing import List
+from typing import List, Dict, Any
 
 
 class TextChunker:
@@ -109,3 +109,33 @@ class TextChunker:
 
         # Fallback: use target end
         return end
+
+    def chunk_with_page_tracking(
+        self,
+        page_data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Chunk text while preserving page number for each chunk.
+
+        Args:
+            page_data: List of dicts with {page_num: int, text: str}
+
+        Returns:
+            List of dicts with {text: str, page_num: int}
+        """
+        chunks = []
+
+        for page_info in page_data:
+            page_num = page_info['page_num']
+            text = page_info['text']
+
+            # Chunk this page's text
+            page_chunks = self.chunk_text(text)
+
+            for chunk_text in page_chunks:
+                chunks.append({
+                    'text': chunk_text,
+                    'page_num': page_num
+                })
+
+        return chunks

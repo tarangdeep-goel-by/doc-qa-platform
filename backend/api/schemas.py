@@ -67,6 +67,7 @@ class SourceInfo(BaseModel):
     doc_title: str
     chunk_text: str
     score: float
+    page_num: Optional[int] = None
 
 
 # Query Response
@@ -84,3 +85,64 @@ class HealthResponse(BaseModel):
     status: str
     qdrant_connected: bool
     gemini_configured: bool
+
+
+# Chat Schemas
+class CreateChatRequest(BaseModel):
+    """Request to create a new chat."""
+    name: str = Field(..., min_length=1, max_length=200)
+    doc_ids: List[str] = Field(default_factory=list)
+
+
+class ChatResponse(BaseModel):
+    """Chat session response."""
+    id: str
+    name: str
+    doc_ids: List[str]
+    created_at: str
+    updated_at: str
+    message_count: int
+
+
+class ChatListResponse(BaseModel):
+    """List of chats."""
+    chats: List[ChatResponse]
+
+
+class MessageResponse(BaseModel):
+    """Chat message response."""
+    id: str
+    chat_id: str
+    role: str
+    content: str
+    timestamp: str
+    sources: Optional[List[SourceInfo]] = None
+    filtered_docs: Optional[List[str]] = None
+
+
+class ChatDetailResponse(BaseModel):
+    """Detailed chat with messages."""
+    chat: ChatResponse
+    messages: List[MessageResponse]
+
+
+class AskInChatRequest(BaseModel):
+    """Request to ask a question in a chat."""
+    question: str = Field(..., min_length=1)
+    top_k: int = Field(default=10, ge=1, le=20)
+
+
+class AskInChatResponse(BaseModel):
+    """Response to question in chat."""
+    message: MessageResponse
+
+
+class RenameChatRequest(BaseModel):
+    """Request to rename a chat."""
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class DeleteChatResponse(BaseModel):
+    """Response after deleting a chat."""
+    success: bool
+    message: str

@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi.responses import FileResponse
 
 from api.schemas import (
     UploadResponse,
@@ -41,6 +42,21 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
     document_store = request.app.state.document_store
     upload_dir = request.app.state.upload_dir
 
+    # Check for duplicate by filename
+    duplicate = document_store.find_by_filename(file.filename)
+
+    if duplicate:
+        raise HTTPException(
+            status_code=409,  # Conflict
+            detail={
+                "error": "duplicate_document",
+                "message": f"Document '{file.filename}' already exists",
+                "existing_doc_id": duplicate.doc_id,
+                "existing_upload_date": duplicate.upload_date,
+                "suggestion": "Use the existing document or rename your file"
+            }
+        )
+
     # Generate document ID
     doc_id = str(uuid.uuid4())
     file_extension = file.filename.split('.')[-1]
@@ -57,31 +73,32 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         # Process document
         print(f"Processing document: {file.filename}")
         processor = DocumentProcessor()
-        text, metadata = processor.process_document(file_path, file_extension)
+        page_data, metadata = processor.process_document(file_path, file_extension)
 
         # Get file size
         file_size_mb = processor.get_file_size_mb(file_path)
 
-        # Chunk text
+        # Chunk text with page tracking
         print("Chunking text...")
         chunker = TextChunker(chunk_size=1000, chunk_overlap=200)
-        text_chunks = chunker.chunk_text(text)
-        print(f"Created {len(text_chunks)} chunks")
+        chunk_data = chunker.chunk_with_page_tracking(page_data)
+        print(f"Created {len(chunk_data)} chunks")
 
-        if not text_chunks:
+        if not chunk_data:
             raise ValueError("No text chunks created from document")
 
         # Create document chunks
         doc_title = metadata.get('title') or file.filename
         chunks = [
             DocumentChunk(
-                text=chunk_text,
+                text=chunk['text'],
                 doc_id=doc_id,
                 doc_title=doc_title,
                 chunk_index=i,
-                metadata={"page": metadata.get('total_pages')}
+                page_num=chunk['page_num'],
+                metadata=metadata
             )
-            for i, chunk_text in enumerate(text_chunks)
+            for i, chunk in enumerate(chunk_data)
         ]
 
         # Generate embeddings
@@ -105,7 +122,7 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
             format=file_extension,
             upload_date=datetime.now().isoformat(),
             file_size_mb=file_size_mb,
-            chunk_count=len(text_chunks),
+            chunk_count=len(chunk_data),
             total_pages=metadata.get('total_pages'),
             metadata=metadata
         )
@@ -118,7 +135,7 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
             doc_id=doc_id,
             title=doc_title,
             status="success",
-            chunk_count=len(text_chunks),
+            chunk_count=len(chunk_data),
             processing_time=round(processing_time, 2)
         )
 
@@ -209,3 +226,27 @@ async def delete_document(request: Request, doc_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+
+@router.get("/documents/{doc_id}/file")
+async def download_document(request: Request, doc_id: str):
+    """
+    Serve the PDF file for a document.
+
+    Can be opened in browser with #page=N anchor for specific pages.
+    """
+    document_store = request.app.state.document_store
+
+    doc = document_store.get_document(doc_id)
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Document file not found on disk")
+
+    return FileResponse(
+        doc.file_path,
+        media_type='application/pdf',
+        filename=doc.filename
+    )

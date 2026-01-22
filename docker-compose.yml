@@ -39,3 +39,23 @@ services:
     depends_on:
       - qdrant
     restart: unless-stopped
+
+  test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: doc-qa-test
+    volumes:
+      - ./backend:/app
+    environment:
+      - TEST_BASE_URL=http://backend:8000
+      - TEST_PDF_PATH=tests/fixtures/test.pdf
+      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+    depends_on:
+      - backend
+      - qdrant
+    command: pytest tests/test_api.py -v
+    profiles:
+      - test
