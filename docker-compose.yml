@@ -36,10 +36,18 @@ services:
       - CHUNK_SIZE=1000
       - CHUNK_OVERLAP=200
       - TOP_K_RESULTS=5
+      # RAG Improvements
+      - USE_HYBRID_SEARCH=true
+      - HYBRID_ALPHA=0.5
+      - USE_RERANKING=true
+      - MIN_CONFIDENCE_SCORE=0.3
+      - BM25_CACHE_DIR=data/bm25
+      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
     depends_on:
       - qdrant
     restart: unless-stopped
 
+  # Run all tests
   test:
     build:
       context: ./backend
@@ -53,9 +61,66 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIM=384
     depends_on:
       - backend
       - qdrant
-    command: pytest tests/test_api.py -v
+    command: pytest tests/ -v --tb=short
+    profiles:
+      - test
+
+  # Run unit tests only (fast, no external dependencies)
+  unit-tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: doc-qa-unit-tests
+    volumes:
+      - ./backend:/app
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+    command: pytest tests/test_bm25_index.py tests/test_reranker.py -v --tb=short
+    profiles:
+      - test
+
+  # Run integration tests (needs Qdrant)
+  integration-tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: doc-qa-integration-tests
+    volumes:
+      - ./backend:/app
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIM=384
+    depends_on:
+      - qdrant
+    command: pytest tests/test_hybrid_search.py tests/test_qa_guardrails.py tests/test_rag_pipeline_integration.py -v --tb=short
+    profiles:
+      - test
+
+  # Run API tests only (needs backend + Qdrant)
+  api-tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: doc-qa-api-tests
+    volumes:
+      - ./backend:/app
+    environment:
+      - TEST_BASE_URL=http://backend:8000
+      - TEST_PDF_PATH=tests/fixtures/test.pdf
+      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+    depends_on:
+      - backend
+      - qdrant
+    command: pytest tests/test_api.py tests/test_deleted_documents.py -v --tb=short
     profiles:
       - test
