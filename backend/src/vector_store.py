@@ -13,6 +13,7 @@ from qdrant_client.models import (
     MatchValue,
     MatchAny
 )
+from src.bm25_index import BM25Index
 
 
 class VectorStore:
@@ -44,6 +45,10 @@ class VectorStore:
 
         # Initialize collection
         self._init_collection()
+
+        # Initialize BM25 index
+        self.bm25_index = BM25Index()
+        self.bm25_index.load_cache()  # Try to load cached index
 
     def _init_collection(self):
         """Create collection if it doesn't exist."""
@@ -95,6 +100,9 @@ class VectorStore:
             collection_name=self.collection_name,
             points=points
         )
+
+        # Rebuild BM25 index with new chunks
+        self.rebuild_bm25_index()
 
         return len(points)
 
@@ -169,6 +177,9 @@ class VectorStore:
             )
         )
 
+        # Rebuild BM25 index after deletion
+        self.rebuild_bm25_index()
+
         return 0  # Qdrant doesn't return count
 
     def get_collection_info(self) -> Dict[str, Any]:
@@ -187,3 +198,149 @@ class VectorStore:
             return True
         except Exception:
             return False
+
+    def rebuild_bm25_index(self):
+        """
+        Rebuild BM25 index from all chunks in Qdrant.
+        Should be called after adding or deleting documents.
+        """
+        # Fetch all points from Qdrant
+        # Note: This uses scroll which is efficient for large datasets
+        all_chunks = []
+        offset = None
+        limit = 100
+
+        while True:
+            result = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=limit,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False  # We don't need vectors for BM25
+            )
+
+            points, offset = result
+
+            if not points:
+                break
+
+            # Extract payloads
+            for point in points:
+                all_chunks.append(point.payload)
+
+            if offset is None:
+                break
+
+        print(f"Rebuilding BM25 index with {len(all_chunks)} chunks")
+        self.bm25_index.build_index(all_chunks)
+
+    def hybrid_search(
+        self,
+        query_vector: np.ndarray,
+        query_text: str,
+        top_k: int = 5,
+        doc_ids: Optional[List[str]] = None,
+        alpha: float = 0.5
+    ) -> List[Dict[str, Any]]:
+        """
+        Hybrid search combining vector similarity and BM25 keyword matching.
+
+        Args:
+            query_vector: Query embedding
+            query_text: Original query text for BM25
+            top_k: Number of final results to return
+            doc_ids: Optional list of document IDs to filter by
+            alpha: Weight for vector vs BM25 (0=all BM25, 1=all vector, 0.5=balanced)
+
+        Returns:
+            List of search results with combined scores
+        """
+        # Get more candidates from both methods
+        candidates_k = min(top_k * 4, 20)  # Get 4x candidates or max 20
+
+        # Vector search
+        vector_results = self.search(
+            query_vector=query_vector,
+            top_k=candidates_k,
+            doc_ids=doc_ids
+        )
+
+        # BM25 search
+        bm25_results = self.bm25_index.search(
+            query=query_text,
+            top_k=candidates_k,
+            doc_ids=doc_ids
+        )
+
+        # Normalize scores
+        vector_scores = self._normalize_scores([r["score"] for r in vector_results])
+        bm25_scores = self._normalize_scores([r["score"] for r in bm25_results])
+
+        # Combine scores
+        combined = {}
+
+        # Add vector results
+        for i, result in enumerate(vector_results):
+            chunk_id = result["id"]
+            combined[chunk_id] = {
+                "result": result,
+                "score": alpha * vector_scores[i]
+            }
+
+        # Add BM25 results
+        for i, result in enumerate(bm25_results):
+            # BM25 results use chunk data directly
+            chunk_text = result["chunk"]["text"]
+
+            # Find matching vector result by text (since we don't have IDs from BM25)
+            matching_id = None
+            for vr in vector_results:
+                if vr["payload"].get("text") == chunk_text:
+                    matching_id = vr["id"]
+                    break
+
+            if matching_id:
+                # Add BM25 score to existing entry
+                combined[matching_id]["score"] += (1 - alpha) * bm25_scores[i]
+            else:
+                # New result from BM25 only
+                # Create a pseudo-result (this shouldn't happen often if both indices are synced)
+                pass
+
+        # Sort by combined score
+        sorted_results = sorted(
+            combined.items(),
+            key=lambda x: x[1]["score"],
+            reverse=True
+        )
+
+        # Return top k with original format
+        final_results = []
+        for chunk_id, data in sorted_results[:top_k]:
+            result = data["result"]
+            result["score"] = data["score"]  # Update with combined score
+            final_results.append(result)
+
+        return final_results
+
+    def _normalize_scores(self, scores: List[float]) -> List[float]:
+        """
+        Normalize scores to 0-1 range using min-max normalization.
+
+        Args:
+            scores: List of raw scores
+
+        Returns:
+            List of normalized scores
+        """
+        if not scores:
+            return []
+
+        min_score = min(scores)
+        max_score = max(scores)
+
+        if max_score == min_score:
+            # All scores are the same
+            return [1.0] * len(scores)
+
+        return [(s - min_score) / (max_score - min_score) for s in scores]
