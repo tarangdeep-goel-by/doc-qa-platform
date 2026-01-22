@@ -108,6 +108,18 @@ class QAEngine:
         # Check top score against threshold
         top_score = search_results[0]["score"] if search_results else 0
         if top_score < min_score:
+            # Format sources consistently even for low confidence responses
+            formatted_sources = [
+                {
+                    "doc_id": result["payload"]["doc_id"],
+                    "doc_title": result["payload"]["doc_title"],
+                    "chunk_text": result["payload"]["text"][:200] + "..." if len(result["payload"]["text"]) > 200 else result["payload"]["text"],
+                    "score": round(result["score"], 3),
+                    "page_num": result["payload"].get("page_num")
+                }
+                for result in search_results
+            ]
+
             return {
                 "question": question,
                 "answer": (
@@ -117,7 +129,7 @@ class QAEngine:
                     "- The question needs to be more specific\n"
                     "- Try rephrasing or check if the right documents are uploaded"
                 ),
-                "sources": search_results,  # Still return sources for debugging
+                "sources": formatted_sources,
                 "retrieved_count": len(search_results),
                 "low_confidence": True,
                 "top_score": top_score

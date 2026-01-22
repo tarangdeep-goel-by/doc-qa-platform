@@ -220,21 +220,13 @@ async def delete_document(request: Request, doc_id: str):
         document_store.delete_document(doc_id)
         print(f"Deleted document metadata: {doc_id}")
 
-        # Update all chats to remove this doc_id
+        # Count affected chats (but don't remove doc_ids - we want to show them as missing)
         all_chats = chat_manager.list_chats()
-        chats_updated = 0
-
-        for chat in all_chats:
-            if doc_id in chat.doc_ids:
-                # Remove the doc_id from the chat
-                chat.doc_ids = [id for id in chat.doc_ids if id != doc_id]
-                # Save the updated chat
-                chat_manager.save_chat(chat)
-                chats_updated += 1
+        chats_affected = sum(1 for chat in all_chats if doc_id in chat.doc_ids)
 
         message = f"Document '{doc.title}' deleted successfully"
-        if chats_updated > 0:
-            message += f". Updated {chats_updated} chat(s)"
+        if chats_affected > 0:
+            message += f". {chats_affected} chat(s) reference this document"
 
         return DeleteResponse(
             success=True,

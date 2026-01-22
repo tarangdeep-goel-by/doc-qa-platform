@@ -98,7 +98,7 @@ class TestDeletedDocuments:
         assert len(data["available_documents"]) == 0
 
     def test_delete_document_updates_chat_references(self, client, uploaded_doc, chat_with_doc):
-        """Test that deleting document removes it from chat doc_ids."""
+        """Test that deleting document keeps it in chat doc_ids but shows as missing."""
         chat_id = chat_with_doc["id"]
 
         # Verify chat has the document initially
@@ -109,12 +109,14 @@ class TestDeletedDocuments:
         del_response = client.delete(f"/api/admin/documents/{uploaded_doc}")
         assert del_response.status_code == 200
 
-        # Check delete message mentions chat update
+        # Check delete message mentions chat reference
         assert "chat" in del_response.json()["message"].lower()
 
-        # Verify chat no longer references the document
+        # Verify chat STILL has the doc_id (for history) but it shows as missing
         updated_chat = client.get(f"/api/chats/{chat_id}").json()
-        assert uploaded_doc not in updated_chat["chat"]["doc_ids"]
+        assert uploaded_doc in updated_chat["chat"]["doc_ids"]
+        assert uploaded_doc in updated_chat["missing_documents"]
+        assert len(updated_chat["available_documents"]) == 0
 
     def test_delete_document_multiple_chats(self, client, uploaded_doc):
         """Test deleting document that's in multiple chats."""
@@ -133,16 +135,18 @@ class TestDeletedDocuments:
         del_response = client.delete(f"/api/admin/documents/{uploaded_doc}")
         assert del_response.status_code == 200
 
-        # Should mention multiple chats updated
+        # Should mention multiple chats reference this document
         message = del_response.json()["message"]
         assert "2" in message or "chat" in message.lower()
 
-        # Both chats should no longer have the document
+        # Both chats should still have the doc_id but it's marked as missing
         chat1_updated = client.get(f"/api/chats/{chat1['id']}").json()
         chat2_updated = client.get(f"/api/chats/{chat2['id']}").json()
 
-        assert uploaded_doc not in chat1_updated["chat"]["doc_ids"]
-        assert uploaded_doc not in chat2_updated["chat"]["doc_ids"]
+        assert uploaded_doc in chat1_updated["chat"]["doc_ids"]
+        assert uploaded_doc in chat1_updated["missing_documents"]
+        assert uploaded_doc in chat2_updated["chat"]["doc_ids"]
+        assert uploaded_doc in chat2_updated["missing_documents"]
 
     def test_chat_with_mixed_documents(self, client):
         """Test chat with some deleted and some existing documents."""
@@ -237,14 +241,12 @@ class TestDeletedDocuments:
             json={"question": "What is this document about?"}
         )
 
-        # Should still work but return "no information" type answer
+        # Should return clear message about deleted documents
         assert response.status_code == 200
         answer = response.json()["message"]["content"]
 
-        # Should indicate no information found
-        assert "couldn't find" in answer.lower() or \
-               "no information" in answer.lower() or \
-               "don't have" in answer.lower()
+        # Should indicate all documents deleted
+        assert "deleted" in answer.lower() or "not available" in answer.lower()
 
     def test_delete_document_chat_list_still_works(self, client, uploaded_doc, chat_with_doc):
         """Test that chat list works after document deletion."""

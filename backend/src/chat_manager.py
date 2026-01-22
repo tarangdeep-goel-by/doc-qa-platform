@@ -224,6 +224,16 @@ class ChatManager:
         self._save_chat_metadata(chat)
         return True
 
+    def save_chat(self, chat: Chat):
+        """
+        Save chat metadata to disk.
+
+        Args:
+            chat: Chat object to save
+        """
+        chat.updated_at = datetime.now().isoformat()
+        self._save_chat_metadata(chat)
+
     def _save_chat_metadata(self, chat: Chat):
         """Save chat metadata to disk."""
         chat_dir = self.chats_dir / chat.id

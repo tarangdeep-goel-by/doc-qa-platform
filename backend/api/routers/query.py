@@ -21,13 +21,32 @@ async def ask_question(http_request: Request, query: QueryRequest):
     Uses RAG pipeline to retrieve relevant chunks and generate answer.
     """
     qa_engine = http_request.app.state.qa_engine
+    document_store = http_request.app.state.document_store
 
     try:
-        # Run RAG pipeline
+        # Validate doc_ids if provided
+        doc_ids = None
+        if query.doc_ids:
+            valid_doc_ids = [
+                doc_id for doc_id in query.doc_ids
+                if document_store.get_document(doc_id) is not None
+            ]
+
+            if not valid_doc_ids:
+                return QueryResponse(
+                    question=query.question,
+                    answer="The specified documents are not available.",
+                    sources=[],
+                    retrieved_count=0
+                )
+
+            doc_ids = valid_doc_ids
+
+        # Run RAG pipeline with validated doc_ids
         result = qa_engine.answer_question(
             question=query.question,
             top_k=query.top_k,
-            doc_ids=query.doc_ids
+            doc_ids=doc_ids
         )
 
         # Convert sources to schema format

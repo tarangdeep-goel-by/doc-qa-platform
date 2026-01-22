@@ -172,6 +172,7 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     """
     chat_manager = request.app.state.chat_manager
     qa_engine = request.app.state.qa_engine
+    document_store = request.app.state.document_store
 
     # Get chat
     chat, messages = chat_manager.get_chat(chat_id)
@@ -180,11 +181,57 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
         raise HTTPException(status_code=404, detail="Chat not found")
 
     try:
-        # Run RAG pipeline with chat's documents and history
+        # Filter to only existing documents
+        available_doc_ids = [
+            doc_id for doc_id in chat.doc_ids
+            if document_store.get_document(doc_id) is not None
+        ] if chat.doc_ids else []
+
+        # If no documents available, return early
+        if not available_doc_ids:
+            # Create user message
+            user_message = ChatMessage(
+                id=str(uuid.uuid4()),
+                chat_id=chat_id,
+                role="user",
+                content=body.question,
+                timestamp=datetime.now().isoformat(),
+                filtered_docs=[]
+            )
+            chat_manager.add_message(chat_id, user_message)
+
+            # Create assistant message with helpful error
+            assistant_message = ChatMessage(
+                id=str(uuid.uuid4()),
+                chat_id=chat_id,
+                role="assistant",
+                content=(
+                    "I cannot answer questions for this chat because all associated "
+                    "documents have been deleted. Please add new documents to continue."
+                ),
+                timestamp=datetime.now().isoformat(),
+                sources=[],
+                filtered_docs=[]
+            )
+            chat_manager.add_message(chat_id, assistant_message)
+
+            return AskInChatResponse(
+                message=MessageResponse(
+                    id=assistant_message.id,
+                    chat_id=assistant_message.chat_id,
+                    role=assistant_message.role,
+                    content=assistant_message.content,
+                    timestamp=assistant_message.timestamp,
+                    sources=[],
+                    filtered_docs=assistant_message.filtered_docs
+                )
+            )
+
+        # Run RAG pipeline with available documents only
         result = qa_engine.answer_question(
             question=body.question,
             top_k=body.top_k,
-            doc_ids=chat.doc_ids if chat.doc_ids else None,
+            doc_ids=available_doc_ids,
             chat_history=chat.gemini_chat_history
         )
 
@@ -195,7 +242,7 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
             role="user",
             content=body.question,
             timestamp=datetime.now().isoformat(),
-            filtered_docs=chat.doc_ids
+            filtered_docs=available_doc_ids
         )
         chat_manager.add_message(chat_id, user_message)
 
@@ -219,7 +266,7 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
             content=result["answer"],
             timestamp=datetime.now().isoformat(),
             sources=sources_dicts,
-            filtered_docs=chat.doc_ids
+            filtered_docs=available_doc_ids
         )
         chat_manager.add_message(chat_id, assistant_message)
 
