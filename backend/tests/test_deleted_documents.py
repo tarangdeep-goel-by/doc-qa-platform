@@ -1,14 +1,32 @@
 """Tests for deleted documents edge case handling."""
 
 import pytest
-from fastapi.testclient import TestClient
-from api.main import app
+import os
+
+
+# Set to use requests for live API testing
+BASE_URL = os.getenv("TEST_BASE_URL", "http://localhost:8000")
 
 
 @pytest.fixture
 def client():
-    """Test client for API."""
-    return TestClient(app)
+    """Test client - uses live API via requests."""
+    import requests
+
+    class APIClient:
+        def __init__(self, base_url):
+            self.base_url = base_url
+
+        def post(self, path, **kwargs):
+            return requests.post(f"{self.base_url}{path}", **kwargs)
+
+        def get(self, path, **kwargs):
+            return requests.get(f"{self.base_url}{path}", **kwargs)
+
+        def delete(self, path, **kwargs):
+            return requests.delete(f"{self.base_url}{path}", **kwargs)
+
+    return APIClient(BASE_URL)
 
 
 @pytest.fixture
