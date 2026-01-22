@@ -37,7 +37,8 @@ class QAEngine:
         self,
         question: str,
         top_k: int = 10,
-        doc_ids: Optional[List[str]] = None
+        doc_ids: Optional[List[str]] = None,
+        chat_history: Optional[List[Dict]] = None
     ) -> Dict[str, Any]:
         """
         Answer a question using RAG pipeline.
@@ -46,6 +47,7 @@ class QAEngine:
             question: User question
             top_k: Number of chunks to retrieve
             doc_ids: Optional list of document IDs to filter search
+            chat_history: Optional chat history for context (Gemini format)
 
         Returns:
             Dictionary with answer and sources
@@ -86,7 +88,8 @@ class QAEngine:
                 "doc_id": payload["doc_id"],
                 "doc_title": payload["doc_title"],
                 "chunk_text": payload["text"][:200] + "..." if len(payload["text"]) > 200 else payload["text"],
-                "score": round(score, 3)
+                "score": round(score, 3),
+                "page_num": payload.get("page_num")
             })
 
         context = "\n\n".join(context_parts)

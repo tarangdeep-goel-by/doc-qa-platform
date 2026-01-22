@@ -36,7 +36,8 @@ async def ask_question(http_request: Request, query: QueryRequest):
                 doc_id=source["doc_id"],
                 doc_title=source["doc_title"],
                 chunk_text=source["chunk_text"],
-                score=source["score"]
+                score=source["score"],
+                page_num=source.get("page_num")
             )
             for source in result["sources"]
         ]

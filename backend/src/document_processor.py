@@ -1,7 +1,7 @@
 """Document processing utilities for extracting text from various formats."""
 
 import os
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import PyPDF2
 
 
@@ -9,17 +9,19 @@ class DocumentProcessor:
     """Processes documents and extracts text."""
 
     @staticmethod
-    def extract_text_from_pdf(file_path: str) -> Tuple[str, Dict[str, Any]]:
+    def extract_text_from_pdf(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Extract text from PDF file.
+        Extract text from PDF file with page tracking.
 
         Args:
             file_path: Path to PDF file
 
         Returns:
-            Tuple of (extracted_text, metadata)
+            Tuple of (page_data, metadata)
+            page_data: List of dicts with {page_num: int, text: str}
+            metadata: Dict with PDF metadata
         """
-        text_parts = []
+        page_data = []
         metadata = {}
 
         try:
@@ -36,29 +38,30 @@ class DocumentProcessor:
                     metadata['subject'] = pdf_reader.metadata.get('/Subject', '')
                     metadata['creator'] = pdf_reader.metadata.get('/Creator', '')
 
-                # Extract text from all pages
+                # Extract text from all pages with page numbers
                 for page_num, page in enumerate(pdf_reader.pages):
                     try:
                         page_text = page.extract_text()
                         if page_text.strip():
-                            text_parts.append(page_text)
+                            page_data.append({
+                                'page_num': page_num + 1,  # 1-indexed
+                                'text': page_text
+                            })
                     except Exception as e:
                         print(f"Warning: Error extracting text from page {page_num + 1}: {e}")
                         continue
 
-            # Combine all text
-            full_text = "\n\n".join(text_parts)
-
-            if not full_text.strip():
+            # Validate we got some text
+            if not page_data:
                 raise ValueError("No text could be extracted from PDF")
 
-            return full_text, metadata
+            return page_data, metadata
 
         except Exception as e:
             raise ValueError(f"Failed to process PDF: {str(e)}")
 
     @staticmethod
-    def process_document(file_path: str, file_format: str) -> Tuple[str, Dict[str, Any]]:
+    def process_document(file_path: str, file_format: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Process document and extract text based on format.
 
@@ -67,7 +70,8 @@ class DocumentProcessor:
             file_format: File format (pdf, docx, html, txt)
 
         Returns:
-            Tuple of (extracted_text, metadata)
+            Tuple of (page_data, metadata)
+            page_data: List of dicts with {page_num: int, text: str}
         """
         if file_format.lower() == 'pdf':
             return DocumentProcessor.extract_text_from_pdf(file_path)

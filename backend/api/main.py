@@ -11,6 +11,7 @@ from src.embedder import Embedder
 from src.vector_store import VectorStore
 from src.qa_engine import QAEngine
 from src.models import DocumentStore
+from src.chat_manager import ChatManager
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +51,9 @@ async def lifespan(app: FastAPI):
     print("Initializing document store...")
     document_store = DocumentStore(data_dir=data_dir)
 
+    print("Initializing chat manager...")
+    chat_manager = ChatManager(base_dir=data_dir)
+
     print("Initializing QA engine...")
     qa_engine = QAEngine(
         embedder=embedder,
@@ -62,6 +66,7 @@ async def lifespan(app: FastAPI):
     app.state.embedder = embedder
     app.state.vector_store = vector_store
     app.state.document_store = document_store
+    app.state.chat_manager = chat_manager
     app.state.qa_engine = qa_engine
     app.state.upload_dir = upload_dir
 
@@ -91,9 +96,10 @@ app.add_middleware(
 )
 
 # Include routers (imported here to avoid circular imports)
-from .routers import admin, query
+from .routers import admin, query, chats
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
+app.include_router(chats.router, prefix="/api/chats", tags=["Chats"])
 
 
 # Root endpoint

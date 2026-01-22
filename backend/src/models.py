@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import json
 import os
 
@@ -38,6 +38,7 @@ class DocumentChunk:
     doc_id: str
     doc_title: str
     chunk_index: int
+    page_num: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> Dict[str, Any]:
@@ -47,6 +48,7 @@ class DocumentChunk:
             "doc_id": self.doc_id,
             "doc_title": self.doc_title,
             "chunk_index": self.chunk_index,
+            "page_num": self.page_num,
             "metadata": self.metadata
         }
 
@@ -101,3 +103,50 @@ class DocumentStore:
         """List all documents."""
         docs = self.load_all()
         return [DocumentMetadata.from_dict(d) for d in docs.values()]
+
+    def find_by_filename(self, filename: str) -> Optional[DocumentMetadata]:
+        """Find document by filename."""
+        docs = self.list_documents()
+        return next((doc for doc in docs if doc.filename == filename), None)
+
+
+@dataclass
+class Chat:
+    """Represents a chat session with associated documents."""
+    id: str
+    name: str
+    doc_ids: List[str]
+    created_at: str
+    updated_at: str
+    message_count: int = 0
+    gemini_chat_history: List[Dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Chat":
+        """Create from dictionary."""
+        return cls(**data)
+
+
+@dataclass
+class ChatMessage:
+    """Represents a message in a chat session."""
+    id: str
+    chat_id: str
+    role: str  # "user" | "assistant"
+    content: str
+    timestamp: str
+    sources: Optional[List[Dict[str, Any]]] = None
+    filtered_docs: Optional[List[str]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ChatMessage":
+        """Create from dictionary."""
+        return cls(**data)

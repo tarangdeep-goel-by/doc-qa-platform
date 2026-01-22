@@ -1,0 +1,97 @@
+[
+  {
+    "id": "5cca4e3f-83b2-403c-8323-08937ff3b3d3",
+    "chat_id": "fa07315f-60ae-4621-bd07-3ffdef20d516",
+    "role": "user",
+    "content": "Who is the letter for?",
+    "timestamp": "2026-01-21T16:37:22.331458",
+    "sources": null,
+    "filtered_docs": [
+      "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+      "b7bff8f2-bf92-4efa-83dd-a2c3f9928892"
+    ]
+  },
+  {
+    "id": "c176b18d-a451-41a1-ad69-d902b8e60c96",
+    "chat_id": "fa07315f-60ae-4621-bd07-3ffdef20d516",
+    "role": "assistant",
+    "content": "The letter, referred to as an \"Agreement,\" is for \"the Employee\" and \"The Company,\" who are also collectively called \"the Parties.\"\n\n**Document:** Tarang Deep Goel MPL2159 Separation Letter Apr 25.pdf, Chunk 2",
+    "timestamp": "2026-01-21T16:37:22.334504",
+    "sources": [
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "A c k n o w l e d g m e n t s How does a person say \u201cthank you\u201d when there are so many people to thank? Obviously this book is a thank you to my two fathers, who were powerful ro le models, and to my ...",
+        "score": 0.339,
+        "page_num": 10
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "the notes she had jotted down on her legal pad. \u201cDo you see this?\u201d I said pointing to her notes. She looked down at her notes. \u201cWhat?\u201d she said, confused. Again, I pointed deliberately to her notes. O...",
+        "score": 0.242,
+        "page_num": 120
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "T o par ents everywher e, a child\u2019 s first and most important teachers, and to all those who educate, influence, and lead by example",
+        "score": 0.24,
+        "page_num": 9
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "ing.\u201d \u201cThey\u2019ll cut of f the electricity .\u201d I still paid myself first. \u201cWhy?\u201d you ask. Because that\u2019 s what the story , The Richest Man In Babylon , was all about: the power of self-discipline and the ...",
+        "score": 0.238,
+        "page_num": 158
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "als. 5. T o show that it\u2019 s not rocket science. In 1989, I used to jog through a lovely neighborhood in Portland, Oregon. It was a suburb that had little gingerbread houses. They were small and cute. ...",
+        "score": 0.213,
+        "page_num": 111
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "ting. Her articles held a reader \u2019 s interest. \u201cY ou have a great style,\u201d I said in reply . \u201cWhat holds you back from achieving your dream?\u201d \u201cMy work does not seem to go anywhere,\u201d she said quietly . ...",
+        "score": 0.21,
+        "page_num": 119
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "C h a p t e r F i v e L E S S O N 5 : T H E R I C H I N V E N T M O N E Y Often in the real world, it\u2019 s not the smart who get ahead, but the bold. Last night, I took a break from writing and watched ...",
+        "score": 0.206,
+        "page_num": 97
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "If you purchase this book without a cover , or purchase a PDF , jpg, or tif f copy of this book, it is likely stolen property or a counterfeit. In that case, neither the authors, the publisher , nor a...",
+        "score": 0.204,
+        "page_num": 6
+      },
+      {
+        "doc_id": "b7bff8f2-bf92-4efa-83dd-a2c3f9928892",
+        "doc_title": "Tarang Deep Goel MPL2159 Separation Letter Apr 25.pdf",
+        "chunk_text": "after referred to as the \" Employee\", which expression shall, unless repugnant to the context or meaning thereof, be deemed to mean and include its, successors and permitted assignees) of OTHER PART. ...",
+        "score": 0.202,
+        "page_num": null
+      },
+      {
+        "doc_id": "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+        "doc_title": "Rich Dad Poor Dad",
+        "chunk_text": "C h a p t e r S i x L E S S O N 6 : W O R K T O L E A R N \u2014 D O N \u2019 T W O R K F O R M O N E Y Job security meant everything to my educated dad. Learning meant everything to my rich dad. A few years ag...",
+        "score": 0.2,
+        "page_num": 119
+      }
+    ],
+    "filtered_docs": [
+      "45afea9c-6e0d-4cc0-b9c1-14fb3f65579a",
+      "b7bff8f2-bf92-4efa-83dd-a2c3f9928892"
+    ]
+  }
+]
