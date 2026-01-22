@@ -1,14 +1,14 @@
 # Project Status - Document Q&A Platform
 
-**Last Updated**: January 21, 2026
+**Last Updated**: January 22, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
 
 ---
 
-## 🎯 Current Status: MVP Complete with Document Filtering
+## 🎯 Current Status: Multi-Chat System with Deleted Document Handling
 
-The platform is fully functional for basic RAG-based document Q&A with document filtering capabilities.
+The platform is fully functional with multi-chat conversations and robust handling of deleted documents.
 
 ---
 
@@ -36,17 +36,89 @@ The platform is fully functional for basic RAG-based document Q&A with document 
 - [x] Context retrieval with relevance scores
 - [x] Answer generation using Google Gemini 2.0 Flash
 - [x] Source citation in responses
-- [x] **NEW: Document filtering (search specific docs or all docs)** ✨
+- [x] Document filtering (search specific docs or all docs)
+- [x] Hybrid search (vector + BM25 keyword search)
+- [x] Reranking with cross-encoder
+- [x] Configurable relevance thresholds (min_score)
+
+### Multi-Chat System
+- [x] Create named chat sessions
+- [x] Associate documents with chats
+- [x] Chat message persistence
+- [x] Gemini conversation history tracking
+- [x] Rename and delete chats
+- [x] List all chats with metadata
+- [x] **Deleted document handling** ✨
+- [x] Soft delete pattern (preserve history)
+- [x] Automatic filtering of unavailable documents
 
 ### Admin Endpoints
 - [x] `POST /api/admin/upload` - Upload documents
 - [x] `GET /api/admin/documents` - List all documents
 - [x] `GET /api/admin/documents/{doc_id}` - Get document details
+- [x] `GET /api/admin/documents/{doc_id}/file` - Download/view PDF
 - [x] `DELETE /api/admin/documents/{doc_id}` - Delete documents
+
+### Chat Endpoints
+- [x] `POST /api/chats` - Create new chat
+- [x] `GET /api/chats` - List all chats
+- [x] `GET /api/chats/{chat_id}` - Get chat with messages
+- [x] `POST /api/chats/{chat_id}/ask` - Ask question in chat context
+- [x] `PUT /api/chats/{chat_id}/rename` - Rename chat
+- [x] `DELETE /api/chats/{chat_id}` - Delete chat
 
 ### Query Endpoints
 - [x] `POST /api/query/ask` - Ask questions with optional document filtering
 - [x] `GET /api/query/documents` - List available documents
+
+---
+
+## 🆕 Recent Changes (January 22, 2026)
+
+### Deleted Document Handling (Latest)
+
+**What was implemented:**
+- Fixed handling of deleted documents in chat contexts
+- Chats now maintain doc_id references even after deletion (soft delete pattern)
+- RAG pipeline automatically filters out deleted documents
+- Clear user-facing error messages when documents are unavailable
+- Fixed QA engine sources format inconsistency
+
+**Files Modified:**
+1. `backend/api/routers/chats.py` - Filter deleted docs before RAG, return clear messages
+2. `backend/api/routers/query.py` - Validate doc_ids in legacy endpoint
+3. `backend/api/routers/admin.py` - Soft delete (keep doc_ids in chats for history)
+4. `backend/src/qa_engine.py` - Fixed sources format for low-confidence responses
+5. `backend/tests/test_deleted_documents.py` - Updated test expectations
+
+**Behavior:**
+```bash
+# Delete document
+DELETE /api/admin/documents/{doc_id}
+# Response: "Document 'test.pdf' deleted successfully. 2 chat(s) reference this document"
+
+# Ask in chat with deleted docs
+POST /api/chats/{chat_id}/ask
+{
+  "question": "What is this about?"
+}
+# Response: "I cannot answer questions for this chat because all associated
+#            documents have been deleted. Please add new documents to continue."
+
+# Chat with mixed documents (some deleted)
+# Uses only available documents automatically
+```
+
+**Benefits:**
+- Chat history preserved (audit trail of what docs were used)
+- No confusing "no information found" errors
+- Automatic filtering prevents RAG pipeline errors
+- Frontend can show "X documents deleted" warnings
+
+**Test Coverage:**
+- All 107 tests passing ✅
+- Comprehensive deleted document test suite
+- Integration tests for RAG pipeline with deleted docs
 
 ---
 
@@ -64,30 +136,6 @@ The platform is fully functional for basic RAG-based document Q&A with document 
 2. `backend/src/vector_store.py` - Added `MatchAny` filter support
 3. `backend/src/qa_engine.py` - Updated `answer_question()` to accept `doc_ids`
 4. `backend/api/routers/query.py` - Pass `doc_ids` from request to QA engine
-
-**API Examples:**
-
-```bash
-# Search all documents (default behavior)
-POST /api/query/ask
-{
-  "question": "What is habit stacking?"
-}
-
-# Search specific document
-POST /api/query/ask
-{
-  "question": "What are the FX5U models?",
-  "doc_ids": ["de2c1151-6401-4659-b03b-1d9d1da9ef1c"]
-}
-
-# Search multiple documents
-POST /api/query/ask
-{
-  "question": "Compare concepts from both books",
-  "doc_ids": ["doc-id-1", "doc-id-2"]
-}
-```
 
 **Benefits:**
 - Prevents cross-contamination from irrelevant documents
@@ -209,14 +257,39 @@ POST /api/query/ask
 
 ## 🧪 Testing Status
 
-- [x] Manual testing of upload endpoint
-- [x] Manual testing of query endpoint
-- [x] Manual testing of document filtering
-- [ ] Unit tests for chunker
-- [ ] Unit tests for embedder
-- [ ] Unit tests for vector store
-- [ ] Integration tests for RAG pipeline
+**Test Suite: 107 tests, all passing ✅**
+
+### API Tests
+- [x] Health check endpoint
+- [x] Document upload, list, get, delete
+- [x] Chat creation, listing, retrieval
+- [x] Chat rename and deletion
+- [x] Ask questions in chat context
+- [x] Message persistence
+- [x] Legacy query endpoint
+
+### Feature Tests
+- [x] BM25 index (17 tests)
+- [x] Hybrid search (13 tests)
+- [x] QA guardrails (14 tests)
+- [x] RAG pipeline integration (16 tests)
+- [x] Reranker functionality (14 tests)
+- [x] Deleted documents handling (14 tests)
+
+### Coverage
+- [x] All API endpoints tested
+- [x] Success cases (200, 201)
+- [x] Error cases (400, 404, 422, 500)
+- [x] Data persistence verified
+- [x] Edge cases (empty queries, deleted docs, etc.)
+
+### Manual Testing
+- [x] Document upload via curl/Postman
+- [x] Query endpoint with filtering
+- [x] Chat workflows
+- [x] PDF viewing in browser
 - [ ] Load testing for concurrent queries
+- [ ] Performance benchmarking
 
 ---
 
@@ -235,6 +308,10 @@ POST /api/query/ask
 ## 🐛 Known Issues
 
 None currently! 🎉
+
+**Recently Fixed:**
+- ✅ Deleted documents breaking chat queries (Jan 22)
+- ✅ QA engine sources format inconsistency (Jan 22)
 
 ---
 
@@ -265,10 +342,10 @@ None currently! 🎉
 **For next session:**
 
 1. **To continue development**: `docker-compose up -d` and navigate to backend
-2. **Recent context**: We just added document filtering feature - allows searching specific docs via `doc_ids` parameter
-3. **Suggested next task**: Build frontend UI or add DOCX/HTML support
-4. **Testing**: All current features tested manually via curl/Postman
-5. **No blockers**: System is stable and ready for next features
+2. **Recent context**: Just fixed deleted document handling - chats now gracefully handle deleted docs with soft delete pattern
+3. **Test Suite**: 107 tests all passing ✅
+4. **Suggested next task**: Build frontend UI (React + TypeScript) or add more document formats
+5. **No blockers**: System is stable and production-ready for MVP use case
 
 **Commands to resume:**
 
