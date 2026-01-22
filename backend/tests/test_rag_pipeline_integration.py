@@ -18,7 +18,16 @@ def embedder():
 @pytest.fixture
 def vector_store():
     """VectorStore instance."""
-    store = VectorStore(collection_name="test_rag_pipeline")
+    import os
+    # Use environment variables for host/port (Docker compatibility)
+    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+
+    store = VectorStore(
+        host=qdrant_host,
+        port=qdrant_port,
+        collection_name="test_rag_pipeline"
+    )
     yield store
     # Cleanup
     try:

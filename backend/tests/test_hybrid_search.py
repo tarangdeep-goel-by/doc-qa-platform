@@ -15,8 +15,17 @@ def embedder():
 @pytest.fixture
 def vector_store():
     """VectorStore instance for testing."""
+    import os
+    # Use environment variables for host/port (Docker compatibility)
+    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+
     # Use test collection name
-    store = VectorStore(collection_name="test_hybrid_search")
+    store = VectorStore(
+        host=qdrant_host,
+        port=qdrant_port,
+        collection_name="test_hybrid_search"
+    )
     yield store
     # Cleanup - delete test collection
     try:
@@ -289,16 +298,24 @@ class TestHybridSearch:
 
     def test_bm25_index_cache_persistence(self, vector_store, embedder, sample_documents):
         """Test that BM25 index cache persists."""
+        import os
+
         # Rebuild to create cache
         vector_store.rebuild_bm25_index()
 
         # Check cache was saved
-        import os
         cache_file = os.path.join(vector_store.bm25_index.cache_dir, "bm25_index.pkl")
         assert os.path.exists(cache_file)
 
         # Create new vector store and load cache
-        new_store = VectorStore(collection_name="test_hybrid_search")
+        qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+        qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+
+        new_store = VectorStore(
+            host=qdrant_host,
+            port=qdrant_port,
+            collection_name="test_hybrid_search"
+        )
         loaded = new_store.bm25_index.load_cache()
 
         # Should load successfully
