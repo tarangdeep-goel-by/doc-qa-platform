@@ -124,6 +124,8 @@ class ChatDetailResponse(BaseModel):
     """Detailed chat with messages."""
     chat: ChatResponse
     messages: List[MessageResponse]
+    missing_documents: List[str] = Field(default_factory=list, description="Document IDs that no longer exist")
+    available_documents: List[Dict[str, str]] = Field(default_factory=list, description="Documents that are still available")
 
 
 class AskInChatRequest(BaseModel):

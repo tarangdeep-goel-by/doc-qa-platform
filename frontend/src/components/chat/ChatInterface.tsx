@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/appStore'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessageItem } from './ChatMessageItem'
 import { MessageInput } from '../MessageInput'
+import { AlertCircle } from 'lucide-react'
 
 export function ChatInterface() {
   const { chatId } = useParams()
@@ -38,6 +39,30 @@ export function ChatInterface() {
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
       <ChatHeader chat={activeChat} />
+
+      {/* Deleted Documents Warning */}
+      {activeChat.missing_documents && activeChat.missing_documents.length > 0 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-fluid-md mx-fluid-lg mt-fluid-md">
+          <div className="flex items-start gap-fluid-sm">
+            <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-sans text-fluid-sm text-yellow-700 font-medium">
+                {activeChat.missing_documents.length} document(s) from this chat have been deleted
+              </p>
+              {activeChat.available_documents && activeChat.available_documents.length > 0 ? (
+                <p className="font-sans text-fluid-sm text-yellow-700 mt-fluid-xs">
+                  Questions will use the {activeChat.available_documents.length} remaining document(s): {' '}
+                  {activeChat.available_documents.map(d => d.title).join(', ')}
+                </p>
+              ) : (
+                <p className="font-sans text-fluid-sm text-yellow-700 mt-fluid-xs">
+                  This chat has no documents available. Consider adding new documents or archiving this chat.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-fluid-lg py-fluid-md">

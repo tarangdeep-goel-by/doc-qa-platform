@@ -73,11 +73,26 @@ async def list_chats(request: Request):
 async def get_chat(request: Request, chat_id: str):
     """Get chat details with all messages."""
     chat_manager = request.app.state.chat_manager
+    document_store = request.app.state.document_store
 
     chat, messages = chat_manager.get_chat(chat_id)
 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+
+    # Validate documents still exist
+    missing_docs = []
+    available_docs = []
+
+    for doc_id in chat.doc_ids:
+        doc = document_store.get_document(doc_id)
+        if doc:
+            available_docs.append({
+                "doc_id": doc.doc_id,
+                "title": doc.title
+            })
+        else:
+            missing_docs.append(doc_id)
 
     chat_response = ChatResponse(
         id=chat.id,
@@ -103,7 +118,9 @@ async def get_chat(request: Request, chat_id: str):
 
     return ChatDetailResponse(
         chat=chat_response,
-        messages=message_responses
+        messages=message_responses,
+        missing_documents=missing_docs,
+        available_documents=available_docs
     )
 
 
