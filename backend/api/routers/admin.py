@@ -198,6 +198,7 @@ async def delete_document(request: Request, doc_id: str):
     """Delete a document and its chunks from the system."""
     vector_store = request.app.state.vector_store
     document_store = request.app.state.document_store
+    chat_manager = request.app.state.chat_manager
 
     # Get document metadata
     doc = document_store.get_document(doc_id)
@@ -219,9 +220,25 @@ async def delete_document(request: Request, doc_id: str):
         document_store.delete_document(doc_id)
         print(f"Deleted document metadata: {doc_id}")
 
+        # Update all chats to remove this doc_id
+        all_chats = chat_manager.list_chats()
+        chats_updated = 0
+
+        for chat in all_chats:
+            if doc_id in chat.doc_ids:
+                # Remove the doc_id from the chat
+                chat.doc_ids = [id for id in chat.doc_ids if id != doc_id]
+                # Save the updated chat
+                chat_manager.save_chat(chat)
+                chats_updated += 1
+
+        message = f"Document '{doc.title}' deleted successfully"
+        if chats_updated > 0:
+            message += f". Updated {chats_updated} chat(s)"
+
         return DeleteResponse(
             success=True,
-            message=f"Document '{doc.title}' deleted successfully"
+            message=message
         )
 
     except Exception as e:

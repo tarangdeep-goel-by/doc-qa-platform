@@ -38,6 +38,8 @@ export interface Chat {
   created_at: string
   updated_at: string
   message_count: number
+  missing_documents?: string[]
+  available_documents?: { doc_id: string; title: string }[]
 }
 
 export interface ChatMessage {
