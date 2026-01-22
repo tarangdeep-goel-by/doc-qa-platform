@@ -32,6 +32,8 @@ wheels/
 backend/data/uploads/*
 !backend/data/uploads/.gitkeep
 backend/data/documents.json
+backend/data/chats/
+backend/data/bm25/
 
 # Qdrant storage
 qdrant_storage/
