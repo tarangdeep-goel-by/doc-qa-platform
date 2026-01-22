@@ -420,14 +420,26 @@ class TestErrorCases:
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """Setup test environment before running tests."""
+    import time
+
     print("\n=== Setting up test environment ===")
 
-    # Check if backend is running
-    try:
-        response = requests.get(f"{BASE_URL}/health", timeout=5)
-        print(f"Backend is running at {BASE_URL}")
-    except requests.exceptions.ConnectionError:
-        pytest.exit(f"Backend is not running at {BASE_URL}. Start it with: python run_api.py")
+    # Check if backend is running (retry with timeout for Docker startup)
+    max_retries = 30  # 30 seconds total
+    retry_delay = 1  # 1 second between retries
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(f"{BASE_URL}/health", timeout=2)
+            if response.status_code == 200:
+                print(f"✓ Backend is running at {BASE_URL}")
+                break
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt < max_retries - 1:
+                print(f"  Waiting for backend to start... ({attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+            else:
+                pytest.exit(f"Backend did not start at {BASE_URL} after {max_retries} seconds. Check logs with: docker-compose logs backend")
 
     # Create test fixtures directory
     fixtures_dir = Path("tests/fixtures")
