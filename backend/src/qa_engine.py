@@ -39,6 +39,43 @@ class QAEngine:
         # Initialize reranker if enabled
         self.reranker = Reranker() if use_reranker else None
 
+    def _expand_query(self, question: str, num_variants: int = 2) -> List[str]:
+        """
+        Generate alternative phrasings of the question to improve recall.
+
+        Args:
+            question: Original user question
+            num_variants: Number of alternative phrasings to generate
+
+        Returns:
+            List of query variants [original, variant1, variant2, ...]
+        """
+        try:
+            prompt = f"""Generate {num_variants} alternative ways to phrase this question.
+Keep the core intent but use different words, synonyms, or perspectives.
+Each variant should be concise and clear.
+
+Question: {question}
+
+Return ONLY the {num_variants} variants, one per line, without numbering or additional text."""
+
+            response = self.model.generate_content(prompt)
+            variants_text = response.text.strip()
+
+            # Parse variants (one per line)
+            variants = [v.strip() for v in variants_text.split('\n') if v.strip()]
+
+            # Limit to requested number
+            variants = variants[:num_variants]
+
+            # Return original + variants
+            return [question] + variants
+
+        except Exception as e:
+            # If expansion fails, fall back to original query only
+            print(f"Warning: Query expansion failed: {e}")
+            return [question]
+
     def answer_question(
         self,
         question: str,
@@ -48,7 +85,11 @@ class QAEngine:
         use_hybrid: bool = True,
         hybrid_alpha: float = 0.5,
         use_reranking: bool = True,
-        min_score: float = 0.3
+        min_score: float = 0.3,
+        use_query_expansion: bool = False,
+        query_expansion_variants: int = 2,
+        use_rrf: bool = True,
+        rerank_blending: str = "position_aware"
     ) -> Dict[str, Any]:
         """
         Answer a question using RAG pipeline.
@@ -62,37 +103,65 @@ class QAEngine:
             hybrid_alpha: Weight for hybrid search (0=all BM25, 1=all vector, 0.5=balanced)
             use_reranking: Whether to rerank results with cross-encoder
             min_score: Minimum confidence score threshold (0-1)
+            use_query_expansion: Whether to generate alternative query phrasings (improves recall)
+            query_expansion_variants: Number of alternative phrasings to generate
+            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
+            rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
 
         Returns:
             Dictionary with answer and sources
         """
-        # Step 1: Embed the question
-        query_embedding = self.embedder.embed_text(question)
+        # Step 1: Query expansion (if enabled)
+        if use_query_expansion:
+            query_variants = self._expand_query(question, num_variants=query_expansion_variants)
+            # Weight original query 2×, variants 1× each
+            query_weights = [2.0] + [1.0] * query_expansion_variants
+        else:
+            query_variants = [question]
+            query_weights = [1.0]
 
-        # Step 2: Retrieve relevant chunks (get more candidates if reranking)
+        # Step 2: Embed all query variants
+        query_embeddings = [self.embedder.embed_text(q) for q in query_variants]
+
+        # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
 
-        if use_hybrid:
-            search_results = self.vector_store.hybrid_search(
-                query_vector=query_embedding,
-                query_text=question,
+        if use_query_expansion and len(query_variants) > 1:
+            # Multi-query search with fusion
+            search_results = self.vector_store.multi_query_hybrid_search(
+                query_variants=query_variants,
+                query_embeddings=query_embeddings,
+                query_weights=query_weights,
                 top_k=retrieval_k,
                 doc_ids=doc_ids,
-                alpha=hybrid_alpha
+                alpha=hybrid_alpha,
+                use_rrf=use_rrf
+            )
+        elif use_hybrid:
+            # Single query hybrid search
+            search_results = self.vector_store.hybrid_search(
+                query_vector=query_embeddings[0],
+                query_text=query_variants[0],
+                top_k=retrieval_k,
+                doc_ids=doc_ids,
+                alpha=hybrid_alpha,
+                use_rrf=use_rrf
             )
         else:
+            # Single query vector search
             search_results = self.vector_store.search(
-                query_vector=query_embedding,
+                query_vector=query_embeddings[0],
                 top_k=retrieval_k,
                 doc_ids=doc_ids
             )
 
         # Step 2.5: Rerank if enabled
         if use_reranking and self.reranker and search_results:
-            search_results = self.reranker.rerank(
+            search_results = self.reranker.rerank_with_position_blending(
                 query=question,
                 chunks=search_results,
-                top_k=top_k
+                top_k=top_k,
+                blend_strategy=rerank_blending
             )
 
         # Step 2.6: Check if we have confident results
