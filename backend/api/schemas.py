@@ -59,6 +59,14 @@ class QueryRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
     doc_ids: Optional[List[str]] = Field(default=None, description="Optional list of document IDs to filter search")
 
+    # Advanced RAG options (optional - defaults from env if not provided)
+    use_hybrid: Optional[bool] = Field(default=None, description="Use hybrid search (vector + BM25)")
+    hybrid_alpha: Optional[float] = Field(default=None, ge=0, le=1, description="Hybrid weight (0=BM25, 1=vector)")
+    use_reranking: Optional[bool] = Field(default=None, description="Use cross-encoder reranking")
+    use_query_expansion: Optional[bool] = Field(default=None, description="Generate alternative query phrasings")
+    use_rrf: Optional[bool] = Field(default=None, description="Use Reciprocal Rank Fusion")
+    rerank_blending: Optional[str] = Field(default=None, description="Reranking blend strategy: 'position_aware' or 'replace'")
+
 
 # Source Information
 class SourceInfo(BaseModel):

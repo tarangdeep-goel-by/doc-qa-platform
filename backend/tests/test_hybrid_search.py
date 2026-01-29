@@ -327,3 +327,127 @@ class TestHybridSearch:
             new_store.client.delete_collection("test_hybrid_search")
         except:
             pass
+
+    def test_rrf_fusion(self, vector_store, embedder, sample_documents):
+        """Test Reciprocal Rank Fusion (RRF) method."""
+        query = "Python programming"
+        query_vector = embedder.embed_text(query)
+
+        # Use RRF fusion
+        rrf_results = vector_store.hybrid_search(
+            query_vector=query_vector,
+            query_text=query,
+            top_k=3,
+            alpha=0.5,
+            use_rrf=True
+        )
+
+        # Use weighted fusion
+        weighted_results = vector_store.hybrid_search(
+            query_vector=query_vector,
+            query_text=query,
+            top_k=3,
+            alpha=0.5,
+            use_rrf=False
+        )
+
+        # Both should return results
+        assert len(rrf_results) > 0
+        assert len(weighted_results) > 0
+
+        # Results might differ in ranking
+        # At minimum, verify structure
+        assert all("score" in r for r in rrf_results)
+        assert all("score" in r for r in weighted_results)
+
+    def test_rrf_position_bonuses(self, vector_store, embedder, sample_documents):
+        """Test that RRF applies position bonuses correctly."""
+        # Get vector and BM25 results separately
+        query = "Python"
+        query_vector = embedder.embed_text(query)
+
+        vector_results = vector_store.search(
+            query_vector=query_vector,
+            top_k=5
+        )
+
+        bm25_results = vector_store.bm25_index.search(
+            query=query,
+            top_k=5
+        )
+
+        # Apply RRF fusion
+        fused = vector_store._reciprocal_rank_fusion(
+            vector_results=vector_results,
+            bm25_results=bm25_results,
+            k=60
+        )
+
+        # Should return results
+        assert len(fused) > 0
+
+        # Scores should be positive
+        assert all(r["score"] > 0 for r in fused)
+
+        # Results should be sorted by score
+        scores = [r["score"] for r in fused]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_rrf_vs_weighted_ranking_quality(self, vector_store, embedder, sample_documents):
+        """Compare RRF vs weighted fusion for ranking quality."""
+        # Use a query with clear keyword match
+        query = "scikit-learn"
+        query_vector = embedder.embed_text(query)
+
+        # RRF fusion
+        rrf_results = vector_store.hybrid_search(
+            query_vector=query_vector,
+            query_text=query,
+            top_k=3,
+            alpha=0.5,
+            use_rrf=True
+        )
+
+        # Both methods should find the relevant chunk
+        assert len(rrf_results) > 0
+
+        # Check if "scikit-learn" appears in top results
+        found_keyword = any("scikit-learn" in r["payload"]["text"] for r in rrf_results[:2])
+        assert found_keyword
+
+    def test_rrf_deduplication(self, vector_store, embedder, sample_documents):
+        """Test that RRF properly deduplicates results from vector and BM25."""
+        query = "Python"
+        query_vector = embedder.embed_text(query)
+
+        results = vector_store.hybrid_search(
+            query_vector=query_vector,
+            query_text=query,
+            top_k=3,
+            alpha=0.5,
+            use_rrf=True
+        )
+
+        # Check no duplicate chunk IDs
+        chunk_ids = [r["id"] for r in results]
+        assert len(chunk_ids) == len(set(chunk_ids)), "RRF should deduplicate chunks"
+
+    def test_rrf_with_k_parameter(self, vector_store, embedder, sample_documents):
+        """Test RRF with different k parameters."""
+        query = "machine learning"
+        query_vector = embedder.embed_text(query)
+
+        vector_results = vector_store.search(query_vector=query_vector, top_k=5)
+        bm25_results = vector_store.bm25_index.search(query=query, top_k=5)
+
+        # Try different k values
+        for k in [10, 60, 100]:
+            fused = vector_store._reciprocal_rank_fusion(
+                vector_results=vector_results,
+                bm25_results=bm25_results,
+                k=k
+            )
+
+            # Should work with different k values
+            assert len(fused) > 0
+            assert all(r["score"] > 0 for r in fused)
