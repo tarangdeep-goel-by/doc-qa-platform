@@ -4,20 +4,40 @@ A RAG (Retrieval Augmented Generation) platform for uploading large documents an
 
 ## Features
 
-- **Document Upload**: Upload PDF documents (support for DOCX, HTML, TXT coming soon)
+### Core Functionality
+- **Document Upload**: Upload PDF documents with automatic processing and indexing
 - **Smart Chunking**: Intelligent text chunking with overlap for better context
-- **Semantic Search**: Fast vector search using Qdrant
+- **Multi-Chat System**: Create multiple chat sessions with different document sets
+- **Chat Persistence**: All conversations saved with full message history
+
+### Advanced Search
+- **Hybrid Search**: Combines vector similarity (semantic) + BM25 (keyword) search
+- **Reranking**: Cross-encoder reranking for improved result relevance
 - **Document Filtering**: Search within specific documents or across all documents
-- **AI-Powered Q&A**: Answer questions using Google Gemini 2.0 Flash
-- **Source Citations**: Every answer includes source documents and relevance scores
+- **Confidence Thresholds**: Configurable minimum score for answer quality
+
+### AI & Citations
+- **AI-Powered Q&A**: Answer questions using Google Gemini 2.5 Flash
+- **Source Citations**: Every answer includes source documents with page numbers
+- **Clickable PDF Links**: View exact source pages in browser
+- **Context-Aware**: Maintains conversation history within each chat
+
+### Robustness
+- **Deleted Document Handling**: Graceful handling when documents are removed
+- **Error Messaging**: Clear, actionable error messages for users
+- **Comprehensive Testing**: 107 automated tests ensuring reliability
 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python)
+- **Frontend**: React + TypeScript with Zustand state management
 - **Vector DB**: Qdrant (self-hosted via Docker)
-- **Embeddings**: sentence-transformers/all-MiniLM-L6-v2 (local, free)
-- **LLM**: Google Gemini 2.0 Flash
+- **Embeddings**: sentence-transformers/all-MiniLM-L6-v2 (384-dim, local)
+- **LLM**: Google Gemini 2.5 Flash
+- **Reranker**: cross-encoder/ms-marco-MiniLM-L-6-v2
+- **Keyword Search**: BM25 (rank-bm25)
 - **Document Processing**: PyPDF2
+- **Testing**: Pytest (107 tests)
 
 ## Quick Start
 
@@ -145,16 +165,26 @@ curl -X DELETE http://localhost:8000/api/admin/documents/{doc_id}
 
 ## API Endpoints
 
+### Chat Endpoints (`/api/chats`)
+
+- `POST /api/chats` - Create new chat session
+- `GET /api/chats` - List all chats
+- `GET /api/chats/{chat_id}` - Get chat with messages
+- `POST /api/chats/{chat_id}/ask` - Ask question in chat context
+- `PUT /api/chats/{chat_id}/rename` - Rename chat
+- `DELETE /api/chats/{chat_id}` - Delete chat
+
 ### Admin Endpoints (`/api/admin`)
 
 - `POST /api/admin/upload` - Upload a document
 - `GET /api/admin/documents` - List all documents
 - `GET /api/admin/documents/{doc_id}` - Get document details
+- `GET /api/admin/documents/{doc_id}/file` - Download/view PDF
 - `DELETE /api/admin/documents/{doc_id}` - Delete a document
 
 ### Query Endpoints (`/api/query`)
 
-- `POST /api/query/ask` - Ask a question (optional `doc_ids` filter)
+- `POST /api/query/ask` - Ask a question (legacy, optional `doc_ids` filter)
 - `GET /api/query/documents` - List available documents
 
 ### System Endpoints
@@ -217,11 +247,16 @@ Edit `backend/.env` to configure:
 
 ### Query Pipeline (RAG)
 
-1. **Embed Query** → Question converted to vector
-2. **Search** → Find top-5 most similar chunks in Qdrant
-3. **Retrieve** → Get chunk text + metadata
-4. **Generate** → Send context + question to Gemini
-5. **Return** → Answer + source citations
+1. **Embed Query** → Question converted to 384-dim vector
+2. **Hybrid Search** →
+   - Vector search (semantic similarity)
+   - BM25 search (keyword matching)
+   - Fusion with weighted scoring (default: 50/50)
+3. **Reranking** → Cross-encoder reranks results for relevance
+4. **Quality Check** → Filter results below confidence threshold
+5. **Retrieve** → Get chunk text + metadata + page numbers
+6. **Generate** → Send context + question to Gemini with chat history
+7. **Return** → Answer + source citations with page links
 
 ## Performance
 
@@ -240,6 +275,32 @@ python run_api.py
 ```
 
 The API will auto-reload on code changes.
+
+### Run Tests
+
+**Run all 107 tests:**
+```bash
+docker-compose run --rm test
+```
+
+**Run specific test file:**
+```bash
+docker-compose run --rm test pytest tests/test_api.py -v
+```
+
+**Run with coverage:**
+```bash
+docker-compose run --rm test pytest --cov=src --cov-report=html
+```
+
+**Test categories:**
+- API endpoints (19 tests)
+- BM25 index (17 tests)
+- Hybrid search (13 tests)
+- QA guardrails (14 tests)
+- RAG pipeline (16 tests)
+- Reranker (14 tests)
+- Deleted documents (14 tests)
 
 ### View Qdrant Dashboard
 
@@ -281,16 +342,27 @@ The first run will download the embedding model (~100MB). Ensure you have intern
 
 If processing very large documents, reduce `CHUNK_SIZE` in `.env`.
 
+## Completed Features ✅
+
+- ✅ Frontend UI (React + TypeScript)
+- ✅ Multi-chat system with conversation history
+- ✅ Hybrid search (vector + BM25)
+- ✅ Reranking with cross-encoder
+- ✅ Page number tracking and clickable citations
+- ✅ Document filtering per chat
+- ✅ Deleted document handling
+- ✅ Comprehensive test suite (107 tests)
+
 ## Future Enhancements
 
 - [ ] Support DOCX, HTML, TXT formats
-- [ ] User authentication
+- [ ] User authentication & authorization
 - [ ] Document versioning
-- [ ] Question history
-- [ ] Export Q&A sessions
-- [ ] Frontend UI (React + TypeScript)
-- [ ] Multi-document search with advanced filters
+- [ ] Export Q&A sessions (PDF, Markdown)
 - [ ] Document metadata filtering (date, type, tags)
+- [ ] Advanced analytics and usage tracking
+- [ ] Multi-language support
+- [ ] Mobile-responsive UI improvements
 
 ## License
 
