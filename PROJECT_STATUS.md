@@ -1,6 +1,6 @@
 # Project Status - Document Q&A Platform
 
-**Last Updated**: January 29, 2026
+**Last Updated**: January 31, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
 
@@ -8,7 +8,7 @@ This document tracks implementation progress, recent changes, and next steps for
 
 ## 🎯 Current Status: Enhanced RAG with QMD-Inspired Optimizations
 
-The platform is fully functional with multi-chat conversations, robust deleted document handling, and now includes advanced retrieval optimizations inspired by QMD (Query Expansion, RRF, Position-Aware Reranking).
+The platform is fully functional with multi-chat conversations, robust deleted document handling, and now includes advanced retrieval optimizations inspired by QMD (Query Expansion, RRF, Position-Aware Reranking). All features have comprehensive test coverage.
 
 ---
 
@@ -73,6 +73,52 @@ The platform is fully functional with multi-chat conversations, robust deleted d
 ### Query Endpoints
 - [x] `POST /api/query/ask` - Ask questions with optional document filtering
 - [x] `GET /api/query/documents` - List available documents
+
+---
+
+## 🆕 Recent Changes (January 31, 2026)
+
+### Document Chat Count Feature Tests
+
+**What was implemented:**
+Added comprehensive test coverage for the document chat count feature in `/api/query/documents` endpoint.
+
+**New Test Class: TestQueryDocuments**
+Created 5 test cases covering all edge cases:
+
+1. **test_query_documents_basic** - Validates endpoint returns correct structure
+   - Verifies all fields present: doc_id, title, chat_count, chats, etc.
+   - Confirms data types are correct
+
+2. **test_query_documents_no_chats** - Document with no associated chats
+   - Verifies chat_count = 0
+   - Verifies chats = []
+
+3. **test_query_documents_single_chat** - Document used in exactly 1 chat
+   - Verifies chat_count = 1
+   - Verifies chat details (id, name) are correct
+
+4. **test_query_documents_multiple_chats** - Document used in 3 chats
+   - Verifies chat_count = 3
+   - Verifies all chat IDs present in response
+
+5. **test_query_documents_mixed_usage** - Multiple documents with different usage
+   - Document A in chats 1 and 3 → chat_count = 2
+   - Document B in chats 2 and 3 → chat_count = 2
+   - Verifies selective counting per document
+
+**Files Modified:**
+- `backend/tests/test_api.py` - Added TestQueryDocuments class with 5 tests (+208 lines)
+
+**Test Results:**
+- All 24 API integration tests passing ✅
+- Total test suite: 136 tests (131 → 136, +5 new tests)
+
+**Benefits:**
+- Complete test coverage for document-chat relationship tracking
+- Validates feature works across all usage patterns
+- Ensures no regressions in future changes
+- Follows existing test patterns (fixtures, cleanup, assertions)
 
 ---
 
@@ -372,9 +418,9 @@ POST /api/chats/{chat_id}/ask
 
 ## 🧪 Testing Status
 
-**Test Suite: 131 tests, all passing ✅**
+**Test Suite: 136 tests, all passing ✅**
 
-### API Tests
+### API Tests (24 tests)
 - [x] Health check endpoint
 - [x] Document upload, list, get, delete
 - [x] Chat creation, listing, retrieval
@@ -382,6 +428,7 @@ POST /api/chats/{chat_id}/ask
 - [x] Ask questions in chat context
 - [x] Message persistence
 - [x] Legacy query endpoint
+- [x] Document chat count feature (5 tests) - **NEW** ✨
 
 ### Feature Tests
 - [x] BM25 index (17 tests)
@@ -461,12 +508,11 @@ None currently! 🎉
 **For next session:**
 
 1. **To continue development**: `docker-compose up -d` and navigate to backend
-2. **Recent context**: Just implemented QMD-inspired RAG optimizations (~20-30% quality improvement)
-   - Query Expansion (LLM-based query variants)
-   - Reciprocal Rank Fusion (robust score fusion)
-   - Position-Aware Reranker Blending (context-sensitive scoring)
-3. **Test Suite**: 131 tests all passing ✅ (+24 new tests)
-4. **Latest commit**: `2d90cf4` - feat: Add QMD-inspired RAG optimizations
+2. **Recent context**:
+   - QMD-inspired RAG optimizations (~20-30% quality improvement) ✅
+   - Document chat count feature tests (5 new tests) ✅
+3. **Test Suite**: 136 tests all passing ✅
+4. **Latest commit**: `336e3ec` - test: Add comprehensive tests for document chat count feature
 5. **Suggested next task**: Build frontend UI (React + TypeScript) or add more document formats
 6. **No blockers**: System is stable and production-ready for MVP use case
 
