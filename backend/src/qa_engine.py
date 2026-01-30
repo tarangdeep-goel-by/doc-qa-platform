@@ -1,7 +1,7 @@
 """Question-answering engine using RAG (Retrieval Augmented Generation)."""
 
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
+from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
 from .reranker import Reranker
@@ -32,9 +32,8 @@ class QAEngine:
         self.vector_store = vector_store
         self.model_name = model_name
 
-        # Configure Gemini
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel(model_name)
+        # Create Gemini client (new SDK)
+        self.client = genai.Client(api_key=gemini_api_key)
 
         # Initialize reranker if enabled
         self.reranker = Reranker() if use_reranker else None
@@ -59,7 +58,10 @@ Question: {question}
 
 Return ONLY the {num_variants} variants, one per line, without numbering or additional text."""
 
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             variants_text = response.text.strip()
 
             # Parse variants (one per line)
@@ -279,7 +281,10 @@ Answer:"""
     def _generate_answer(self, prompt: str) -> str:
         """Generate answer using Gemini."""
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
             return f"Error generating answer: {str(e)}"
@@ -317,7 +322,10 @@ Answer:"""
         """Check if Gemini API is accessible."""
         try:
             # Try a simple generation
-            response = self.model.generate_content("Test")
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents="Test"
+            )
             return True
         except Exception:
             return False
