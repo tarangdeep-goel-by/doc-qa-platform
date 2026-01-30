@@ -16,6 +16,12 @@ class UploadResponse(BaseModel):
 
 
 # Document List Response
+class ChatUsageInfo(BaseModel):
+    """Information about a chat using a document."""
+    id: str
+    name: str
+
+
 class DocumentInfo(BaseModel):
     """Document information for listing."""
     doc_id: str
@@ -24,6 +30,8 @@ class DocumentInfo(BaseModel):
     file_size_mb: float
     chunk_count: int
     format: str
+    chat_count: int = Field(default=0, description="Number of chats using this document")
+    chats: List[ChatUsageInfo] = Field(default_factory=list, description="List of chats using this document")
 
 
 class DocumentListResponse(BaseModel):
@@ -50,6 +58,26 @@ class DeleteResponse(BaseModel):
     """Response after deleting a document."""
     success: bool
     message: str
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request to delete multiple documents."""
+    doc_ids: List[str] = Field(..., min_length=1, description="List of document IDs to delete")
+
+
+class DocumentDeleteResult(BaseModel):
+    """Result of deleting a single document."""
+    doc_id: str
+    success: bool
+    message: str
+
+
+class BulkDeleteResponse(BaseModel):
+    """Response after bulk deleting documents."""
+    results: List[DocumentDeleteResult]
+    total: int
+    successful: int
+    failed: int
 
 
 # Query Request
@@ -156,3 +184,23 @@ class DeleteChatResponse(BaseModel):
     """Response after deleting a chat."""
     success: bool
     message: str
+
+
+class BulkDeleteChatsRequest(BaseModel):
+    """Request to delete multiple chats."""
+    chat_ids: List[str] = Field(..., min_length=1, description="List of chat IDs to delete")
+
+
+class ChatDeleteResult(BaseModel):
+    """Result of deleting a single chat."""
+    chat_id: str
+    success: bool
+    message: str
+
+
+class BulkDeleteChatsResponse(BaseModel):
+    """Response after bulk deleting chats."""
+    results: List[ChatDeleteResult]
+    total: int
+    successful: int
+    failed: int

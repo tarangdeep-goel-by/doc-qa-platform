@@ -8,9 +8,19 @@ interface Props {
   chat: Chat
   isActive: boolean
   onClick: () => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelection?: () => void
 }
 
-export function ChatListItem({ chat, isActive, onClick }: Props) {
+export function ChatListItem({
+  chat,
+  isActive,
+  onClick,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelection
+}: Props) {
   const { deleteChat } = useAppStore()
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -23,21 +33,47 @@ export function ChatListItem({ chat, isActive, onClick }: Props) {
     }
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (selectionMode && onToggleSelection) {
+      e.stopPropagation()
+      onToggleSelection()
+    } else {
+      onClick()
+    }
+  }
+
   const timeAgo = formatDistanceToNow(new Date(chat.updated_at), { addSuffix: true })
 
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className={`
         group relative px-fluid-md py-fluid-sm rounded-lg cursor-pointer transition-colors
-        ${isActive
+        ${isActive && !selectionMode
           ? 'bg-burgundy/10 border border-burgundy/20'
+          : isSelected
+          ? 'bg-burgundy/5 border border-burgundy/30'
           : 'hover:bg-ink/5 border border-transparent'
         }
         ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
       `}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2">
+        {/* Checkbox in selection mode */}
+        {selectionMode && (
+          <div className="flex items-start pt-1">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => {
+                e.stopPropagation()
+                onToggleSelection?.()
+              }}
+              className="w-4 h-4 rounded border-ink/20 text-burgundy focus:ring-burgundy"
+            />
+          </div>
+        )}
+
         <div className="flex-1 min-w-0">
           <h3 className="font-sans text-fluid-sm text-ink font-medium truncate">
             {chat.name}
@@ -57,14 +93,17 @@ export function ChatListItem({ chat, isActive, onClick }: Props) {
           </div>
         </div>
 
-        {/* Delete button - show on hover */}
-        <button
-          onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded transition-opacity"
-          title="Delete chat"
-        >
-          <Trash2 className="w-4 h-4 text-red-500" />
-        </button>
+        {/* Delete button - hide in selection mode */}
+        {!selectionMode && (
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-red-500/10 rounded transition-colors"
+            title="Delete chat"
+            disabled={isDeleting}
+          >
+            <Trash2 className="w-4 h-4 text-red-500/70 hover:text-red-500" />
+          </button>
+        )}
       </div>
 
       {/* Document count indicator */}
