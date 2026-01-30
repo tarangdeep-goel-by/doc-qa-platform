@@ -94,21 +94,34 @@ async def ask_question(http_request: Request, query: QueryRequest):
 
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_available_documents(request: Request):
-    """List documents available for querying (same as admin endpoint)."""
+    """List documents available for querying with chat usage information."""
     document_store = request.app.state.document_store
+    chat_manager = request.app.state.chat_manager
 
     docs = document_store.list_documents()
+    all_chats = chat_manager.list_chats()
 
-    document_infos = [
-        DocumentInfo(
-            doc_id=doc.doc_id,
-            title=doc.title,
-            upload_date=doc.upload_date,
-            file_size_mb=doc.file_size_mb,
-            chunk_count=doc.chunk_count,
-            format=doc.format
+    document_infos = []
+    for doc in docs:
+        # Find chats that use this document
+        from api.schemas import ChatUsageInfo
+        doc_chats = [
+            ChatUsageInfo(id=chat.id, name=chat.name)
+            for chat in all_chats
+            if doc.doc_id in chat.doc_ids
+        ]
+
+        document_infos.append(
+            DocumentInfo(
+                doc_id=doc.doc_id,
+                title=doc.title,
+                upload_date=doc.upload_date,
+                file_size_mb=doc.file_size_mb,
+                chunk_count=doc.chunk_count,
+                format=doc.format,
+                chat_count=len(doc_chats),
+                chats=doc_chats
+            )
         )
-        for doc in docs
-    ]
 
     return DocumentListResponse(documents=document_infos)
