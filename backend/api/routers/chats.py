@@ -15,6 +15,9 @@ from api.schemas import (
     AskInChatResponse,
     RenameChatRequest,
     DeleteChatResponse,
+    BulkDeleteChatsRequest,
+    BulkDeleteChatsResponse,
+    ChatDeleteResult,
     SourceInfo
 )
 from src.models import ChatMessage
@@ -160,6 +163,67 @@ async def delete_chat(request: Request, chat_id: str):
     return DeleteChatResponse(
         success=True,
         message=f"Chat deleted successfully"
+    )
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteChatsResponse)
+async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsRequest):
+    """
+    Delete multiple chats at once.
+
+    Returns status for each chat deletion attempt.
+    """
+    chat_manager = request.app.state.chat_manager
+
+    results = []
+    successful = 0
+    failed = 0
+
+    for chat_id in bulk_request.chat_ids:
+        try:
+            # Get chat info for better error message
+            chat, _ = chat_manager.get_chat(chat_id)
+
+            if not chat:
+                results.append(ChatDeleteResult(
+                    chat_id=chat_id,
+                    success=False,
+                    message="Chat not found"
+                ))
+                failed += 1
+                continue
+
+            # Delete chat
+            success = chat_manager.delete_chat(chat_id)
+
+            if success:
+                results.append(ChatDeleteResult(
+                    chat_id=chat_id,
+                    success=True,
+                    message=f"'{chat.name}' deleted"
+                ))
+                successful += 1
+            else:
+                results.append(ChatDeleteResult(
+                    chat_id=chat_id,
+                    success=False,
+                    message="Delete failed"
+                ))
+                failed += 1
+
+        except Exception as e:
+            results.append(ChatDeleteResult(
+                chat_id=chat_id,
+                success=False,
+                message=f"Failed: {str(e)}"
+            ))
+            failed += 1
+
+    return BulkDeleteChatsResponse(
+        results=results,
+        total=len(bulk_request.chat_ids),
+        successful=successful,
+        failed=failed
     )
 
 

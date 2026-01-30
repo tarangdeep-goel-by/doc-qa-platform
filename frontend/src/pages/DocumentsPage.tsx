@@ -1,22 +1,31 @@
 import { useEffect, useState } from 'react'
-import { FileText, Upload, Trash2, ExternalLink } from 'lucide-react'
+import { FileText, Upload, Trash2, ExternalLink, MessageSquare } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppStore } from '../store/appStore'
 import { UploadModal } from '../components/modals/UploadModal'
+import * as api from '../api/client'
 import type { Document } from '../types'
 
 export function DocumentsPage() {
+  const navigate = useNavigate()
   const { documents, loadDocuments, deleteDocument } = useAppStore()
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   useEffect(() => {
     loadDocuments()
   }, [loadDocuments])
 
   const handleDelete = async (doc: Document) => {
-    if (!confirm(`Delete "${doc.title}"?\n\nThis will remove the document and all its chunks. Chats using this document will be updated.`)) {
+    const chatWarning = doc.chat_count > 0
+      ? `\n\nWarning: This document is used in ${doc.chat_count} chat(s).`
+      : ''
+
+    if (!confirm(`Delete "${doc.title}"?${chatWarning}\n\nThis will remove the document and all its chunks.`)) {
       return
     }
 
@@ -31,8 +40,62 @@ export function DocumentsPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedDocs.size === 0) return
+
+    const totalChats = documents
+      .filter(doc => selectedDocs.has(doc.doc_id))
+      .reduce((sum, doc) => sum + doc.chat_count, 0)
+
+    const chatWarning = totalChats > 0
+      ? `\n\nWarning: ${totalChats} chat(s) will be affected.`
+      : ''
+
+    if (!confirm(`Delete ${selectedDocs.size} document(s)?${chatWarning}\n\nThis action cannot be undone.`)) {
+      return
+    }
+
+    setIsBulkDeleting(true)
+    try {
+      const response = await api.bulkDeleteDocuments(Array.from(selectedDocs))
+
+      if (response.successful > 0) {
+        toast.success(`${response.successful} document(s) deleted successfully`)
+      }
+
+      if (response.failed > 0) {
+        toast.error(`${response.failed} document(s) failed to delete`)
+      }
+
+      // Reload documents
+      await loadDocuments()
+      setSelectedDocs(new Set())
+    } catch (error) {
+      toast.error('Bulk delete failed')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
+  const toggleSelection = (docId: string) => {
+    const newSelection = new Set(selectedDocs)
+    if (newSelection.has(docId)) {
+      newSelection.delete(docId)
+    } else {
+      newSelection.add(docId)
+    }
+    setSelectedDocs(newSelection)
+  }
+
+  const selectAll = () => {
+    if (selectedDocs.size === documents.length) {
+      setSelectedDocs(new Set())
+    } else {
+      setSelectedDocs(new Set(documents.map(doc => doc.doc_id)))
+    }
+  }
+
   const handleView = (doc: Document) => {
-    // Open document in new tab
     window.open(`/api/admin/documents/${doc.doc_id}/file`, '_blank')
   }
 
@@ -47,17 +110,55 @@ export function DocumentsPage() {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-fluid-lg py-fluid-md border-b border-ink/10">
-        <h1 className="font-display text-fluid-2xl text-ink font-semibold">
-          Documents
-        </h1>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-paper rounded-lg hover:bg-burgundy/90 transition-colors"
-        >
-          <Upload className="w-4 h-4" />
-          <span className="font-sans text-fluid-sm font-medium">Upload</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <h1 className="font-display text-fluid-2xl text-ink font-semibold">
+            Documents
+          </h1>
+          {documents.length > 0 && (
+            <span className="text-fluid-sm text-ink/60">
+              {documents.length} total
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedDocs.size > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="font-sans text-fluid-sm font-medium">
+                Delete {selectedDocs.size}
+              </span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-paper rounded-lg hover:bg-burgundy/90 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="font-sans text-fluid-sm font-medium">Upload</span>
+          </button>
+        </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {documents.length > 0 && (
+        <div className="px-fluid-lg py-fluid-sm border-b border-ink/10 bg-ink/5">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectedDocs.size === documents.length}
+              onChange={selectAll}
+              className="w-4 h-4 rounded border-ink/20 text-burgundy focus:ring-burgundy"
+            />
+            <span className="text-fluid-sm text-ink/70">
+              {selectedDocs.size === documents.length ? 'Deselect all' : 'Select all'}
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Documents List */}
       <div className="flex-1 overflow-y-auto">
@@ -83,16 +184,28 @@ export function DocumentsPage() {
             {documents.map(doc => {
               const uploadDate = formatDistanceToNow(new Date(doc.upload_date), { addSuffix: true })
               const isDeleting = deletingId === doc.doc_id
+              const isSelected = selectedDocs.has(doc.doc_id)
 
               return (
                 <div
                   key={doc.doc_id}
                   className={`
                     border border-ink/10 rounded-lg p-fluid-md hover:border-burgundy/30 transition-colors
-                    ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
+                    ${isDeleting || isBulkDeleting ? 'opacity-50 pointer-events-none' : ''}
+                    ${isSelected ? 'bg-burgundy/5 border-burgundy/30' : ''}
                   `}
                 >
-                  <div className="flex items-start justify-between gap-fluid-md">
+                  <div className="flex items-start gap-fluid-md">
+                    {/* Checkbox */}
+                    <div className="flex items-start pt-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelection(doc.doc_id)}
+                        className="w-4 h-4 rounded border-ink/20 text-burgundy focus:ring-burgundy"
+                      />
+                    </div>
+
                     {/* Document Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-fluid-xs">
@@ -102,13 +215,42 @@ export function DocumentsPage() {
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-fluid-md text-fluid-sm text-ink/60">
+                      <div className="flex items-center gap-fluid-md text-fluid-sm text-ink/60 mb-fluid-xs">
                         <span>{formatFileSize(doc.file_size_mb)}</span>
                         <span>•</span>
                         <span>{doc.chunk_count} chunks</span>
                         <span>•</span>
                         <span>{uploadDate}</span>
                       </div>
+
+                      {/* Chat Usage */}
+                      {doc.chat_count > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <MessageSquare className="w-4 h-4 text-burgundy/70" />
+                          <span className="text-fluid-xs text-burgundy/70 font-medium">
+                            Used in {doc.chat_count} chat{doc.chat_count > 1 ? 's' : ''}
+                          </span>
+                          {doc.chats.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {doc.chats.slice(0, 3).map(chat => (
+                                <button
+                                  key={chat.id}
+                                  onClick={() => navigate(`/chat/${chat.id}`)}
+                                  className="px-2 py-0.5 bg-burgundy/10 hover:bg-burgundy/20 text-burgundy text-fluid-xs rounded transition-colors"
+                                  title={`Go to ${chat.name}`}
+                                >
+                                  {chat.name}
+                                </button>
+                              ))}
+                              {doc.chats.length > 3 && (
+                                <span className="text-fluid-xs text-ink/50">
+                                  +{doc.chats.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Buttons */}

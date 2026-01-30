@@ -1,3 +1,8 @@
+export interface ChatUsageInfo {
+  id: string
+  name: string
+}
+
 export interface Document {
   doc_id: string
   title: string
@@ -5,6 +10,8 @@ export interface Document {
   file_size_mb: number
   chunk_count: number
   format: string
+  chat_count: number
+  chats: ChatUsageInfo[]
 }
 
 export interface Source {

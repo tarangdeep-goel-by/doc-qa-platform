@@ -98,6 +98,35 @@ export async function deleteChat(chatId: string): Promise<void> {
   }
 }
 
+export interface ChatDeleteResult {
+  chat_id: string
+  success: boolean
+  message: string
+}
+
+export interface BulkDeleteChatsResponse {
+  results: ChatDeleteResult[]
+  total: number
+  successful: number
+  failed: number
+}
+
+export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChatsResponse> {
+  const response = await fetch(`${API_BASE}/chats/bulk-delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ chat_ids: chatIds }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to bulk delete chats')
+  }
+
+  return response.json()
+}
+
 export async function askInChat(
   chatId: string,
   question: string,
@@ -156,6 +185,35 @@ export async function deleteDocument(docId: string): Promise<void> {
   if (!response.ok) {
     throw new Error('Failed to delete document')
   }
+}
+
+export interface DocumentDeleteResult {
+  doc_id: string
+  success: boolean
+  message: string
+}
+
+export interface BulkDeleteResponse {
+  results: DocumentDeleteResult[]
+  total: number
+  successful: number
+  failed: number
+}
+
+export async function bulkDeleteDocuments(docIds: string[]): Promise<BulkDeleteResponse> {
+  const response = await fetch(`${API_BASE}/admin/documents/bulk-delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ doc_ids: docIds }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to bulk delete documents')
+  }
+
+  return response.json()
 }
 
 // Utility function to open document at specific page

@@ -12,8 +12,12 @@ from api.schemas import (
     UploadResponse,
     DocumentListResponse,
     DocumentInfo,
+    ChatUsageInfo,
     DocumentDetailResponse,
-    DeleteResponse
+    DeleteResponse,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
+    DocumentDeleteResult
 )
 from src.models import DocumentMetadata, DocumentChunk
 from src.document_processor import DocumentProcessor
@@ -150,22 +154,34 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_documents(request: Request):
-    """List all uploaded documents."""
+    """List all uploaded documents with chat usage information."""
     document_store = request.app.state.document_store
+    chat_manager = request.app.state.chat_manager
 
     docs = document_store.list_documents()
+    all_chats = chat_manager.list_chats()
 
-    document_infos = [
-        DocumentInfo(
-            doc_id=doc.doc_id,
-            title=doc.title,
-            upload_date=doc.upload_date,
-            file_size_mb=doc.file_size_mb,
-            chunk_count=doc.chunk_count,
-            format=doc.format
+    document_infos = []
+    for doc in docs:
+        # Find chats that use this document
+        doc_chats = [
+            ChatUsageInfo(id=chat.id, name=chat.name)
+            for chat in all_chats
+            if doc.doc_id in chat.doc_ids
+        ]
+
+        document_infos.append(
+            DocumentInfo(
+                doc_id=doc.doc_id,
+                title=doc.title,
+                upload_date=doc.upload_date,
+                file_size_mb=doc.file_size_mb,
+                chunk_count=doc.chunk_count,
+                format=doc.format,
+                chat_count=len(doc_chats),
+                chats=doc_chats
+            )
         )
-        for doc in docs
-    ]
 
     return DocumentListResponse(documents=document_infos)
 
@@ -235,6 +251,76 @@ async def delete_document(request: Request, doc_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+
+@router.post("/documents/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_documents(request: Request, bulk_request: BulkDeleteRequest):
+    """
+    Delete multiple documents at once.
+
+    Returns status for each document deletion attempt.
+    """
+    vector_store = request.app.state.vector_store
+    document_store = request.app.state.document_store
+    chat_manager = request.app.state.chat_manager
+
+    results = []
+    successful = 0
+    failed = 0
+
+    for doc_id in bulk_request.doc_ids:
+        try:
+            # Get document metadata
+            doc = document_store.get_document(doc_id)
+
+            if not doc:
+                results.append(DocumentDeleteResult(
+                    doc_id=doc_id,
+                    success=False,
+                    message="Document not found"
+                ))
+                failed += 1
+                continue
+
+            # Delete from Qdrant
+            vector_store.delete_document(doc_id)
+
+            # Delete file from disk
+            if os.path.exists(doc.file_path):
+                os.remove(doc.file_path)
+
+            # Delete metadata
+            document_store.delete_document(doc_id)
+
+            # Count affected chats
+            all_chats = chat_manager.list_chats()
+            chats_affected = sum(1 for chat in all_chats if doc_id in chat.doc_ids)
+
+            message = f"'{doc.title}' deleted"
+            if chats_affected > 0:
+                message += f" ({chats_affected} chat(s) affected)"
+
+            results.append(DocumentDeleteResult(
+                doc_id=doc_id,
+                success=True,
+                message=message
+            ))
+            successful += 1
+
+        except Exception as e:
+            results.append(DocumentDeleteResult(
+                doc_id=doc_id,
+                success=False,
+                message=f"Failed: {str(e)}"
+            ))
+            failed += 1
+
+    return BulkDeleteResponse(
+        results=results,
+        total=len(bulk_request.doc_ids),
+        successful=successful,
+        failed=failed
+    )
 
 
 @router.get("/documents/{doc_id}/file")
