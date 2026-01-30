@@ -373,6 +373,214 @@ class TestLegacyQuery:
             assert "page_num" in source
 
 
+class TestQueryDocuments:
+    """Test /api/query/documents endpoint with chat usage information."""
+
+    @pytest.fixture
+    def uploaded_doc_id(self):
+        """Fixture that uploads a document and returns its ID."""
+        pdf_path = Path(TEST_PDF_PATH)
+        if not pdf_path.exists():
+            pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
+
+        with open(pdf_path, 'rb') as f:
+            files = {'file': (pdf_path.name, f, 'application/pdf')}
+            response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
+
+        assert response.status_code == 200
+        doc_id = response.json()["doc_id"]
+
+        yield doc_id
+
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
+
+    def test_query_documents_basic(self, uploaded_doc_id):
+        """Test GET /api/query/documents returns correct structure."""
+        response = requests.get(f"{BASE_URL}/api/query/documents")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "documents" in data
+        assert isinstance(data["documents"], list)
+
+        # Find our uploaded document
+        doc = None
+        for d in data["documents"]:
+            if d["doc_id"] == uploaded_doc_id:
+                doc = d
+                break
+
+        assert doc is not None, "Uploaded document not found in response"
+
+        # Verify all expected fields
+        assert "doc_id" in doc
+        assert "title" in doc
+        assert "upload_date" in doc
+        assert "file_size_mb" in doc
+        assert "chunk_count" in doc
+        assert "format" in doc
+        assert "chat_count" in doc
+        assert "chats" in doc
+
+        # Verify types
+        assert isinstance(doc["chat_count"], int)
+        assert isinstance(doc["chats"], list)
+
+    def test_query_documents_no_chats(self, uploaded_doc_id):
+        """Test document shows chat_count=0 when not used in any chat."""
+        response = requests.get(f"{BASE_URL}/api/query/documents")
+        assert response.status_code == 200
+
+        data = response.json()
+        doc = next((d for d in data["documents"] if d["doc_id"] == uploaded_doc_id), None)
+
+        assert doc is not None
+        assert doc["chat_count"] == 0
+        assert doc["chats"] == []
+
+    def test_query_documents_single_chat(self, uploaded_doc_id):
+        """Test document shows chat_count=1 when used in 1 chat."""
+        # Create chat with this document
+        chat_payload = {
+            "name": "Test Chat Single",
+            "doc_ids": [uploaded_doc_id]
+        }
+        chat_response = requests.post(f"{BASE_URL}/api/chats", json=chat_payload)
+        assert chat_response.status_code == 200
+        chat_id = chat_response.json()["id"]
+
+        try:
+            # Query documents
+            response = requests.get(f"{BASE_URL}/api/query/documents")
+            assert response.status_code == 200
+
+            data = response.json()
+            doc = next((d for d in data["documents"] if d["doc_id"] == uploaded_doc_id), None)
+
+            assert doc is not None
+            assert doc["chat_count"] == 1
+            assert len(doc["chats"]) == 1
+            assert doc["chats"][0]["id"] == chat_id
+            assert doc["chats"][0]["name"] == "Test Chat Single"
+
+        finally:
+            # Cleanup chat
+            requests.delete(f"{BASE_URL}/api/chats/{chat_id}")
+
+    def test_query_documents_multiple_chats(self, uploaded_doc_id):
+        """Test document shows chat_count=3 when used in 3 chats."""
+        chat_ids = []
+
+        try:
+            # Create 3 chats with this document
+            for i in range(3):
+                chat_payload = {
+                    "name": f"Test Chat {i+1}",
+                    "doc_ids": [uploaded_doc_id]
+                }
+                chat_response = requests.post(f"{BASE_URL}/api/chats", json=chat_payload)
+                assert chat_response.status_code == 200
+                chat_ids.append(chat_response.json()["id"])
+
+            # Query documents
+            response = requests.get(f"{BASE_URL}/api/query/documents")
+            assert response.status_code == 200
+
+            data = response.json()
+            doc = next((d for d in data["documents"] if d["doc_id"] == uploaded_doc_id), None)
+
+            assert doc is not None
+            assert doc["chat_count"] == 3
+            assert len(doc["chats"]) == 3
+
+            # Verify all chat IDs are present
+            returned_chat_ids = [c["id"] for c in doc["chats"]]
+            for chat_id in chat_ids:
+                assert chat_id in returned_chat_ids
+
+        finally:
+            # Cleanup chats
+            for chat_id in chat_ids:
+                requests.delete(f"{BASE_URL}/api/chats/{chat_id}")
+
+    def test_query_documents_mixed_usage(self):
+        """Test correct chat counts across multiple documents with different usage."""
+        pdf_path = Path(TEST_PDF_PATH)
+        if not pdf_path.exists():
+            pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
+
+        doc_ids = []
+        chat_ids = []
+
+        try:
+            # Upload 2 documents (with different filenames to avoid conflicts)
+            for i in range(2):
+                with open(pdf_path, 'rb') as f:
+                    # Use different filenames to avoid duplicate detection
+                    filename = f"test_doc_{i}.pdf"
+                    files = {'file': (filename, f, 'application/pdf')}
+                    response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
+                assert response.status_code == 200, f"Upload failed: {response.json()}"
+                doc_ids.append(response.json()["doc_id"])
+
+            doc_a, doc_b = doc_ids[0], doc_ids[1]
+
+            # Create chat 1 with doc A only
+            chat1_payload = {"name": "Chat A Only", "doc_ids": [doc_a]}
+            chat1_response = requests.post(f"{BASE_URL}/api/chats", json=chat1_payload)
+            assert chat1_response.status_code == 200
+            chat_ids.append(chat1_response.json()["id"])
+
+            # Create chat 2 with doc B only
+            chat2_payload = {"name": "Chat B Only", "doc_ids": [doc_b]}
+            chat2_response = requests.post(f"{BASE_URL}/api/chats", json=chat2_payload)
+            assert chat2_response.status_code == 200
+            chat_ids.append(chat2_response.json()["id"])
+
+            # Create chat 3 with both docs
+            chat3_payload = {"name": "Chat A+B", "doc_ids": [doc_a, doc_b]}
+            chat3_response = requests.post(f"{BASE_URL}/api/chats", json=chat3_payload)
+            assert chat3_response.status_code == 200
+            chat_ids.append(chat3_response.json()["id"])
+
+            # Query documents
+            response = requests.get(f"{BASE_URL}/api/query/documents")
+            assert response.status_code == 200
+
+            data = response.json()
+
+            # Find both documents
+            doc_a_data = next((d for d in data["documents"] if d["doc_id"] == doc_a), None)
+            doc_b_data = next((d for d in data["documents"] if d["doc_id"] == doc_b), None)
+
+            assert doc_a_data is not None
+            assert doc_b_data is not None
+
+            # Verify doc A has chat_count=2 (chats 1 and 3)
+            assert doc_a_data["chat_count"] == 2
+            assert len(doc_a_data["chats"]) == 2
+            doc_a_chat_ids = [c["id"] for c in doc_a_data["chats"]]
+            assert chat_ids[0] in doc_a_chat_ids  # Chat 1
+            assert chat_ids[2] in doc_a_chat_ids  # Chat 3
+
+            # Verify doc B has chat_count=2 (chats 2 and 3)
+            assert doc_b_data["chat_count"] == 2
+            assert len(doc_b_data["chats"]) == 2
+            doc_b_chat_ids = [c["id"] for c in doc_b_data["chats"]]
+            assert chat_ids[1] in doc_b_chat_ids  # Chat 2
+            assert chat_ids[2] in doc_b_chat_ids  # Chat 3
+
+        finally:
+            # Cleanup chats
+            for chat_id in chat_ids:
+                requests.delete(f"{BASE_URL}/api/chats/{chat_id}")
+
+            # Cleanup documents
+            for doc_id in doc_ids:
+                requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
+
+
 class TestErrorCases:
     """Test error handling."""
 
