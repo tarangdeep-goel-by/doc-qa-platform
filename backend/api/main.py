@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "384"))
     data_dir = os.getenv("DATA_DIR", "data")
     upload_dir = os.getenv("UPLOAD_DIR", "data/uploads")
+    use_reranking = os.getenv("USE_RERANKING", "true").lower() == "true"
 
     # Ensure directories exist
     os.makedirs(data_dir, exist_ok=True)
@@ -59,7 +60,8 @@ async def lifespan(app: FastAPI):
         embedder=embedder,
         vector_store=vector_store,
         gemini_api_key=gemini_api_key,
-        model_name=gemini_model
+        model_name=gemini_model,
+        use_reranker=use_reranking
     )
 
     # Store in app state

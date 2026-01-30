@@ -37,7 +37,7 @@ services:
       # RAG Improvements
       - USE_HYBRID_SEARCH=true
       - HYBRID_ALPHA=0.5
-      - USE_RERANKING=true
+      - USE_RERANKING=false
       - MIN_CONFIDENCE_SCORE=0.3
       - BM25_CACHE_DIR=data/bm25
       - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
