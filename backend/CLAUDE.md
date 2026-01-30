@@ -126,28 +126,6 @@ Position-Aware Blending
 Context Building + LLM Generation
 ```
 
-### Authentication & Authorization
-
-**JWT-based auth** (src/auth.py, api/routers/auth.py):
-- Access tokens: 30min default (configurable)
-- Refresh tokens: 7 days default
-- Bcrypt password hashing
-- User isolation: documents/chats tied to `user_id`
-
-**User Store:**
-- Simple JSON-based: `data/users.json`
-- Schema: `{user_id: {id, email, hashed_password, is_active, created_at}}`
-
-**Protected endpoints pattern:**
-```python
-from src.auth import verify_token, get_current_user
-
-@router.get("/protected")
-async def protected_route(current_user: dict = Depends(get_current_user)):
-    user_id = current_user["user_id"]
-    # Filter data by user_id
-```
-
 ### Document Processing Pipeline
 
 **Upload flow** (api/routers/admin.py:upload_document):
@@ -167,7 +145,6 @@ async def protected_route(current_user: dict = Depends(get_current_user)):
     "doc_id": "uuid",
     "doc_title": "document.pdf",
     "chunk_index": 0,
-    "user_id": "user-uuid",  # For multi-tenancy
     "page_number": 5,         # Optional, from PyPDF2
     "metadata": {...}         # PDF metadata
 }
@@ -198,9 +175,9 @@ results = vector_store.search(
 ### Chat Management
 
 **Chat sessions** (src/chat_manager.py):
-- Stored in `data/chats/{user_id}/{chat_id}.json`
-- Schema: `{id, user_id, title, created_at, updated_at, messages: []}`
-- Messages: `{id, question, answer, sources, timestamp}`
+- Stored in `data/chats/{chat_id}.json`
+- Schema: `{id, name, doc_ids, created_at, updated_at}`
+- Messages stored separately in chat file: `[{id, role, content, sources, timestamp}]`
 
 **Automatic title generation:**
 - Uses Gemini to generate concise title from first question
@@ -253,29 +230,23 @@ def base_url():
 
 @pytest.fixture
 def test_pdf():
-    # Generate test PDF or use fixture
     return "tests/fixtures/test.pdf"
-
-@pytest.fixture
-def auth_headers(base_url):
-    # Login and return auth headers
-    return {"Authorization": f"Bearer {token}"}
 ```
 
 **Integration test pattern:**
 ```python
-def test_upload_and_query(base_url, test_pdf, auth_headers):
+def test_upload_and_query(base_url, test_pdf):
     # Upload
-    response = requests.post(f"{base_url}/api/admin/upload",
-                            files={"file": open(test_pdf, "rb")},
-                            headers=auth_headers)
+    with open(test_pdf, 'rb') as f:
+        files = {'file': (test_pdf.name, f, 'application/pdf')}
+        response = requests.post(f"{base_url}/api/admin/upload", files=files)
+
     assert response.status_code == 200
     doc_id = response.json()["doc_id"]
 
     # Query
     response = requests.post(f"{base_url}/api/query/ask",
-                            json={"question": "test"},
-                            headers=auth_headers)
+                            json={"question": "test"})
     assert response.status_code == 200
     assert "answer" in response.json()
 ```
@@ -286,11 +257,6 @@ def test_upload_and_query(base_url, test_pdf, auth_headers):
 
 **Required:**
 - `GEMINI_API_KEY`: Must be set
-
-**Authentication:**
-- `JWT_SECRET_KEY`: Change in production (256-bit secret)
-- `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: Default 30
-- `JWT_REFRESH_TOKEN_EXPIRE_DAYS`: Default 7
 
 **Security:**
 - `ALLOWED_ORIGINS`: CORS whitelist (comma-separated)
@@ -370,29 +336,6 @@ docker-compose logs backend | grep "Query:"
    ```
 3. Re-upload all documents
 
-### Adding Multi-Tenancy Filtering
-
-Pattern used throughout the codebase:
-
-```python
-# Filtering by user_id in VectorStore
-def search(self, query_vector, user_id=None, doc_ids=None):
-    must_conditions = []
-
-    if user_id:
-        must_conditions.append(
-            FieldCondition(key="user_id", match=MatchValue(value=user_id))
-        )
-
-    if doc_ids:
-        must_conditions.append(
-            FieldCondition(key="doc_id", match=MatchAny(any=doc_ids))
-        )
-
-    query_filter = Filter(must=must_conditions) if must_conditions else None
-    # ... search with filter
-```
-
 ## Performance Considerations
 
 **Bottlenecks:**
@@ -412,14 +355,22 @@ def search(self, query_vector, user_id=None, doc_ids=None):
 
 Current state stores are JSON-based:
 - `data/documents.json` (DocumentStore)
-- `data/users.json` (UserStore)
-- `data/chats/{user_id}/{chat_id}.json` (ChatManager)
+- `data/chats/{chat_id}.json` (ChatManager)
 
 To migrate:
 1. Add SQLAlchemy models (`src/database.py`)
 2. Create migration script
 3. Replace store methods with DB queries
 4. Keep Qdrant for vectors (no change)
+
+### Adding User Authentication (Future)
+
+Currently no authentication. To add:
+1. Implement JWT auth (src/auth.py)
+2. Add user store (JSON or PostgreSQL)
+3. Add `user_id` to Qdrant payload for multi-tenancy
+4. Add `user_id` filtering in VectorStore.search()
+5. Protect endpoints with `Depends(get_current_user)`
 
 ### From Synchronous to Async Processing
 
