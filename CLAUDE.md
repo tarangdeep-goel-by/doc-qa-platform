@@ -1,6 +1,6 @@
-# CLAUDE.md - Document Q&A Platform Development Guide
+# CLAUDE.md
 
-This file provides guidance to Claude Code when working on the Document Q&A Platform.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Information
 
@@ -9,401 +9,628 @@ This file provides guidance to Claude Code when working on the Document Q&A Plat
 
 ## Project Overview
 
-A RAG (Retrieval Augmented Generation) platform for uploading documents and answering questions using semantic search + LLM generation.
+A production-ready RAG (Retrieval Augmented Generation) platform for uploading documents and answering questions using advanced semantic search + LLM generation. Full-stack application with React frontend and FastAPI backend.
 
 **Tech Stack:**
-- Backend: FastAPI (Python)
+
+**Backend:**
+- Framework: FastAPI (Python 3.11+)
 - Vector DB: Qdrant (self-hosted, Docker)
-- Embeddings: sentence-transformers/all-MiniLM-L6-v2 (local, free, 384-dim)
-- LLM: Google Gemini 2.0 Flash
-- Document Processing: PyPDF2 (PDF only currently)
+- Embeddings: sentence-transformers/all-MiniLM-L6-v2 (384-dim, local)
+- LLM: Google Gemini 2.5 Flash
+- Keyword Search: BM25 (rank-bm25)
+- Reranker: cross-encoder/ms-marco-MiniLM-L-6-v2
+- Document Processing: PyPDF2
+- Testing: Pytest (136 tests)
 
-## Architecture
+**Frontend:**
+- Framework: React 18 + TypeScript + Vite
+- State: Zustand (centralized store)
+- Routing: React Router v7
+- Styling: Tailwind CSS (editorial design system)
+- UI: Lucide React icons
+- Notifications: react-hot-toast
 
-### Document Ingestion Pipeline
+## Essential Commands
 
-**Flow**: Upload → Extract → Chunk → Embed → Store
-
-1. **DocumentProcessor** (`src/document_processor.py`)
-   - Extracts text from PDF using PyPDF2
-   - Captures metadata (pages, author, title)
-   - Currently PDF-only; designed to add DOCX/HTML support later
-
-2. **Chunker** (`src/chunker.py`)
-   - Splits text into 1000-char chunks with 200-char overlap
-   - Smart splitting: prefers paragraph/sentence boundaries
-   - Maintains context across chunks
-
-3. **Embedder** (`src/embedder.py`)
-   - Uses `sentence-transformers/all-MiniLM-L6-v2`
-   - Generates 384-dim vectors
-   - Batches chunks for efficiency (batch_size=32)
-
-4. **VectorStore** (`src/vector_store.py`)
-   - Wraps Qdrant client
-   - Collection: "documents" with cosine similarity
-   - Payload schema: {text, doc_id, doc_title, chunk_index, metadata}
-
-### Query Pipeline (RAG)
-
-**Flow**: Question → Embed → Search → Retrieve → Generate
-
-1. **QAEngine** (`src/qa_engine.py`)
-   - Embeds question using same embedder
-   - Searches Qdrant for top-k similar chunks (default k=5)
-   - Builds context from retrieved chunks
-   - Sends to Gemini with prompt template
-   - Returns answer + source citations
-
-### Data Models
-
-**DocumentMetadata** (`src/models.py`):
-- Stored in `data/documents.json`
-- Fields: doc_id, title, filename, file_path, format, upload_date, file_size_mb, chunk_count, total_pages, metadata
-
-**DocumentChunk** (`src/models.py`):
-- Represents text chunk with metadata
-- Fields: text, doc_id, doc_title, chunk_index, metadata
-
-**DocumentStore** (`src/models.py`):
-- Simple JSON-based store for document metadata
-- Methods: save_document, get_document, delete_document, list_documents
-
-## API Structure
-
-### FastAPI App (`api/main.py`)
-
-- Uses lifespan events for initialization
-- Creates shared state: embedder, vector_store, document_store, qa_engine
-- Includes CORS middleware
-- Routes: admin (upload/manage), query (Q&A)
-
-### Admin Router (`api/routers/admin.py`)
-
-- `POST /api/admin/upload`: Upload & process document (synchronous)
-- `GET /api/admin/documents`: List all documents
-- `GET /api/admin/documents/{doc_id}`: Get document details
-- `DELETE /api/admin/documents/{doc_id}`: Delete document + chunks
-
-### Query Router (`api/routers/query.py`)
-
-- `POST /api/query/ask`: Ask question (runs RAG pipeline)
-- `GET /api/query/documents`: List available documents
-
-### Schemas (`api/schemas.py`)
-
-Pydantic models for request/response validation:
-- UploadResponse, DocumentInfo, DocumentListResponse
-- DocumentDetailResponse, DeleteResponse
-- QueryRequest, QueryResponse, SourceInfo
-- HealthResponse
-
-## Key Design Decisions
-
-### Why These Technologies?
-
-**Qdrant**: Free, self-hosted, production-ready, handles millions of vectors
-
-**sentence-transformers/all-MiniLM-L6-v2**: Free, local, fast (~50ms/chunk), good quality
-
-**Gemini 2.0 Flash**: Large context (1M+ tokens), fast, cheap, strong instruction following
-
-**1000-char chunks + 200-char overlap**: Balances semantic coherence with LLM context limits
-
-### File Storage
-
-- Original files: `data/uploads/{doc_id}.{ext}`
-- Metadata: `data/documents.json`
-- Vectors: Qdrant storage (Docker volume)
-
-### Processing Strategy
-
-- **Synchronous upload**: Blocks until complete (~10-30s typical)
-- Future: Could add async processing with status polling
-- Logs progress to console for debugging
-
-## Development Patterns
-
-### Adding New Document Formats
-
-1. Add processor to `DocumentProcessor.process_document()`
-2. Extract text + metadata consistently
-3. Update requirements.txt with new libraries
-4. Update upload validation in admin router
-5. Test end-to-end
-
-Example skeleton:
-```python
-def extract_text_from_docx(file_path: str) -> Tuple[str, Dict]:
-    # Use python-docx
-    # Extract paragraphs
-    # Build metadata
-    return full_text, metadata
-```
-
-### Modifying Chunk Size/Overlap
-
-Update `.env`:
-```env
-CHUNK_SIZE=1500
-CHUNK_OVERLAP=300
-```
-
-Then initialize chunker:
-```python
-chunker = TextChunker(
-    chunk_size=int(os.getenv("CHUNK_SIZE", 1000)),
-    chunk_overlap=int(os.getenv("CHUNK_OVERLAP", 200))
-)
-```
-
-### Changing Embedding Model
-
-1. Update `.env`:
-   ```env
-   EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2
-   EMBEDDING_DIM=768
-   ```
-
-2. Recreate Qdrant collection (dimension must match)
-
-3. Re-upload all documents
-
-### Customizing Gemini Prompt
-
-Edit `QAEngine._build_prompt()` in `src/qa_engine.py`:
-```python
-def _build_prompt(self, question: str, context: str) -> str:
-    # Modify prompt template
-    # Add constraints, examples, etc.
-    return prompt
-```
-
-## Common Tasks
-
-### Testing Document Upload
+### Full Stack Development
 
 ```bash
-# Start Qdrant
+# Start all services (Qdrant + backend)
 docker-compose up -d
 
-# Start API
+# Terminal 1: Backend
 cd backend && python run_api.py
 
-# Upload test PDF
-curl -X POST http://localhost:8000/api/admin/upload \
-  -F "file=@test.pdf"
-
-# Check Qdrant dashboard
-open http://localhost:6333/dashboard
+# Terminal 2: Frontend
+cd frontend && npm run dev
 ```
 
-### Debugging Query Results
+### Backend Only
 
-1. Check retrieved chunks:
-   - Inspect `sources` in response
-   - Verify relevance scores (>0.7 is good)
+```bash
+# Start Qdrant + backend in Docker
+docker-compose up -d
 
-2. Test search directly:
-   ```python
-   from src.embedder import Embedder
-   from src.vector_store import VectorStore
+# View logs
+docker-compose logs -f backend
 
-   embedder = Embedder()
-   vector_store = VectorStore()
+# Rebuild after code changes
+docker-compose build backend
+docker-compose restart backend
+```
 
-   query_vec = embedder.embed_text("test question")
-   results = vector_store.search(query_vec, top_k=5)
-   ```
+### Frontend Only
 
-3. Inspect Gemini input:
-   - Add logging to `QAEngine._generate_answer()`
-   - Print full prompt before generation
+```bash
+# Install dependencies
+cd frontend && npm install
 
-### Adding New Endpoints
+# Development server (http://localhost:3000)
+npm run dev
 
-1. Create schema in `api/schemas.py`
+# Production build
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Testing
+
+```bash
+# Backend: Run all 136 tests (Docker - recommended)
+docker-compose run --rm test
+
+# Backend: Run specific test file
+docker-compose run --rm test pytest tests/test_api.py -v
+
+# Backend: Run specific test class
+docker-compose run --rm test pytest tests/test_api.py::TestQueryDocuments -v
+
+# Backend: With coverage report
+docker-compose run --rm test pytest tests/ --cov=src --cov-report=html
+
+# Backend: Quick integration tests (bash script)
+cd backend && ./test_api.sh tests/fixtures/test.pdf
+
+# Frontend: No test suite yet (future)
+```
+
+### Access Points
+
+- **Frontend UI**: http://localhost:3000
+- **API docs**: http://localhost:8000/docs
+- **Health check**: http://localhost:8000/health
+- **Qdrant dashboard**: http://localhost:6333/dashboard
+
+## High-Level Architecture
+
+### Full Stack Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    React Frontend (Port 3000)                │
+│  • Zustand state management (documents, chats, messages)    │
+│  • React Router (/, /chat/:id, /documents)                  │
+│  • Tailwind CSS (editorial design system)                   │
+│  • API client (typed fetch wrapper)                         │
+└─────────────────────────────────────────────────────────────┘
+                             ↓ HTTP/REST
+┌─────────────────────────────────────────────────────────────┐
+│                 FastAPI Backend (Port 8000)                  │
+│  • Three router groups: /api/admin, /api/chats, /api/query │
+│  • Shared app state (lifespan events)                       │
+│  • Pydantic schemas for validation                          │
+└─────────────────────────────────────────────────────────────┘
+         ↓                                    ↓
+    ┌─────────┐                          ┌─────────┐
+    │ Qdrant  │                          │ Gemini  │
+    │ Vectors │                          │   API   │
+    │  +BM25  │                          │(Gen+QE) │
+    └─────────┘                          └─────────┘
+```
+
+### Three-Layer RAG Pipeline (Backend)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     FastAPI Backend                           │
+├──────────────────────────────────────────────────────────────┤
+│                                                                │
+│  1. INGESTION: PDF → Extract → Chunk → Embed → Store         │
+│     • PyPDF2 extracts text page-by-page                       │
+│     • TextChunker: 1000-char chunks, 200-char overlap         │
+│     • Embedder: all-MiniLM-L6-v2 (384-dim vectors)           │
+│     • VectorStore: Qdrant + BM25 index                       │
+│                                                                │
+│  2. RETRIEVAL: Question → Multi-Strategy Search → Rerank     │
+│     • Query Expansion: LLM generates variants (optional)     │
+│     • Hybrid Search: Vector (semantic) + BM25 (keyword)      │
+│     • RRF Fusion: Reciprocal Rank Fusion for score merging  │
+│     • Reranking: Cross-encoder with position-aware blending  │
+│                                                                │
+│  3. GENERATION: Context + History → LLM → Answer + Sources  │
+│     • Gemini 2.5 Flash with conversation history             │
+│     • Source citations with page numbers                      │
+│     • PDF links for exact source viewing                      │
+│                                                                │
+└──────────────────────────────────────────────────────────────┘
+         ↓                                    ↓
+    ┌─────────┐                          ┌─────────┐
+    │ Qdrant  │                          │ Gemini  │
+    │ Vectors │                          │   API   │
+    │  +BM25  │                          │(Gen+QE) │
+    └─────────┘                          └─────────┘
+```
+
+### Frontend Architecture
+
+**State Management** (src/store/appStore.ts):
+- Centralized Zustand store for all application state
+- No local component state for server data
+- Optimistic updates for messages (instant UI feedback)
+- Auto-reload on mutations (upload/delete triggers refresh)
+
+**Store structure:**
+```typescript
+{
+  chats: Chat[]              // All user chats
+  activeChat: Chat | null    // Currently open chat
+  documents: Document[]      // All uploaded documents
+  messages: ChatMessage[]    // Messages for activeChat only
+  loading: boolean           // Global loading state
+  error: string | null       // Global error state
+}
+```
+
+**Key actions:**
+- `loadChats()` - Fetch all chats from API
+- `loadDocuments()` - Fetch all documents from API
+- `setActiveChat(chatId)` - Load chat + messages
+- `createChat(name, docIds)` - Create chat with document filter
+- `sendMessage(question)` - Send message (optimistic update)
+- `uploadDocument(file)` - Upload PDF with duplicate detection
+- `deleteDocument(docId)` - Delete doc + update affected chats
+
+**Routing** (React Router v7):
+```
+/ (AppLayout)
+├── / (WelcomeScreen) - Chat list + new chat button
+├── /chat/:chatId (ChatInterface) - Chat conversation
+└── /documents (DocumentsPage) - Document management
+```
+
+**Design System** (Tailwind):
+- Editorial aesthetic: magazine-style typography, serif fonts
+- Color palette: cream (#faf9f7), ink (#1a1a2e), burgundy (#8b4049)
+- Fluid typography: `text-fluid-{xs|sm|base|lg|xl|2xl|3xl}` (responsive without breakpoints)
+- Typography: Fraunces (serif), Literata (body), Inter Variable (sans)
+
+**API Client** (src/api/client.ts):
+- Type-safe fetch wrapper (no direct fetch in components)
+- All endpoints return typed responses
+- Error handling with human-readable messages
+
+### Backend Architecture
+
+**Application State** (api/main.py):
+- FastAPI lifespan events initialize shared components once at startup
+- Components stored in `app.state`: embedder, vector_store, document_store, chat_manager, qa_engine
+- Access via `get_app_state(request)` in routers
+
+**Document Processing** (src/):
+- `document_processor.py` - PDF text extraction with PyPDF2
+- `chunker.py` - Smart text chunking (sentence-boundary aware)
+- `embedder.py` - Embedding generation (batched for efficiency)
+- `vector_store.py` - Qdrant wrapper + BM25 integration
+- `bm25_index.py` - Persistent keyword search index
+
+**Query Engine** (src/qa_engine.py):
+- Orchestrates the full RAG pipeline
+- Optional query expansion (LLM-generated variants)
+- Calls VectorStore for hybrid search
+- Applies reranking with position-aware blending
+- Generates answer with Gemini using conversation history
+
+**Chat System** (src/chat_manager.py):
+- Multi-chat sessions with document associations
+- Message persistence to `data/chats/{chat_id}.json`
+- Automatic title generation from first question
+- Soft delete pattern: maintains doc_id references after deletion
+
+**Data Persistence**:
+- Documents: `data/documents.json` (metadata), `data/uploads/` (PDFs)
+- Chats: `data/chats/{chat_id}.json` (messages + metadata)
+- Vectors: Qdrant Docker volume
+- BM25 Index: `data/bm25/` (pickled corpus)
+
+### API Structure
+
+**Three router groups:**
+
+1. **Admin** (`/api/admin/*`) - Document management
+   - Upload, list, get details, delete documents
+   - Serves PDF files for viewing
+
+2. **Chats** (`/api/chats/*`) - Conversation management
+   - Create, list, get, rename, delete chats
+   - Ask questions in chat context (preserves history)
+
+3. **Query** (`/api/query/*`) - Legacy Q&A endpoints
+   - Stateless question answering
+   - Document filtering support
+
+### Advanced RAG Features
+
+**Configurable via `.env`:**
+
+```bash
+# Query Expansion (adds 1-2s latency, +15-25% recall)
+USE_QUERY_EXPANSION=false
+QUERY_EXPANSION_VARIANTS=2
+
+# Hybrid Search (vector + keyword)
+USE_HYBRID_SEARCH=true
+HYBRID_ALPHA=0.5  # 0=keyword only, 1=semantic only
+
+# Reciprocal Rank Fusion (better than weighted averaging)
+USE_RRF=true
+RRF_K_PARAMETER=60
+
+# Cross-encoder Reranking
+USE_RERANKING=true
+RERANKER_BLENDING=position_aware  # or "replace"
+```
+
+**Position-Aware Reranking** (src/reranker.py):
+- Top 3 results: 75% retrieval weight, 25% reranker
+- Ranks 4-10: 50/50 blend
+- Ranks 11+: 25% retrieval, 75% reranker
+- Preserves good initial rankings while improving lower ranks
+
+### Deleted Document Handling
+
+**Soft delete pattern:**
+- Chats maintain `doc_ids` array even after document deletion
+- RAG pipeline filters out deleted documents automatically
+- Clear error messages when all chat documents are deleted
+- Preserves chat history for audit trail
+
+## Key Design Patterns
+
+### Shared Application State
+
+Components are initialized once at startup via FastAPI lifespan events and stored in `app.state`. Access in routers:
+
+```python
+def get_app_state(request: Request):
+    return request.app.state
+
+@router.post("/endpoint")
+async def handler(request: Request):
+    state = get_app_state(request)
+    result = state.qa_engine.answer_question(...)
+```
+
+### Qdrant Payload Structure
+
+Every chunk stored in Qdrant includes:
+
+```python
+{
+    "text": "chunk content...",
+    "doc_id": "uuid",
+    "doc_title": "document.pdf",
+    "chunk_index": 0,
+    "page_number": 5,        # From PyPDF2
+    "metadata": {...}        # PDF metadata
+}
+```
+
+### Document Filtering
+
+Use `MatchAny` filter in Qdrant to search specific documents:
+
+```python
+# In vector_store.py
+if doc_ids:
+    must_conditions.append(
+        FieldCondition(key="doc_id", match=MatchAny(any=doc_ids))
+    )
+```
+
+## Key Design Patterns
+
+### Frontend Patterns
+
+**1. Optimistic Message Updates:**
+When sending a message:
+1. Immediately add user message to UI (`temp-${Date.now()}` ID)
+2. Call API
+3. Add assistant response when received
+4. No loading spinner for user message (instant feedback)
+
+**2. Document Filtering in Chats:**
+Each chat has a fixed `doc_ids` array set at creation. Questions in that chat only search those documents.
+
+Flow:
+1. User clicks "New Chat"
+2. Modal shows document selector (multi-select)
+3. User selects documents + names chat
+4. `createChat(name, docIds)` creates chat with filter
+5. All questions in that chat use those doc_ids
+
+**3. Error Handling:**
+Pattern: Try/catch → Set error in store → Toast notification
+
+```typescript
+try {
+  await api.uploadDocument(file)
+  toast.success('Document uploaded successfully')
+} catch (error) {
+  const message = error instanceof Error ? error.message : 'Generic error'
+  toast.error(message)
+  throw error
+}
+```
+
+**4. Modal Pattern:**
+Controlled visibility via parent state
+
+```typescript
+const [isOpen, setIsOpen] = useState(false)
+
+<NewChatModal
+  isOpen={isOpen}
+  onClose={() => setIsOpen(false)}
+  onSuccess={(chat) => {
+    navigate(`/chat/${chat.id}`)
+    setIsOpen(false)
+  }}
+/>
+```
+
+### Backend Patterns
+
+## Common Development Tasks
+
+### Frontend Tasks
+
+**Adding a New Page:**
+1. Create component in `frontend/src/pages/`
+2. Add route to `frontend/src/App.tsx`
+3. Add navigation link to sidebar/header
+4. Use `useAppStore()` to access state
+
+**Adding a New API Endpoint (Frontend):**
+1. Add types to `frontend/src/types/index.ts`
+2. Add function to `frontend/src/api/client.ts`
+3. Add action to `frontend/src/store/appStore.ts` (if needed)
+4. Use in component via `useAppStore()`
+
+**Modifying Design System:**
+- Colors: Edit `frontend/tailwind.config.js` → `theme.extend.colors`
+- Typography: Edit `frontend/tailwind.config.js` → `theme.extend.fontFamily`
+- Fluid sizes: Edit `frontend/tailwind.config.js` → `theme.extend.fontSize`
+
+### Backend Tasks
+
+**Adding a New Document Format:**
+
+1. Add extraction logic to `src/document_processor.py`
+2. Update `requirements.txt` with new library
+3. Update MIME type validation in `api/routers/admin.py`
+4. Add tests to `tests/test_api.py`
+
+### Modifying RAG Pipeline
+
+1. Update logic in `src/qa_engine.py` or `src/vector_store.py`
+2. Add configuration to `.env.example`
+3. Add unit tests
+4. Add integration test to `tests/test_rag_pipeline_integration.py`
+
+**Adding a New API Endpoint (Backend):**
+1. Define Pydantic schemas in `backend/api/schemas.py`
 2. Add endpoint to appropriate router
-3. Use `get_app_state()` to access components
-4. Handle errors with HTTPException
-5. Test with curl or in `/docs`
+3. Access components via `get_app_state(request)`
+4. Add test to `backend/tests/test_api.py`
+5. Update frontend API client (`frontend/src/api/client.ts`)
+6. Add types to `frontend/src/types/index.ts`
 
-### Database Migrations
+### Debugging RAG Results
 
-Currently uses simple JSON store. To migrate to PostgreSQL:
+```python
+# Add logging to qa_engine.py
+import logging
+logger = logging.getLogger(__name__)
 
-1. Add SQLAlchemy to requirements
-2. Create `src/database.py` with models
-3. Replace `DocumentStore` with DB queries
-4. Update routers to use new store
-5. Keep Qdrant for vectors (no change)
+# Log retrieved chunks
+for result in results:
+    logger.info(f"Score: {result.score}, Text: {result.payload['text'][:100]}")
 
-## Environment Variables
+# View logs
+docker-compose logs backend | grep "Score:"
+```
+
+## Environment Configuration
 
 **Required:**
 - `GEMINI_API_KEY` - Must be set
 
-**Optional (with defaults):**
-- `API_HOST=0.0.0.0`
-- `API_PORT=8000`
-- `QDRANT_HOST=localhost`
-- `QDRANT_PORT=6333`
-- `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2`
-- `EMBEDDING_DIM=384`
-- `CHUNK_SIZE=1000`
-- `CHUNK_OVERLAP=200`
-- `TOP_K_RESULTS=5`
+**RAG Optimization Toggles:**
+- `USE_HYBRID_SEARCH=true` - Enable BM25 + vector fusion
+- `USE_RERANKING=true` - Enable cross-encoder reranking
+- `USE_QUERY_EXPANSION=false` - Generate query variants (adds latency)
+- `USE_RRF=true` - Use Reciprocal Rank Fusion
+- `RERANKER_BLENDING=position_aware` - Context-aware score blending
 
-## Testing Strategy
+**Performance:**
+- `CHUNK_SIZE=1000` - Text chunk size
+- `CHUNK_OVERLAP=200` - Chunk overlap
+- `TOP_K_RESULTS=5` - Default retrieval count
 
-### Manual Testing Workflow
+See `.env.example` for full list.
 
-1. Upload document
-2. Verify chunks created (check response)
-3. Ask specific question about content
-4. Check sources match expected sections
-5. Try edge cases:
-   - Very short question
-   - Question about missing topic
-   - Multiple documents
+## Testing Architecture
 
-### Unit Testing (Future)
+**136 tests across 8 test files:**
 
-```bash
-# Add to requirements.txt
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
+- `test_api.py` (24 tests) - API integration tests
+- `test_bm25_index.py` (17 tests) - BM25 keyword search
+- `test_hybrid_search.py` (18 tests) - Hybrid search + RRF
+- `test_query_expansion.py` (10 tests) - Query expansion
+- `test_reranker.py` (23 tests) - Reranker + position-aware blending
+- `test_rag_pipeline_integration.py` (16 tests) - End-to-end RAG
+- `test_qa_guardrails.py` (14 tests) - LLM guardrails
+- `test_deleted_documents.py` (14 tests) - Deletion handling
 
-# Create tests/
-# - test_chunker.py
-# - test_embedder.py
-# - test_vector_store.py
-# - test_qa_engine.py
+**Test patterns:**
+- Fixtures in `conftest.py` for shared setup
+- Docker-based test runner for consistency
+- Automatic cleanup after each test
+- Integration tests use real services (Qdrant, Gemini)
 
-# Run
-pytest tests/
+## Project Structure
+
+```
+doc-qa-platform/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── chat/               # ChatInterface, ChatMessageItem
+│   │   │   ├── sidebar/            # Sidebar, ChatListItem
+│   │   │   ├── modals/             # NewChatModal, UploadModal
+│   │   │   └── welcome/            # WelcomeScreen
+│   │   ├── layouts/
+│   │   │   └── AppLayout.tsx       # Sidebar + content wrapper
+│   │   ├── pages/
+│   │   │   └── DocumentsPage.tsx   # Document management
+│   │   ├── store/
+│   │   │   └── appStore.ts         # Zustand store (single source of truth)
+│   │   ├── api/
+│   │   │   └── client.ts           # Type-safe API client
+│   │   ├── types/
+│   │   │   └── index.ts            # TypeScript type definitions
+│   │   ├── App.tsx                 # Router setup
+│   │   └── main.tsx                # React entry point
+│   ├── tailwind.config.js          # Design system config
+│   ├── vite.config.ts              # Vite + proxy config
+│   ├── package.json
+│   └── CLAUDE.md                   # Frontend-specific guidance
+│
+├── backend/
+│   ├── api/
+│   │   ├── main.py                 # FastAPI app, lifespan events
+│   │   ├── routers/
+│   │   │   ├── admin.py            # Document management
+│   │   │   ├── chats.py            # Chat sessions
+│   │   │   └── query.py            # Legacy Q&A
+│   │   └── schemas.py              # Pydantic models
+│   ├── src/
+│   │   ├── document_processor.py   # PDF extraction
+│   │   ├── chunker.py              # Text chunking
+│   │   ├── embedder.py             # Embedding generation
+│   │   ├── vector_store.py         # Qdrant + BM25
+│   │   ├── bm25_index.py           # Keyword search index
+│   │   ├── reranker.py             # Cross-encoder reranking
+│   │   ├── qa_engine.py            # RAG orchestration
+│   │   ├── chat_manager.py         # Chat persistence
+│   │   └── models.py               # Data models
+│   ├── tests/                      # 136 automated tests
+│   ├── data/
+│   │   ├── uploads/                # PDF files
+│   │   ├── documents.json          # Document metadata
+│   │   ├── chats/                  # Chat sessions
+│   │   └── bm25/                   # BM25 index cache
+│   ├── .env.example
+│   ├── requirements.txt
+│   └── CLAUDE.md                   # Backend-specific guidance
+│
+├── qdrant_storage/                 # Qdrant Docker volume
+├── docker-compose.yml
+├── PROJECT_STATUS.md               # Implementation tracker
+└── README.md                       # User-facing docs
 ```
 
-## Performance Optimization
+## Performance Metrics
 
-### Current Performance
-
+**Expected performance:**
 - Upload: ~10-30s for 200-page book
-- Query: ~2-3s total
-  - Embedding: ~50ms
-  - Search: ~50ms
-  - Generation: 1-2s
+- Query (standard): ~2-3s (50ms embed + 100ms search + 1-2s LLM)
+- Query (with expansion): ~3-5s (+1-2s for variant generation)
+- Hybrid search: ~150ms (vector + BM25 + fusion)
+- Reranking: ~200ms for 10 candidates
 
-### Optimization Opportunities
-
-1. **Faster embeddings**: Use GPU if available
-   ```python
-   embedder = Embedder()
-   if torch.cuda.is_available():
-       embedder.model = embedder.model.to('cuda')
-   ```
-
-2. **Batch processing**: Upload multiple docs in parallel
-
-3. **Caching**: Cache frequent queries
-   ```python
-   from functools import lru_cache
-
-   @lru_cache(maxsize=100)
-   def cached_embed(text: str):
-       return embedder.embed_text(text)
-   ```
-
-4. **Async processing**: Make upload async with status endpoint
+**Quality improvements (with all features enabled):**
+- Recall: +15-25% (query expansion)
+- Ranking quality: +5-10% (RRF)
+- Top-k precision: +3-5% (position-aware reranking)
+- **Overall: ~20-30% better answer quality**
 
 ## Troubleshooting
 
-### "No text could be extracted from PDF"
+### Frontend Issues
 
-- PDF might be image-based (scanned)
-- Add OCR support with pytesseract
-- Or try different PDF library (pdfplumber, PyMuPDF)
+**"API request failed":**
+1. Check backend is running: `http://localhost:8000/docs`
+2. Check proxy config in `frontend/vite.config.ts`
+3. Inspect network tab for actual error
 
-### "Qdrant connection failed"
+**"Document upload fails silently":**
+1. Check file size (backend may have limits)
+2. Check file format (PDF only currently)
+3. Check backend logs for processing errors
 
+**"Chat not loading messages":**
+1. Check `activeChat` in store (may be null)
+2. Verify `setActiveChat(chatId)` was called
+3. Check network tab for `/api/chats/:id` response
+
+**"Styles not updating":**
+1. Restart dev server (Tailwind purge cache issue)
+2. Check class name is in `content` paths (tailwind.config.js)
+3. Verify class exists in Tailwind (check docs)
+
+### Backend Issues
+
+**Qdrant connection failed:**
 ```bash
-# Check Qdrant status
 docker ps | grep qdrant
-
-# View logs
 docker logs doc-qa-qdrant
-
-# Restart
 docker-compose restart qdrant
 ```
 
-### "Out of memory during embedding"
-
-- Reduce batch_size in `Embedder.embed_texts()`
-- Process documents in smaller chunks
-- Or add more RAM / use swap
-
-### Low relevance scores (<0.5)
-
-- Question may be too vague
-- Document may not contain info
-- Try rephrasing question
-- Check if chunks are too small/large
-
-## Code Style
-
-- Follow PEP 8
-- Use type hints
-- Document functions with docstrings
-- Keep functions focused (single responsibility)
-- Prefer explicit over implicit
-- Handle errors gracefully (try/except with clear messages)
-
-## Git Workflow
-
+**Tests failing:**
 ```bash
-# Feature branch
-git checkout -b feature/add-docx-support
-
-# Make changes
-# Test locally
-# Commit
-git commit -m "Add DOCX support to DocumentProcessor"
-
-# Push
-git push origin feature/add-docx-support
-
-# Create PR
+docker-compose ps                      # Check all services running
+docker-compose logs backend            # Check backend logs
+docker-compose down && docker-compose up -d  # Full restart
 ```
 
-## Next Steps / Roadmap
+**Low relevance scores:**
+- Enable query expansion: `USE_QUERY_EXPANSION=true`
+- Check chunk size (may be too large/small)
+- Inspect retrieved chunks in response `sources`
 
-**Phase 1: Additional Formats**
-- Add DOCX support (python-docx)
-- Add HTML support (BeautifulSoup4)
-- Add TXT support (simple read)
+## Important Notes
 
-**Phase 2: Frontend**
-- Build React + TypeScript admin UI
-- Build user Q&A chat interface
-- Document upload with drag-drop
+**For detailed frontend guidance**, see `frontend/CLAUDE.md` which includes:
+- Component architecture and organization
+- TypeScript patterns and type safety
+- Styling conventions (Tailwind class order)
+- Modal patterns and toast notifications
+- Performance considerations (bundle size, API optimization)
 
-**Phase 3: Advanced Features**
-- User authentication (JWT)
-- Document versioning
-- Question history
-- Export Q&A sessions
-- Filter by document in queries
+**For detailed backend guidance**, see `backend/CLAUDE.md` which includes:
+- Detailed RAG pipeline architecture
+- Authentication & authorization (JWT)
+- BM25 keyword search implementation
+- Document processing pipeline details
+- Chat management system
+- Migration strategies
+- Comprehensive troubleshooting
 
-**Phase 4: Production**
-- Add PostgreSQL for metadata
-- Add Redis for caching
-- Add async processing
-- Add monitoring (Prometheus)
-- Add logging (structured JSON)
-- Add tests (pytest)
-- Add CI/CD (GitHub Actions)
+**For project status and recent changes**, see `PROJECT_STATUS.md`
 
-## Contact
-
-For issues or questions, refer to the main project documentation or create an issue.
+**For user-facing documentation**, see `README.md`
