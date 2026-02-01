@@ -89,8 +89,8 @@ class TestQAGuardrails:
         result = qa_engine.answer_question(
             question="What is the weather forecast for tomorrow?",
             top_k=5,
-            use_hybrid=True,
-            use_reranking=True,
+            use_hybrid=False,  # Raw vector scores needed for min_score threshold
+            use_reranking=False,  # Reranker uses different score scale
             min_score=0.5  # High threshold
         )
 

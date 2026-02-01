@@ -5,6 +5,7 @@ from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
 from .reranker import Reranker
+from .structure_detector import detect_structure
 
 
 class QAEngine:
@@ -144,6 +145,86 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             "Synthesized answer:"
         )
         return self._generate_answer(prompt)
+
+    def _classify_query_type(self, question: str) -> str:
+        """Classify what structure type the query is likely looking for.
+
+        Returns one of: table, list, specification, general
+        """
+        q = question.lower()
+
+        # Table indicators: models, comparison, specifications in tabular form
+        table_keywords = [
+            "models", "compare", "comparison", "specifications", "spec sheet",
+            "dimensions", "ratings", "table", "matrix", "overview of all",
+            "list all models", "variants", "part numbers", "model numbers"
+        ]
+        if any(kw in q for kw in table_keywords):
+            return "table"
+
+        # List indicators: steps, features, requirements
+        list_keywords = [
+            "steps", "features", "list", "requirements", "what are the",
+            "enumerate", "how many", "types of", "kinds of", "categories"
+        ]
+        if any(kw in q for kw in list_keywords):
+            return "list"
+
+        # Specification indicators: technical values, tolerances
+        spec_keywords = [
+            "voltage", "current", "temperature", "weight", "power",
+            "tolerance", "range", "rating", "capacity", "speed",
+            "frequency", "dimension", "size", "resolution"
+        ]
+        if any(kw in q for kw in spec_keywords):
+            return "specification"
+
+        return "general"
+
+    def _boost_by_structure(
+        self, chunks: List[Dict], query_type: str, boost_factor: float = 0.15
+    ) -> List[Dict]:
+        """Boost scores of chunks whose structure matches the query type.
+
+        Args:
+            chunks: Retrieved chunks with scores
+            query_type: Expected structure type from _classify_query_type
+            boost_factor: Score boost for matching structures (0-1)
+
+        Returns:
+            Chunks with adjusted scores, re-sorted
+        """
+        if query_type == "general" or not chunks:
+            return chunks
+
+        # Map query type to matching structure types
+        structure_map = {
+            "table": ["table"],
+            "list": ["list", "mixed"],
+            "specification": ["specification", "table"],
+        }
+        target_types = structure_map.get(query_type, [])
+
+        boosted = []
+        boost_count = 0
+        for chunk in chunks:
+            structure = chunk["payload"].get("structure", {})
+            structure_type = structure.get("structure_type", "prose")
+
+            new_score = chunk["score"]
+            if structure_type in target_types:
+                new_score += boost_factor
+                boost_count += 1
+
+            boosted.append({**chunk, "score": new_score})
+
+        # Re-sort by boosted score
+        boosted.sort(key=lambda x: x["score"], reverse=True)
+
+        if boost_count > 0:
+            print(f"Structure boost: {boost_count}/{len(chunks)} chunks boosted for query_type={query_type}")
+
+        return boosted
 
     def answer_question(
         self,
@@ -287,7 +368,12 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
         search_results = self._deduplicate_chunks(search_results)
 
-        # Step 2.7: Check if we have confident results
+        # Step 2.7: Structure-aware boosting
+        query_type = self._classify_query_type(question)
+        if query_type != "general":
+            search_results = self._boost_by_structure(search_results, query_type)
+
+        # Step 2.8: Check if we have confident results
         reranking_applied = use_reranking and self.reranker and len(search_results) > 0
 
         if not search_results:

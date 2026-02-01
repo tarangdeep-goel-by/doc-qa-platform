@@ -23,6 +23,7 @@ from src.models import DocumentMetadata, DocumentChunk
 from src.document_processor import DocumentProcessor
 from src.chunker import TextChunker
 from src.semantic_chunker import SemanticChunker
+from src.structure_detector import detect_structure
 
 router = APIRouter()
 
@@ -120,9 +121,20 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         embeddings = embedder.embed_texts(chunk_texts)
         print(f"Generated {len(embeddings)} embeddings")
 
+        # Detect structure in each chunk and enrich payload
+        print("Detecting chunk structures...")
+        chunk_payloads = []
+        structure_counts = {"table": 0, "list": 0, "specification": 0, "prose": 0, "mixed": 0}
+        for c in chunks:
+            payload = c.to_payload()
+            structure = detect_structure(c.text)
+            payload["structure"] = structure
+            chunk_payloads.append(payload)
+            structure_counts[structure["structure_type"]] = structure_counts.get(structure["structure_type"], 0) + 1
+        print(f"Structure types: {structure_counts}")
+
         # Store in Qdrant
         print("Storing in Qdrant...")
-        chunk_payloads = [c.to_payload() for c in chunks]
         chunks_added = vector_store.add_document_chunks(chunk_payloads, embeddings)
         print(f"Stored {chunks_added} chunks in Qdrant")
 

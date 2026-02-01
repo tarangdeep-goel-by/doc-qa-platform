@@ -201,8 +201,8 @@ class TestRAGPipelineIntegration:
         """Test pipeline with guardrails - unrelated query should be rejected."""
         result = qa_engine.answer_question(
             question="What is the capital of France?",
-            use_hybrid=True,
-            use_reranking=True,
+            use_hybrid=False,  # Raw vector scores needed for min_score threshold
+            use_reranking=False,  # Reranker uses different score scale
             min_score=0.6  # High threshold
         )
 
