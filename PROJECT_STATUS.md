@@ -1,14 +1,14 @@
 # Project Status - Document Q&A Platform
 
-**Last Updated**: January 31, 2026
+**Last Updated**: February 1, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
 
 ---
 
-## 🎯 Current Status: Enhanced RAG with QMD-Inspired Optimizations
+## 🎯 Current Status: Evaluation-Driven RAG Quality Improvements
 
-The platform is fully functional with multi-chat conversations, robust deleted document handling, and now includes advanced retrieval optimizations inspired by QMD (Query Expansion, RRF, Position-Aware Reranking). All features have comprehensive test coverage.
+The platform is fully functional with an automated evaluation framework measuring answer quality against Claude.ai gold-standard answers. Systematic improvements (Gemini embeddings, enhanced BM25, chunk deduplication) have pushed semantic similarity from 0.742 to 0.897 (+21%).
 
 ---
 
@@ -24,9 +24,9 @@ The platform is fully functional with multi-chat conversations, robust deleted d
 ### Document Processing Pipeline
 - [x] PDF upload via API endpoint
 - [x] Text extraction using PyPDF2
-- [x] Smart text chunking (1000 chars, 200 overlap)
+- [x] Smart text chunking (2500 chars, 500 overlap)
 - [x] Sentence-boundary aware chunking
-- [x] Local embedding generation (sentence-transformers/all-MiniLM-L6-v2)
+- [x] Gemini embedding generation (gemini-embedding-001, 768-dim, MTEB 71.5%)
 - [x] Vector storage in Qdrant
 - [x] Document metadata management (JSON store)
 
@@ -43,6 +43,15 @@ The platform is fully functional with multi-chat conversations, robust deleted d
 - [x] Reranking with cross-encoder
 - [x] **Position-Aware Reranker Blending** - Context-aware score blending ✨
 - [x] Configurable relevance thresholds (min_score)
+- [x] **Chunk deduplication** - Jaccard similarity-based removal of near-duplicate chunks ✨
+
+### Evaluation Framework ✨ NEW
+- [x] Automated benchmark evaluation (`evaluation/run_evaluation.py`)
+- [x] Upload-and-eval one-command script (`scripts/upload_and_eval.py`)
+- [x] Benchmark dataset format with gold-standard Q&A pairs
+- [x] Metrics: semantic similarity, ROUGE-L, ROUGE-1, NDCG@k, MRR
+- [x] Console + HTML reporters with experiment comparison
+- [x] Re-chunking migration script (`scripts/rechunk_documents.py`)
 
 ### Multi-Chat System
 - [x] Create named chat sessions
@@ -73,6 +82,49 @@ The platform is fully functional with multi-chat conversations, robust deleted d
 ### Query Endpoints
 - [x] `POST /api/query/ask` - Ask questions with optional document filtering
 - [x] `GET /api/query/documents` - List available documents
+
+---
+
+## 🆕 Recent Changes (February 1, 2026)
+
+### Evaluation Framework & RAG Quality Improvements
+
+**What was implemented:**
+Built an automated evaluation framework and applied systematic improvements to close the quality gap with Claude.ai answers.
+
+**Evaluation Framework:**
+- `backend/evaluation/` - Full eval suite with metrics, reporters, benchmark datasets
+- `backend/scripts/upload_and_eval.py` - One-command upload + eval + report
+- `backend/evaluation/datasets/fx5u_qa_benchmark.json` - 4 gold-standard Q&A pairs
+- Metrics: semantic similarity, ROUGE-L/1, NDCG@k, MRR, latency
+
+**RAG Improvements Applied (measured via eval):**
+
+| Change | Semantic Sim | Notes |
+|--------|-------------|-------|
+| Baseline (MiniLM, reranking off) | 0.742 | Starting point |
+| + Enable reranking + fix confidence bug | 0.779 (+5%) | Cross-encoder scores can be negative; fixed min_score check |
+| + Gemini embeddings (768-dim) | 0.893 (+15%) | Replaced all-MiniLM-L6-v2 (MTEB 56) with gemini-embedding-001 (MTEB 71.5%) |
+| + Enhanced BM25 + chunk dedup | 0.897 (+21% total) | Stop words, regex tokenizer, Jaccard deduplication |
+
+**Files Created:**
+- `backend/evaluation/__init__.py`, `benchmark_dataset.py`, `run_evaluation.py`
+- `backend/evaluation/metrics/` - `retrieval.py`, `answer_quality.py`, `performance.py`
+- `backend/evaluation/reporters/` - `console_reporter.py`, `html_reporter.py`
+- `backend/evaluation/datasets/fx5u_qa_benchmark.json`
+- `backend/scripts/upload_and_eval.py`
+- `backend/evaluation/results/` - baseline, reranking_fixed, gemini_embeddings, bm25_dedup JSONs
+
+**Files Modified:**
+- `backend/src/embedder.py` - Dual-mode: Gemini API or local sentence-transformers
+- `backend/src/qa_engine.py` - Confidence threshold fix for reranked scores, chunk deduplication
+- `backend/src/bm25_index.py` - Regex tokenizer, stop word removal
+- `backend/api/main.py` - Pass Gemini params to Embedder
+- `docker-compose.yml` - Switched to gemini-embedding-001 (768-dim), enabled reranking
+- `backend/.env.example` - Updated embedding defaults
+
+**Key Bug Fix:**
+Cross-encoder reranking produces scores in range -10 to +10. Position-aware blending can yield negative blended scores. The `MIN_CONFIDENCE_SCORE=0.3` threshold was rejecting valid reranked results, causing "I don't have enough information" responses. Fixed by skipping the threshold when reranking is active.
 
 ---
 
@@ -314,8 +366,8 @@ POST /api/chats/{chat_id}/ask
 |-----------|-----------|-------|
 | Backend Framework | FastAPI | Async, auto-docs, type hints |
 | Vector Database | Qdrant | Self-hosted via Docker |
-| Embeddings | sentence-transformers | all-MiniLM-L6-v2 (384-dim) |
-| Keyword Search | BM25 (rank-bm25) | Cached to disk, synced with Qdrant |
+| Embeddings | Gemini Embedding API | gemini-embedding-001 (768-dim, MTEB 71.5%) |
+| Keyword Search | BM25 (rank-bm25) | Stop words, regex tokenizer, cached to disk |
 | Reranker | CrossEncoder | ms-marco-MiniLM-L-6-v2 |
 | LLM | Google Gemini 2.5 Flash | Generation + Query Expansion |
 | Document Processing | PyPDF2 | PDF-only currently |
@@ -340,11 +392,11 @@ POST /api/chats/{chat_id}/ask
 - **Position-Aware Reranking**: <5ms additional overhead (negligible)
 - **Hybrid Search**: ~100-150ms (vector + BM25 + fusion)
 
-### Quality Improvements (Expected)
-- **Recall**: +15-25% (query expansion)
-- **Ranking Quality**: +5-10% (RRF)
-- **Top-k Precision**: +3-5% (position-aware reranking)
-- **Overall Answer Quality**: ~20-30% improvement
+### Quality Improvements (Measured via Eval Framework)
+- **Semantic Similarity vs Claude.ai**: 0.897 avg (baseline was 0.742, +21%)
+- **ROUGE-L**: 0.152 avg
+- **Best question (q1)**: 0.932 similarity
+- **Weakest question (q3)**: 0.877 similarity
 
 ---
 
@@ -507,53 +559,35 @@ None currently! 🎉
 
 **For next session:**
 
-1. **To continue development**: `docker-compose up -d` and navigate to backend
+1. **To continue development**: `docker-compose up -d` (backend auto-starts with Gemini embeddings)
 2. **Recent context**:
-   - QMD-inspired RAG optimizations (~20-30% quality improvement) ✅
-   - Document chat count feature tests (5 new tests) ✅
-3. **Test Suite**: 136 tests all passing ✅
-4. **Latest commit**: `336e3ec` - test: Add comprehensive tests for document chat count feature
-5. **Suggested next task**: Build frontend UI (React + TypeScript) or add more document formats
-6. **No blockers**: System is stable and production-ready for MVP use case
+   - Evaluation framework built and operational
+   - Gemini embeddings (gemini-embedding-001) replacing sentence-transformers
+   - Semantic similarity: 0.742 → 0.897 (+21% vs Claude.ai gold standard)
+   - Next improvement: semantic chunking (Phase 3)
+3. **Test Suite**: 136 tests all passing (eval scripts run separately)
+4. **Current doc_id**: `4c12f53c-363c-4ddf-812f-b1806c919f01` (FX5U manual)
+5. **Suggested next task**: Semantic chunking or query decomposition
+6. **No blockers**: System stable
 
-**Commands to resume:**
-
-```bash
-cd ./
-docker-compose up -d
-cd backend && python run_api.py  # Or use Docker backend
-```
-
-**Quick test:**
+**Run evaluation:**
 
 ```bash
-# Health check
-curl http://localhost:8000/health
+# Run benchmark eval
+docker-compose run --rm \
+  -e GEMINI_API_KEY=$GEMINI_API_KEY2 \
+  -e QDRANT_HOST=qdrant -e QDRANT_PORT=6333 \
+  -e EMBEDDING_MODEL=gemini-embedding-001 -e EMBEDDING_DIM=768 \
+  -e GEMINI_MODEL=gemini-2.5-flash \
+  -e USE_RERANKING=true -e USE_HYBRID_SEARCH=true \
+  -e USE_QUERY_EXPANSION=true -e USE_RRF=true \
+  test python evaluation/run_evaluation.py \
+    --dataset evaluation/datasets/fx5u_qa_benchmark.json \
+    --doc-ids 4c12f53c-363c-4ddf-812f-b1806c919f01 \
+    --output evaluation/results/latest.json --no-judge
 
-# List documents
-curl http://localhost:8000/api/query/documents
-
-# Test standard query
-curl -X POST http://localhost:8000/api/query/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Test question"}'
-
-# Test with query expansion (adds 1-2s latency, improves recall)
-curl -X POST http://localhost:8000/api/query/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What is machine learning?",
-    "use_query_expansion": true,
-    "use_rrf": true,
-    "rerank_blending": "position_aware"
-  }'
-```
-
-**To enable query expansion by default:**
-
-Edit `.env`:
-```bash
-USE_QUERY_EXPANSION=true  # Adds 1-2s latency but +15-25% recall
-USE_RRF=true              # Already enabled by default
-RERANKER_BLENDING=position_aware  # Already enabled by default
+# Compare two runs
+python evaluation/run_evaluation.py \
+  --compare evaluation/results/baseline.json evaluation/results/latest.json \
+  --output evaluation/results/comparison.html
 ```

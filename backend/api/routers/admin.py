@@ -45,6 +45,8 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
     vector_store = request.app.state.vector_store
     document_store = request.app.state.document_store
     upload_dir = request.app.state.upload_dir
+    chunk_size = request.app.state.chunk_size
+    chunk_overlap = request.app.state.chunk_overlap
 
     # Check for duplicate by filename
     duplicate = document_store.find_by_filename(file.filename)
@@ -84,7 +86,7 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 
         # Chunk text with page tracking
         print("Chunking text...")
-        chunker = TextChunker(chunk_size=1000, chunk_overlap=200)
+        chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         chunk_data = chunker.chunk_with_page_tracking(page_data)
         print(f"Created {len(chunk_data)} chunks")
 

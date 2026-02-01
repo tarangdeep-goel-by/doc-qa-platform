@@ -1,0 +1,48 @@
+{
+  "dataset_name": "FX5U Manual Q&A",
+  "document": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+  "version": "1.0",
+  "description": "Gold standard Q&A pairs from Claude.ai conversation for evaluating RAG quality on the FX5U hardware manual.",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Can you tell me the models of FX5U",
+      "claude_answer": "Looking at the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual, I can tell you the models of the FX5U CPU module.\nThe FX5U CPU module models are as follows:\nAC power supply models:\n\nFX5U-32MR/ES (16 inputs, 16 relay outputs)\nFX5U-32MT/ES (16 inputs, 16 transistor sink outputs)\nFX5U-32MT/ESS (16 inputs, 16 transistor source outputs)\nFX5U-64MR/ES (32 inputs, 32 relay outputs)\nFX5U-64MT/ES (32 inputs, 32 transistor sink outputs)\nFX5U-64MT/ESS (32 inputs, 32 transistor source outputs)\nFX5U-80MR/ES (40 inputs, 40 relay outputs)\nFX5U-80MT/ES (40 inputs, 40 transistor sink outputs)\nFX5U-80MT/ESS (40 inputs, 40 transistor source outputs)\n\nDC power supply models:\n\nFX5U-32MR/DS (16 inputs, 16 relay outputs)\nFX5U-32MT/DS (16 inputs, 16 transistor sink outputs)\nFX5U-32MT/DSS (16 inputs, 16 transistor source outputs)\nFX5U-64MR/DS (32 inputs, 32 relay outputs)\nFX5U-64MT/DS (32 inputs, 32 transistor sink outputs)\nFX5U-64MT/DSS (32 inputs, 32 transistor source outputs)\nFX5U-80MR/DS (40 inputs, 40 relay outputs)\nFX5U-80MT/DS (40 inputs, 40 transistor sink outputs)\nFX5U-80MT/DSS (40 inputs, 40 transistor source outputs)\n\nThe naming convention follows this pattern:\n\nThe number (32/64/80) indicates the total number of I/O points\nMR indicates relay outputs\nMT indicates transistor outputs\nES indicates AC power supply\nDS indicates DC power supply\nESS indicates AC power supply with source type transistor outputs\nDSS indicates DC power supply with source type transistor outputs",
+      "difficulty": "medium",
+      "category": "product_info",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q2",
+      "question": "Which models are AC and which models are DC?",
+      "claude_answer": "Based on the FX5U models, here's the breakdown:\nAC Power Supply Models (ending in /ES or /ESS):\n\nFX5U-32MR/ES\nFX5U-32MT/ES\nFX5U-32MT/ESS\nFX5U-64MR/ES\nFX5U-64MT/ES\nFX5U-64MT/ESS\nFX5U-80MR/ES\nFX5U-80MT/ES\nFX5U-80MT/ESS\n\nDC Power Supply Models (ending in /DS or /DSS):\n\nFX5U-32MR/DS\nFX5U-32MT/DS\nFX5U-32MT/DSS\nFX5U-64MR/DS\nFX5U-64MT/DS\nFX5U-64MT/DSS\nFX5U-80MR/DS\nFX5U-80MT/DS\nFX5U-80MT/DSS\n\nQuick identification tip:\n\n/ES or /ESS = AC power supply (100-240V AC)\n/DS or /DSS = DC power supply (24V DC)\n\nThe \"S\" at the end (ESS or DSS) specifically indicates source-type transistor outputs, while models without the extra \"S\" have either relay outputs (MR) or sink-type transistor outputs (MT).",
+      "difficulty": "easy",
+      "category": "classification",
+      "expected_sources": [],
+      "requires_synthesis": false,
+      "requires_organization": true
+    },
+    {
+      "id": "q3",
+      "question": "Can you tell me about the communication ports in FX5U-32MT/ES?",
+      "claude_answer": "Based on the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual, the FX5U-32MT/ES has the following communication ports:\nBuilt-in Communication Ports:\n\nUSB Port (Mini-B type)\n\nUsed for connection to programming software (GX Works3, GX Works2)\nTypically used for programming, monitoring, and debugging\n\n\nRS-422/485 Port\n\nMulti-purpose serial communication port\nCan be used for various protocols including:\n\nMODBUS RTU communication\nSerial communication with other devices\nConnection to GOT (graphic operation terminals)\n\n\nSupports RS-422 or RS-485 standards\n\n\nEthernet Port (RJ45)\n\nBuilt-in Ethernet communication\nSupports multiple protocols including:\n\nSLMP (Seamless Message Protocol) - Mitsubishi's protocol for MC Protocol communication\nMODBUS TCP\nFTP server/client functionality\n\n\nUsed for network communication, remote monitoring, and programming over Ethernet\n\n\n\nThese three ports provide flexible communication options for programming, HMI connectivity, network integration, and communication with other devices or PLCs. The Ethernet port is particularly useful for modern industrial networks and IoT applications.",
+      "difficulty": "medium",
+      "category": "specifications",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q4",
+      "question": "Can you tell me what the document is about?",
+      "claude_answer": "The document is the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware).\nThis manual covers the hardware aspects of Mitsubishi's MELSEC iQ-F series programmable logic controllers (PLCs), specifically the FX5S, FX5UJ, FX5U, and FX5UC models.\nThe manual typically includes information about:\n\nProduct specifications - Technical specifications for different CPU models and their variants\nHardware configuration - Physical dimensions, mounting methods, and system configuration\nI/O specifications - Input/output characteristics, wiring diagrams, and electrical specifications\nCommunication ports - Details about built-in communication interfaces (USB, RS-422/485, Ethernet)\nExpansion modules - Information about compatible I/O expansion modules and special function modules\nInstallation guidelines - Mounting instructions, wiring methods, and installation precautions\nMaintenance - Troubleshooting, diagnostics, and maintenance procedures\nSafety information - Precautions and safety guidelines for proper operation\n\nThis is a hardware-focused manual, so it concentrates on the physical aspects, wiring, installation, and hardware specifications rather than programming or software configuration (which would typically be covered in separate programming manuals).",
+      "difficulty": "easy",
+      "category": "overview",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    }
+  ]
+}

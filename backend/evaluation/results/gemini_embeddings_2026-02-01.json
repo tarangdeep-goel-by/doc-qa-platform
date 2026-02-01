@@ -1,0 +1,524 @@
+{
+  "timestamp": "2026-02-01T10:01:59.029011",
+  "dataset": "FX5U Manual Q&A",
+  "document": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+  "query_count": 4,
+  "config": {
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dim": "768",
+    "chunk_size": "2500",
+    "chunk_overlap": "500",
+    "top_k": "12",
+    "use_hybrid": "true",
+    "hybrid_alpha": "0.5",
+    "use_reranking": "true",
+    "use_query_expansion": "true",
+    "query_expansion_variants": "2",
+    "use_rrf": "true",
+    "reranker_blending": "position_aware",
+    "min_confidence": "0.3"
+  },
+  "queries": [
+    {
+      "question_id": "q1",
+      "question": "Can you tell me the models of FX5U",
+      "difficulty": "medium",
+      "category": "product_info",
+      "our_answer": "The models of FX5U CPU modules are categorized by their power supply specifications (AC or DC) and output type (Relay, Transistor sink, or Transistor source), as well as their total number of I/O points [Source 7].\n\nThe FX5U CPU module models include:\n\n*   **AC Power Supply Models** [Source 7, Source 8]:\n    *   **Relay Output (Sink/Source):**\n        *   FX5U-32MR/ES (32 points) [Source 1, Source 7, Source 8]\n        *   FX5U-64MR/ES (64 points) [Source 1, Source 7, Source 8]\n        *   FX5U-80MR/ES (80 points) [Source 1, Source 7, Source 8]\n    *   **Transistor (Sink) Output:**\n        *   FX5U-32MT/ES (32 points) [Source 1, Source 7, Source 8, Source 10]\n        *   FX5U-64MT/ES (64 points) [Source 1, Source 7, Source 8]\n        *   FX5U-80MT/ES (80 points) [Source 1, Source 7, Source 8]\n    *   **Transistor (Source) Output:**\n        *   FX5U-32MT/ESS (32 points) [Source 1, Source 7, Source 8]\n        *   FX5U-64MT/ESS (64 points) [Source 1, Source 7, Source 8]\n        *   FX5U-80MT/ESS (80 points) [Source 1, Source 7, Source 8]\n\n*   **DC Power Supply Models** [Source 7, Source 3]:\n    *   **Relay Output (Sink/Source):**\n        *   FX5U-32MR/DS (32 points) [Source 1, Source 3, Source 7]\n        *   FX5U-64MR/DS (64 points) [Source 1, Source 3, Source 7]\n        *   FX5U-80MR/DS (80 points) [Source 1, Source 3, Source 7]\n    *   **Transistor (Sink) Output:**\n        *   FX5U-32MT/DS (32 points) [Source 1, Source 3,",
+      "claude_answer": "Looking at the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual, I can tell you the models of the FX5U CPU module.\nThe FX5U CPU module models are as follows:\nAC power supply models:\n\nFX5U-32MR/ES (16 inputs, 16 relay outputs)\nFX5U-32MT/ES (16 inputs, 16 transistor sink outputs)\nFX5U-32MT/ESS (16 inputs, 16 transistor source outputs)\nFX5U-64MR/ES (32 inputs, 32 relay outputs)\nFX5U-64MT/ES (32 inputs, 32 transistor sink outputs)\nFX5U-64MT/ESS (32 inputs, 32 transistor source outputs)\nFX5U-80MR/ES (40 inputs, 40 relay outputs)\nFX5U-80MT/ES (40 inputs, 40 transistor sink outputs)\nFX5U-80MT/ESS (40 inputs, 40 transistor source outputs)\n\nDC power supply models:\n\nFX5U-32MR/DS (16 inputs, 16 relay outputs)\nFX5U-32MT/DS (16 inputs, 16 transistor sink outputs)\nFX5U-32MT/DSS (16 inputs, 16 transistor source outputs)\nFX5U-64MR/DS (32 inputs, 32 relay outputs)\nFX5U-64MT/DS (32 inputs, 32 transistor sink outputs)\nFX5U-64MT/DSS (32 inputs, 32 transistor source outputs)\nFX5U-80MR/DS (40 inputs, 40 relay outputs)\nFX5U-80MT/DS (40 inputs, 40 transistor sink outputs)\nFX5U-80MT/DSS (40 inputs, 40 transistor source outputs)\n\nThe naming convention follows this pattern:\n\nThe number (32/64/80) indicates the total number of I/O points\nMR indicates relay outputs\nMT indicates transistor outputs\nES indicates AC power supply\nDS indicates DC power supply\nESS indicates AC power supply with source type transistor outputs\nDSS indicates DC power supply with source type transistor outputs",
+      "sources": [
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.10 External Dimensions 1195FX5U CPU module \uf0fbFX5U-32M \uf06f (Unit: mm) \uf0fbFX5U-64M \uf06f, FX5U-80M \uf06f (Unit: mm)Model W W1 (mounting hole pitch) Mass (weight) FX5U-32MR/E...",
+          "score": 2.131,
+          "page_num": 121
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "382 SYSTEM CONFIGURATION 2.2 Configuration Device ListBus conversion module Extended extension cable and connector conversion adapter Expansion board Expansion adapter SD memory card *1 An SD memory c...",
+          "score": 1.636,
+          "page_num": 40
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1135 \u2022 FX5U CPU module Model Terminal layout FX5U-32MR/DS FX5U-32MT/DS FX5U-32MT/DSS FX5U-64MR/DS FX5U-64MT/DS FX5U-64MT/DSS FX5U-80MR/DS FX...",
+          "score": 1.561,
+          "page_num": 115
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "905 CPU MODULE PERFORMANCE SPECIFICATIONS 5.2 Power Supply SpecificationsDC power supply *1 The FX5 safety extension module is not subject to the allowable momentary power failure time. *2 Maximum con...",
+          "score": 1.534,
+          "page_num": 92
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1 MODULE FEATURES 2911 MODULE FEATURES CPU module The CPU module incorporates a CPU, input and output terminals, and a power supply. The following table lists the types of CPU modules. The following t...",
+          "score": 1.426,
+          "page_num": 31
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 372Extension power supply module \uf0fbExtension cable type \uf0fbExtension connector type Intelligent function module Connector conversion module Safety ext...",
+          "score": 1.359,
+          "page_num": 39
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 352 *1 Area-specific modelFX5U CPU module AC power supply Sink/source Relay 16 points 16 points FX5U-32MR/ES 32 points 32 points FX5U-64MR/ES40 poi...",
+          "score": 1.303,
+          "page_num": 37
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1095 \u2022 FX5U CPU module Model Terminal layout FX5U-32MR/ES FX5U-32MT/ES FX5U-32MT/ESS FX5U-64MR/ES FX5U-64MT/ES FX5U-64MT/ESS FX5U-80MR/ES FX...",
+          "score": 1.144,
+          "page_num": 111
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 3322.2 Configuration Device List This section describes the devices that are co nfigured into a MELSEC iQ-F series system. Depending on the combina...",
+          "score": 1.04,
+          "page_num": 35
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "exceeded, 200mA produced by the 24VDC power supply is consumed per module. Module Model Power supply capacity 5VDC built-in power supply 24VDC service power supply CPU module FX5U-32MT/ES 900mA 400mA*...",
+          "score": 0.846,
+          "page_num": 60
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1085 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout \u2022 FX5UJ CPU module Model Terminal layout FX5UJ-24MR/ES FX5UJ-24MT/ES FX5UJ-24MT/ESS FX5UJ-40MR/ES FX5UJ-40MT/ES FX5UJ-40MT/ESS FX5UJ-60MR...",
+          "score": 0.795,
+          "page_num": 110
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "PSU-5V, FX5-C1PS-5V, FX3U-1PSU-5V Safety input expansion module FX5-SF-8DI4 No.2 No.3 No.4 No.1Module number CPU moduleFX5 intelligent module FX5-40SSC-SFX3 intelligent module FX3U-1PGFX3 intelligent ...",
+          "score": 0.286,
+          "page_num": 62
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1527,
+        "rouge_1": 0.2482,
+        "semantic_similarity": 0.9372
+      },
+      "latency_ms": 13622.2,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q2",
+      "question": "Which models are AC and which models are DC?",
+      "difficulty": "easy",
+      "category": "classification",
+      "our_answer": "The following models are categorized by their power supply type (AC or DC) based on the provided context:\n\n**AC Power Supply Models:**\n\n*   **FX5S CPU Module (AC power supply):** [Source 3]\n    *   FX5S-30MR/ES\n    *   FX5S-40MR/ES\n    *   FX5S",
+      "claude_answer": "Based on the FX5U models, here's the breakdown:\nAC Power Supply Models (ending in /ES or /ESS):\n\nFX5U-32MR/ES\nFX5U-32MT/ES\nFX5U-32MT/ESS\nFX5U-64MR/ES\nFX5U-64MT/ES\nFX5U-64MT/ESS\nFX5U-80MR/ES\nFX5U-80MT/ES\nFX5U-80MT/ESS\n\nDC Power Supply Models (ending in /DS or /DSS):\n\nFX5U-32MR/DS\nFX5U-32MT/DS\nFX5U-32MT/DSS\nFX5U-64MR/DS\nFX5U-64MT/DS\nFX5U-64MT/DSS\nFX5U-80MR/DS\nFX5U-80MT/DS\nFX5U-80MT/DSS\n\nQuick identification tip:\n\n/ES or /ESS = AC power supply (100-240V AC)\n/DS or /DSS = DC power supply (24V DC)\n\nThe \"S\" at the end (ESS or DSS) specifically indicates source-type transistor outputs, while models without the extra \"S\" have either relay outputs (MR) or sink-type transistor outputs (MT).",
+      "sources": [
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 372Extension power supply module \uf0fbExtension cable type \uf0fbExtension connector type Intelligent function module Connector conversion module Safety ext...",
+          "score": 0.875,
+          "page_num": 39
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "382 SYSTEM CONFIGURATION 2.2 Configuration Device ListBus conversion module Extended extension cable and connector conversion adapter Expansion board Expansion adapter SD memory card *1 An SD memory c...",
+          "score": 0.821,
+          "page_num": 40
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "342 SYSTEM CONFIGURATION 2.2 Configuration Device ListMELSEC iQ-F For devices other than CPU modules, the following tables list whether they can be used by each CPU module. \uf0c6: Can be used, \uf0c8: Cannot b...",
+          "score": 0.34,
+          "page_num": 36
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 352 *1 Area-specific modelFX5U CPU module AC power supply Sink/source Relay 16 points 16 points FX5U-32MR/ES 32 points 32 points FX5U-64MR/ES40 poi...",
+          "score": -0.956,
+          "page_num": 37
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "362 SYSTEM CONFIGURATION 2.2 Configuration Device ListI/O module \uf0fbExtension cable type \uf0fbExtension connector typeProduct Input type Output type Number of input pointsNumber of output pointsModel If usa...",
+          "score": -1.068,
+          "page_num": 38
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1055Power, input/output terminal block \u2022 Interpretation of terminal block layout (Screw terminal block) Ex. FX5U CPU module Item Description...",
+          "score": -1.085,
+          "page_num": 107
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1065 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal LayoutAC power supply \u2022 FX5S CPU module Model Terminal layout FX5S-30MR/ES FX5S-30MT/ES FX5S-30MT/ESS FX5S-40MR/ES FX5S-40MT/ES FX5S-40MT/ESS FX...",
+          "score": -1.123,
+          "page_num": 108
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1386 I/O MODULE PERFORMANCE SPECIFICATIONS 6.4 Powered I/O Module \u2022 Output circuit configuration Terminal layoutItem Circuit configuration diagram Relay output Item Circuit configuration diagram Sink ...",
+          "score": -1.733,
+          "page_num": 140
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2415.3 Grounding . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 188 15.4 Power Supply Wiring. ....",
+          "score": -3.241,
+          "page_num": 26
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "885 CPU MODULE PERFORMANCE SPECIFICATIONS 5.2 Power Supply Specifications5.2 Power Supply Specifications This sections describes the power supp ly specifications of the CPU module. AC power supply *1 ...",
+          "score": -3.598,
+          "page_num": 90
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1105 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal LayoutDC power supply \u2022 FX5S CPU module Model Terminal layout FX5S-30MR/DS FX5S-30MT/DS FX5S-30MT/DSS FX5S-40MR/DS FX5S-40MT/DS FX5S-40MT/DSS FX...",
+          "score": -3.85,
+          "page_num": 112
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.2 Power Supply Specifications 895The following shows the power failure detection period of the AC power supply. (FX5UJ/FX5U CPU modules only) SD8008t*1AC powe...",
+          "score": -4.184,
+          "page_num": 91
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1221,
+        "rouge_1": 0.1832,
+        "semantic_similarity": 0.8562
+      },
+      "latency_ms": 18098.0,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q3",
+      "question": "Can you tell me about the communication ports in FX5U-32MT/ES?",
+      "difficulty": "medium",
+      "category": "specifications",
+      "our_answer": "The FX5U-32MT/ES CPU module includes various terminals for power and input/output, and supports communication via specific cables or expansion modules.\n\n**Terminal Layout (I/O and Power)**\nThe terminal layout for the FX5U-32MT/ES includes:\n*   **Power Supply Terminals:** N and L [Source 5, Source 11].\n*   **24VDC Service Power Supply Terminals:** 0V and 24V [Source 5, Source 11].\n*   **Input Terminals:** X0 through X17 [Source 5].\n*   **Output Terminals:** Y0 through Y17, which are transistor (sink) type outputs. These outputs are connected to common terminals (COM0, COM1, COM2, COM3) [Source 3, Source 5, Source 11]. For transistor output (source) types, the \"COM \uf06f\" terminal would be a \"+V \uf06f\" terminal [Source 11].\n\n**Communication Capabilities**\nWhile dedicated communication ports like Ethernet, USB, or RS-232C are not explicitly labeled on the main terminal block diagram for the FX5U-32MT/ES [Source 5], the FX5U CPU module series (which includes FX5U-32MT/ES) supports the following communication options:\n*   **USB Connection:** A USB cable such as MR-J3USBCBL3M or GT09-C30USB-5P can be used [Source 7].\n*   **RS-232C Connection:** An RS-232C connection cable (e.g., FX-232CAB-1) can be used. This requires an expansion board (FX5-232-BD) or an expansion adapter (FX5-23",
+      "claude_answer": "Based on the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual, the FX5U-32MT/ES has the following communication ports:\nBuilt-in Communication Ports:\n\nUSB Port (Mini-B type)\n\nUsed for connection to programming software (GX Works3, GX Works2)\nTypically used for programming, monitoring, and debugging\n\n\nRS-422/485 Port\n\nMulti-purpose serial communication port\nCan be used for various protocols including:\n\nMODBUS RTU communication\nSerial communication with other devices\nConnection to GOT (graphic operation terminals)\n\n\nSupports RS-422 or RS-485 standards\n\n\nEthernet Port (RJ45)\n\nBuilt-in Ethernet communication\nSupports multiple protocols including:\n\nSLMP (Seamless Message Protocol) - Mitsubishi's protocol for MC Protocol communication\nMODBUS TCP\nFTP server/client functionality\n\n\nUsed for network communication, remote monitoring, and programming over Ethernet\n\n\n\nThese three ports provide flexible communication options for programming, HMI connectivity, network integration, and communication with other devices or PLCs. The Ethernet port is particularly useful for modern industrial networks and IoT applications.",
+      "sources": [
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "ication connector may be touched in operat ion, be sure to eliminate the static electricity or attach an Ethernet cap*1 to prevent the influence of static electricity. *1 An Ethernet cap is not provid...",
+          "score": 0.938,
+          "page_num": 291
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1145 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout\uf0fbI/O connector : Indicates that the terminals are connected to each other in the programmable controller. In addition, \uf0f0 indicates that th...",
+          "score": 0.839,
+          "page_num": 116
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 352 *1 Area-specific modelFX5U CPU module AC power supply Sink/source Relay 16 points 16 points FX5U-32MR/ES 32 points 32 points FX5U-64MR/ES40 poi...",
+          "score": 0.801,
+          "page_num": 37
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1155\uf0fbI/O terminal block : Indicates that the terminals are connected to each other in the programmable controller. \u2022 FX5UC CPU module \uf0fbPower...",
+          "score": 0.721,
+          "page_num": 117
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1095 \u2022 FX5U CPU module Model Terminal layout FX5U-32MR/ES FX5U-32MT/ES FX5U-32MT/ESS FX5U-64MR/ES FX5U-64MT/ES FX5U-64MT/ESS FX5U-80MR/ES FX...",
+          "score": 0.381,
+          "page_num": 111
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1135 \u2022 FX5U CPU module Model Terminal layout FX5U-32MR/DS FX5U-32MT/DS FX5U-32MT/DSS FX5U-64MR/DS FX5U-64MT/DS FX5U-64MT/DSS FX5U-80MR/DS FX...",
+          "score": 0.256,
+          "page_num": 115
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "2 SYSTEM CONFIGURATION 2.2 Configuration Device List 392Communication cable *1 The expansion board for RS-232C communications (FX5-232-BD) or expansion adapter for RS-232C communications (FX5-232ADP) ...",
+          "score": 0.121,
+          "page_num": 41
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.10 External Dimensions 1195FX5U CPU module \uf0fbFX5U-32M \uf06f (Unit: mm) \uf0fbFX5U-64M \uf06f, FX5U-80M \uf06f (Unit: mm)Model W W1 (mounting hole pitch) Mass (weight) FX5U-32MR/E...",
+          "score": -0.14,
+          "page_num": 121
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "exceeded, 200mA produced by the 24VDC power supply is consumed per module. Module Model Power supply capacity 5VDC built-in power supply 24VDC service power supply CPU module FX5U-32MT/ES 900mA 400mA*...",
+          "score": -0.198,
+          "page_num": 60
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "FX5S CPU module FX5S-30MR/ES, FX5S-30MT/ES, FX5S-30MT/ESS, FX5S-40MR/ES, FX5S-40MT/ES, FX5S-40MT/ESS, FX5S-60MR/ES, FX5S-60MT/ES, FX5S-60MT/ESS, FX5S-80MR/ES*1, FX5S-80MT/ES*1, FX5S-80MT/ESS*1, FX5S-3...",
+          "score": -0.48,
+          "page_num": 22
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout 1055Power, input/output terminal block \u2022 Interpretation of terminal block layout (Screw terminal block) Ex. FX5U CPU module Item Description...",
+          "score": -0.568,
+          "page_num": 107
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "1085 CPU MODULE PERFORMANCE SPECIFICATIONS 5.9 Terminal Layout \u2022 FX5UJ CPU module Model Terminal layout FX5UJ-24MR/ES FX5UJ-24MT/ES FX5UJ-24MT/ESS FX5UJ-40MR/ES FX5UJ-40MT/ES FX5UJ-40MT/ESS FX5UJ-60MR...",
+          "score": -0.821,
+          "page_num": 110
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.0854,
+        "rouge_1": 0.189,
+        "semantic_similarity": 0.8588
+      },
+      "latency_ms": 19102.3,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q4",
+      "question": "Can you tell me what the document is about?",
+      "difficulty": "easy",
+      "category": "overview",
+      "our_answer": "The document is the \"MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)\" [Source 2, Source 3, Source 4, Source 5, Source 6, Source 7, Source 8, Source 9, Source 10, Source 11, Source 12].\n\nSpecifically, this manual describes the following for the MELSEC iQ-F series programmable controllers:\n*   System configuration [Source 4, Source 5]\n*   Specifications [Source 4]\n*   Installation [Source 4, Source 8]\n*   Wiring [Source 4]\n*   Maintenance [Source 4]\n*   Inspection [Source 4]\n\nThe manual covers various components and topics, including:\n*   Module features [Source 5]\n*   I/O Module performance specifications [Source 6, Source 11]\n*   Extension power supply module performance specifications [Source 6]\n*   Connector conversion module performance specifications [Source 6]\n*   Expansion adapter performance specifications (including Analog Adapter and Communication Adapter) [Source 2, Source 6]\n*   Expansion board performance specifications (for communications and SD Memory Card Module) [Source 2]\n*   SD Memory Card performance specifications (including handling and formatting) [Source 2, Source 8]\n*   Battery performance specifications (including application and life) [Source 2, Source 8]\n*   Installation methods (on DIN rail, directly) [Source 8]\n*   Connection of extension devices (expansion board, expansion adapter) [Source 8]\n*   Troubleshooting (using LEDs, engineering tool, error status) [Source 7]\n*   Precautions for battery transportation and disposal [Source 3]\n\nTarget modules for this manual include FX5S CPU modules (e.g., FX5S-30MR/ES, FX5S-40MT/ESS) and FX5UJ CPU modules (e.g., FX5UJ-24MR/ES, FX5UJ-60MR/ES) [Source 4].",
+      "claude_answer": "The document is the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware).\nThis manual covers the hardware aspects of Mitsubishi's MELSEC iQ-F series programmable logic controllers (PLCs), specifically the FX5S, FX5UJ, FX5U, and FX5UC models.\nThe manual typically includes information about:\n\nProduct specifications - Technical specifications for different CPU models and their variants\nHardware configuration - Physical dimensions, mounting methods, and system configuration\nI/O specifications - Input/output characteristics, wiring diagrams, and electrical specifications\nCommunication ports - Details about built-in communication interfaces (USB, RS-422/485, Ethernet)\nExpansion modules - Information about compatible I/O expansion modules and special function modules\nInstallation guidelines - Mounting instructions, wiring methods, and installation precautions\nMaintenance - Troubleshooting, diagnostics, and maintenance procedures\nSafety information - Precautions and safety guidelines for proper operation\n\nThis is a hardware-focused manual, so it concentrates on the physical aspects, wiring, installation, and hardware specifications rather than programming or software configuration (which would typically be covered in separate programming manuals).",
+      "sources": [
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "I 295MEMO",
+          "score": -1.806,
+          "page_num": 297
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "23 CONTENTSTerminal layout . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 149 External dimensions . ....",
+          "score": -1.894,
+          "page_num": 25
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 289 Compliance with EU Directive (CE marking). . . . . . . . . . . . . . . . . . . . . . . . . . . . ....",
+          "score": -2.007,
+          "page_num": 27
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "20INTRODUCTION This manual describes the system configurat ion, specifications, insta llation, wiring, maintenance, and inspection of MELSEC iQ-F series progra mmable controllers. Please read this man...",
+          "score": -4.25,
+          "page_num": 22
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "21 CONTENTSCONTENTS SAFETY PRECAUTIONS . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .1 PR\u00c9CAUTIONS DE S\u00c9CURIT\u00c9 ...",
+          "score": -4.331,
+          "page_num": 23
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "type . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 129 6.3 I/O Module . . . . . . . . . . . . . . . . . . . . . . . ...",
+          "score": -4.515,
+          "page_num": 24
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "25 CONTENTS16.13 Resetting the CPU Module . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 272 16.14 Executing the Program ...",
+          "score": -4.598,
+          "page_num": 27
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". 155 CHAPTER 11 SD MEMORY CARD PERFORMANCE SPECIFICATIONS 156 11.1 Handling of the SD Memory Card . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ....",
+          "score": -4.881,
+          "page_num": 25
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "296REVISIONS *The manual number is given on the bottom left of the back cover. Japanese manual number: SH-082451-K \uf0e3 2021 MITSUBISHI ELECTRIC CORPORATIONRevision date *Manual number Description Octobe...",
+          "score": -5.402,
+          "page_num": 298
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 S SD LED . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .70 SD memory card disable switch . . . . . . . . . . . . . .68 SD memory card slot . . . . . . . . . . . . . . . . . . . . . .68...",
+          "score": -5.478,
+          "page_num": 296
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "ication . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 104 5.9 Terminal Layout . . . . . . . . . . . . . . . . . . . . . . . ...",
+          "score": -6.713,
+          "page_num": 24
+        },
+        {
+          "doc_id": "4c12f53c-363c-4ddf-812f-b1806c919f01",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 265 16.7 Initializing the CPU Module . . . . . . . . . . . . . . . . . . ....",
+          "score": -6.824,
+          "page_num": 26
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1623,
+        "rouge_1": 0.2618,
+        "semantic_similarity": 0.9219
+      },
+      "latency_ms": 9825.5,
+      "low_confidence": false
+    }
+  ],
+  "summary": {
+    "retrieval": {
+      "avg_mrr": 0.0,
+      "avg_precision@1": 0.0,
+      "avg_recall@1": 0.0,
+      "avg_ndcg@1": 0.0,
+      "avg_precision@3": 0.0,
+      "avg_recall@3": 0.0,
+      "avg_ndcg@3": 0.0,
+      "avg_precision@5": 0.0,
+      "avg_recall@5": 0.0,
+      "avg_ndcg@5": 0.0,
+      "avg_precision@10": 0.0,
+      "avg_recall@10": 0.0,
+      "avg_ndcg@10": 0.0
+    },
+    "answer_quality": {
+      "avg_rouge_l": 0.1306,
+      "avg_rouge_1": 0.2206,
+      "avg_semantic_similarity": 0.8935
+    },
+    "performance": {
+      "query_count": 4,
+      "latency_ms": {
+        "min": 9825.5,
+        "max": 19102.3,
+        "mean": 15162.0,
+        "p50": 18098.0,
+        "p95": 19102.3,
+        "p99": 19102.3
+      },
+      "throughput": {
+        "total_seconds": 64.0,
+        "queries_per_second": 0.06
+      }
+    }
+  }
+}

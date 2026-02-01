@@ -1,10 +1,37 @@
 """BM25 keyword-based search index for document retrieval."""
 
+import re
 from rank_bm25 import BM25Okapi
 from typing import List, Dict, Any, Optional
 import pickle
 import os
 import numpy as np
+
+# Common English stop words (avoids NLTK dependency)
+_STOP_WORDS = frozenset({
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
+    "been", "being", "have", "has", "had", "do", "does", "did", "will",
+    "would", "could", "should", "may", "might", "shall", "can", "need",
+    "it", "its", "this", "that", "these", "those", "he", "she", "they",
+    "we", "you", "i", "me", "my", "his", "her", "our", "your", "their",
+    "what", "which", "who", "whom", "when", "where", "why", "how",
+    "not", "no", "nor", "if", "then", "than", "too", "very", "just",
+    "about", "above", "after", "again", "all", "also", "am", "any",
+    "because", "before", "between", "both", "during", "each", "few",
+    "further", "get", "got", "here", "into", "more", "most", "only",
+    "other", "out", "over", "own", "same", "so", "some", "such",
+    "there", "through", "under", "until", "up", "while",
+})
+
+# Regex: split on non-alphanumeric (keeps model numbers like FX5U-32MR/ES intact via hyphens)
+_TOKEN_RE = re.compile(r"[a-z0-9][\w\-/]*[a-z0-9]|[a-z0-9]", re.IGNORECASE)
+
+
+def tokenize(text: str) -> List[str]:
+    """Tokenize text with stop word removal and lowercasing."""
+    tokens = _TOKEN_RE.findall(text.lower())
+    return [t for t in tokens if t not in _STOP_WORDS and len(t) > 1]
 
 
 class BM25Index:
@@ -38,11 +65,8 @@ class BM25Index:
         # Store chunks for later retrieval
         self.chunks = chunks
 
-        # Tokenize all chunks (simple whitespace tokenization)
-        tokenized_chunks = [
-            chunk["text"].lower().split()
-            for chunk in chunks
-        ]
+        # Tokenize with stop word removal and punctuation handling
+        tokenized_chunks = [tokenize(chunk["text"]) for chunk in chunks]
 
         # Build BM25 index
         self.index = BM25Okapi(tokenized_chunks)
@@ -74,8 +98,8 @@ class BM25Index:
         if not self.index or not self.chunks:
             return []
 
-        # Tokenize query
-        tokenized_query = query.lower().split()
+        # Tokenize query with same pipeline as indexing
+        tokenized_query = tokenize(query)
 
         # Get BM25 scores for all chunks
         scores = self.index.get_scores(tokenized_query)

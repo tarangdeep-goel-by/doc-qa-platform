@@ -166,7 +166,12 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 blend_strategy=rerank_blending
             )
 
-        # Step 2.6: Check if we have confident results
+        # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
+        search_results = self._deduplicate_chunks(search_results)
+
+        # Step 2.7: Check if we have confident results
+        reranking_applied = use_reranking and self.reranker and len(search_results) > 0
+
         if not search_results:
             return {
                 "question": question,
@@ -177,8 +182,10 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             }
 
         # Check top score against threshold
+        # Skip when reranking is active — cross-encoder blended scores use a
+        # different scale (can be negative) so the 0-1 threshold doesn't apply.
         top_score = search_results[0]["score"] if search_results else 0
-        if top_score < min_score:
+        if not reranking_applied and top_score < min_score:
             # Format sources consistently even for low confidence responses
             formatted_sources = [
                 {
@@ -206,20 +213,15 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "top_score": top_score
             }
 
-        # Step 3: Build context from retrieved chunks
-        context_parts = []
-        sources = []
+        # Step 3: Build context from retrieved chunks with enhanced formatting
+        context = self._format_context_with_sources(search_results)
 
-        for i, result in enumerate(search_results):
+        # Build sources list for response
+        sources = []
+        for result in search_results:
             payload = result["payload"]
             score = result["score"]
 
-            # Add to context
-            context_parts.append(
-                f'[Document: "{payload["doc_title"]}", Chunk {payload["chunk_index"] + 1}]: {payload["text"]}'
-            )
-
-            # Add to sources
             sources.append({
                 "doc_id": payload["doc_id"],
                 "doc_title": payload["doc_title"],
@@ -227,8 +229,6 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "score": round(score, 3),
                 "page_num": payload.get("page_num")
             })
-
-        context = "\n\n".join(context_parts)
 
         # Step 4: Generate answer with Gemini
         prompt = self._build_prompt(question, context)
@@ -241,6 +241,33 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             "retrieved_count": len(search_results)
         }
 
+    def _deduplicate_chunks(
+        self, chunks: List[Dict], threshold: float = 0.85
+    ) -> List[Dict]:
+        """Remove near-duplicate chunks based on text overlap (Jaccard similarity)."""
+        if len(chunks) <= 1:
+            return chunks
+
+        unique = [chunks[0]]
+        for chunk in chunks[1:]:
+            text = chunk["payload"]["text"]
+            words = set(text.lower().split())
+            is_dup = False
+            for existing in unique:
+                ex_words = set(existing["payload"]["text"].lower().split())
+                if not words or not ex_words:
+                    continue
+                jaccard = len(words & ex_words) / len(words | ex_words)
+                if jaccard > threshold:
+                    is_dup = True
+                    break
+            if not is_dup:
+                unique.append(chunk)
+
+        if len(unique) < len(chunks):
+            print(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
+        return unique
+
     def _build_prompt(self, question: str, context: str) -> str:
         """
         Build prompt for Gemini with strict grounding instructions.
@@ -252,38 +279,69 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         Returns:
             Formatted prompt string
         """
-        return f"""You are a precise document assistant. Your task is to answer questions using ONLY information explicitly stated in the provided context.
+        return f"""You are a precise document assistant. Answer questions using ONLY the provided context.
 
-CRITICAL RULES:
-1. Answer ONLY using information EXPLICITLY stated in the context below
-2. If the context doesn't contain enough information, say so clearly
-3. NEVER infer, guess, or use general knowledge beyond the context
-4. Quote specific passages when answering
-5. Cite which document(s) you used
+INSTRUCTIONS:
+1. READ all sources carefully - evaluate each source independently regardless of relevance score
+2. PRIORITIZE completeness and accuracy over source ranking (lower-ranked sources may contain tables/lists with complete data)
+3. SYNTHESIZE information across multiple sources if needed
+4. ORGANIZE your answer logically (use bullet points, numbered lists, or sections)
+5. CITE sources using the format: [Source N] or [Document: "title"]
+6. If information spans multiple sources, mention all relevant sources
+7. NEVER use knowledge outside the provided context
 
 Context from documents:
 {context}
 
-User Question: {question}
+Question: {question}
 
-BEFORE answering, verify:
-- Is the answer explicitly stated in the context?
-- Can I quote the specific passage that supports this?
-- Am I using ONLY the context, not my general knowledge?
+Think step-by-step:
+1. What is the user really asking?
+2. Which sources contain relevant information?
+3. How can I organize this information clearly?
+4. What specific quotes support my answer?
 
-If you cannot find sufficient information in the context:
-- Say "I cannot find information about [topic] in the available documents"
-- Suggest the user might need to check other sources or rephrase the question
-- Do NOT attempt to answer from general knowledge
+Answer (be comprehensive and well-organized):"""
 
-Answer:"""
+    def _format_context_with_sources(self, search_results: List[Dict]) -> str:
+        """
+        Format context from search results with relevance indicators.
+
+        Args:
+            search_results: List of search results with payload and score
+
+        Returns:
+            Formatted context string with visual hierarchy
+        """
+        context_parts = []
+        for i, result in enumerate(search_results, 1):
+            payload = result["payload"]
+            score = result["score"]
+
+            # Add relevance indicator
+            relevance = "★★★" if score >= 0.8 else "★★" if score >= 0.6 else "★"
+
+            # Add page number if available
+            page_info = f", Page {payload.get('page_num')}" if payload.get('page_num') else ""
+
+            # Format without bias - show all sources equally
+            source_info = f"[{relevance}] Source {i}: \"{payload['doc_title']}\"{page_info} (Relevance: {score:.0%})"
+
+            context_parts.append(f"{source_info}\n{payload['text']}")
+
+        return "\n\n" + "="*80 + "\n\n".join(context_parts)
 
     def _generate_answer(self, prompt: str) -> str:
         """Generate answer using Gemini."""
         try:
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=prompt
+                contents=prompt,
+                config={
+                    "temperature": 0.3,        # More factual (vs default 0.7)
+                    "topP": 0.9,              # Reasonable diversity (camelCase!)
+                    "maxOutputTokens": 2048   # Prevent runaway responses (camelCase!)
+                }
             )
             return response.text.strip()
         except Exception as e:

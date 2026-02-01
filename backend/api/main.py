@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
     data_dir = os.getenv("DATA_DIR", "data")
     upload_dir = os.getenv("UPLOAD_DIR", "data/uploads")
     use_reranking = os.getenv("USE_RERANKING", "true").lower() == "true"
+    chunk_size = int(os.getenv("CHUNK_SIZE", "2500"))
+    chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "500"))
 
     # Ensure directories exist
     os.makedirs(data_dir, exist_ok=True)
@@ -39,7 +41,11 @@ async def lifespan(app: FastAPI):
 
     # Initialize components
     print("Loading embedder...")
-    embedder = Embedder(model_name=embedding_model)
+    embedder = Embedder(
+        model_name=embedding_model,
+        gemini_api_key=gemini_api_key,
+        output_dimensionality=embedding_dim,
+    )
 
     print("Connecting to Qdrant...")
     vector_store = VectorStore(
@@ -71,6 +77,8 @@ async def lifespan(app: FastAPI):
     app.state.chat_manager = chat_manager
     app.state.qa_engine = qa_engine
     app.state.upload_dir = upload_dir
+    app.state.chunk_size = chunk_size
+    app.state.chunk_overlap = chunk_overlap
 
     print("Application initialized successfully!")
 
