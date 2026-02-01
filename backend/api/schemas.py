@@ -94,6 +94,7 @@ class QueryRequest(BaseModel):
     use_query_expansion: Optional[bool] = Field(default=None, description="Generate alternative query phrasings")
     use_rrf: Optional[bool] = Field(default=None, description="Use Reciprocal Rank Fusion")
     rerank_blending: Optional[str] = Field(default=None, description="Reranking blend strategy: 'position_aware' or 'replace'")
+    use_query_decomposition: Optional[bool] = Field(default=None, description="Decompose complex questions into sub-questions")
 
 
 # Source Information

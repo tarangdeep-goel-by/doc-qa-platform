@@ -78,6 +78,73 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             print(f"Warning: Query expansion failed: {e}")
             return [question]
 
+    def _is_complex_question(self, question: str) -> bool:
+        """Classify whether a question needs decomposition into sub-questions."""
+        try:
+            prompt = (
+                "Classify this question as SIMPLE or COMPLEX.\n"
+                "COMPLEX = asks about multiple distinct topics, requires comparing/contrasting, "
+                "or needs information from different sections.\n"
+                "SIMPLE = asks about one specific thing.\n\n"
+                f"Question: {question}\n\n"
+                "Reply with ONLY the word SIMPLE or COMPLEX."
+            )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config={"temperature": 0.0, "maxOutputTokens": 10}
+            )
+            return "COMPLEX" in response.text.strip().upper()
+        except Exception as e:
+            print(f"Warning: Complexity classification failed: {e}")
+            return False
+
+    def _decompose_query(self, question: str) -> List[str]:
+        """Break a complex question into 2-4 simpler sub-questions."""
+        try:
+            prompt = (
+                "Break this complex question into 2-4 simpler sub-questions.\n"
+                "Each sub-question should be independently answerable from a document.\n"
+                "Keep sub-questions concise and specific.\n\n"
+                f"Question: {question}\n\n"
+                "Return ONLY the sub-questions, one per line, no numbering or bullets."
+            )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config={"temperature": 0.2, "maxOutputTokens": 256}
+            )
+            subs = [
+                line.strip().lstrip("0123456789.-) ")
+                for line in response.text.strip().split("\n")
+                if line.strip() and len(line.strip()) > 10
+            ]
+            return subs[:4] if subs else [question]
+        except Exception as e:
+            print(f"Warning: Query decomposition failed: {e}")
+            return [question]
+
+    def _synthesize_answers(
+        self, question: str, sub_results: List[Dict[str, Any]]
+    ) -> str:
+        """Synthesize sub-question answers into a single comprehensive response."""
+        parts = []
+        for r in sub_results:
+            parts.append(f"Sub-question: {r['question']}\nAnswer: {r['answer']}")
+        sub_text = "\n\n".join(parts)
+
+        prompt = (
+            "You are a document assistant. Synthesize the following sub-answers into one "
+            "comprehensive, well-organized answer to the original question.\n"
+            "- Merge overlapping information, don't repeat\n"
+            "- Keep source citations from the sub-answers\n"
+            "- Use clear structure (headings, bullets) if appropriate\n\n"
+            f"Original question: {question}\n\n"
+            f"Sub-answers:\n{sub_text}\n\n"
+            "Synthesized answer:"
+        )
+        return self._generate_answer(prompt)
+
     def answer_question(
         self,
         question: str,
@@ -91,7 +158,8 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
         use_rrf: bool = True,
-        rerank_blending: str = "position_aware"
+        rerank_blending: str = "position_aware",
+        use_query_decomposition: bool = False
     ) -> Dict[str, Any]:
         """
         Answer a question using RAG pipeline.
@@ -110,9 +178,59 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
             rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
 
+            use_query_decomposition: Whether to decompose complex questions into sub-questions
+
         Returns:
             Dictionary with answer and sources
         """
+        # Step 0: Query decomposition (if enabled)
+        if use_query_decomposition and self._is_complex_question(question):
+            print(f"Query decomposition: question classified as COMPLEX")
+            sub_questions = self._decompose_query(question)
+            print(f"Query decomposition: {len(sub_questions)} sub-questions: {sub_questions}")
+
+            if len(sub_questions) > 1:
+                # Answer each sub-question through the full pipeline (without decomposition)
+                sub_results = []
+                all_sources = []
+                for sq in sub_questions:
+                    sr = self.answer_question(
+                        question=sq,
+                        top_k=top_k,
+                        doc_ids=doc_ids,
+                        use_hybrid=use_hybrid,
+                        hybrid_alpha=hybrid_alpha,
+                        use_reranking=use_reranking,
+                        min_score=min_score,
+                        use_query_expansion=use_query_expansion,
+                        query_expansion_variants=query_expansion_variants,
+                        use_rrf=use_rrf,
+                        rerank_blending=rerank_blending,
+                        use_query_decomposition=False,  # prevent recursion
+                    )
+                    sub_results.append(sr)
+                    all_sources.extend(sr.get("sources", []))
+
+                # Deduplicate sources across sub-answers
+                seen_texts = set()
+                unique_sources = []
+                for s in all_sources:
+                    key = s["chunk_text"][:100]
+                    if key not in seen_texts:
+                        seen_texts.add(key)
+                        unique_sources.append(s)
+
+                # Synthesize final answer
+                answer = self._synthesize_answers(question, sub_results)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "sources": unique_sources[:top_k],
+                    "retrieved_count": len(unique_sources),
+                    "decomposed": True,
+                    "sub_questions": [sr["question"] for sr in sub_results],
+                }
+
         # Step 1: Query expansion (if enabled)
         if use_query_expansion:
             query_variants = self._expand_query(question, num_variants=query_expansion_variants)

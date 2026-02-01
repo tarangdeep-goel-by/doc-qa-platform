@@ -1,0 +1,366 @@
+{
+  "timestamp": "2026-02-01T10:58:10.206638",
+  "dataset": "Separation Letter Q&A",
+  "document": "Separation and Release of Claims Agreement",
+  "query_count": 3,
+  "config": {
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dim": "768",
+    "chunk_size": "2500",
+    "chunk_overlap": "500",
+    "top_k": "12",
+    "use_hybrid": "true",
+    "hybrid_alpha": "0.5",
+    "use_reranking": "true",
+    "use_query_expansion": "true",
+    "query_expansion_variants": "2",
+    "use_rrf": "true",
+    "reranker_blending": "position_aware",
+    "min_confidence": "0.3"
+  },
+  "queries": [
+    {
+      "question_id": "q1",
+      "question": "What is the uploaded document about?",
+      "difficulty": "medium",
+      "category": "product_info",
+      "our_answer": "The uploaded document is a \"Separation and Release of Claims Agreement\" [Source 8].\n\nIt is an agreement executed between:\n*   **Example Corp Private Limited** (referred to as \"Company\" or \"Employer\") [Source 8]\n*   **John Doe** (referred to as \"Employee\") [Source 8]\n\nThe purpose of the agreement is to formalize the arrangement as the Employee's employment with the Company has ended [Source 8]. It includes terms related to:\n*   **Separation Date and Garden Leave** [Source 6]\n*   **Full and Final Settlement (F&F Payment)** [Source 6, Source 10]\n*   **Return of Employer Property** [Source 7]\n*   **Waiver and Release of Claims** by the Employee against the Company [Source 7, Source 9]\n*   **Confidentiality** obligations regarding Company information and intellectual property [Source 1, Source 4, Source 5]\n*   **Non-Disparagement** by the Employee concerning the Employer group [Source 1]\n*   **Intellectual Property** developed by the Employee during employment [Source 1, Source 3]\n*   **Governing Law and Dispute Resolution**, specifying the Laws of India and courts at Bangalore, India [Source 2]",
+      "claude_answer": "This is a Separation and Release of Claims Agreement between Example Corp Private Limited (the company behind Example Gaming Platform, an esports and online gaming company) and an employee named John Doe.\nThe key points of this employment separation agreement are:\nDates and Timeline:\n\nEffective Date: September 1, 2025\nSeparation Date: October 31, 2025\nThe employee is placed on \"garden leave\" (paid leave with restricted duties/access) from the effective date until separation\n\nFinancial Settlement (F&F Payment):\n\nNotice Pay: \u20b9X,XX,XXX\nLeave Encashment: \u20b9XX,XXX\nX,XXX vested ESOP units (exercisable for 10 years from vesting date)\nFamily insurance coverage continues until October 26, 2025\nPayment due by November 20, 2025\n\nKey Obligations on the Employee:\n\nReturn all company property by separation date\nMaintain confidentiality of company information\nNon-disparagement clause (cannot make negative public statements about the company)\nAll intellectual property developed during employment belongs to the company\nRelease of all legal claims against the company\n\nGoverning Law: Indian law, with Bangalore courts having exclusive jurisdiction\nThe agreement also notes that the company waives any \"clawback\" of retention or joining bonuses, and that no separate acceptance is required\u2014receiving the agreement via email constitutes acceptance.",
+      "sources": [
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": -0.902,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "Agreement will not be affected or impaired. (d)Waiver Waiver of any one default will not waive subsequent defaults of the same or different kind, and no failure or delay of either Party to exercise or...",
+          "score": -2.295,
+          "page_num": 6
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "operty The Employee agrees and acknowledges that any and all intellectual property developed by the Employee in connection with the Business during the tenure of their employment with the Company shal...",
+          "score": -2.566,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "s not and shall not share, disseminate, copy, divulge or disclose any Company\u2019s Information including information of our employees, agents, partners, shareholders, officers, directors and affiliated c...",
+          "score": -4.112,
+          "page_num": 4
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(a)The Employee understands and acknowledges that by virtue of the Employee's employment with the Employer, the Employee had access to and knowledge of Confidential Information, was in a position of t...",
+          "score": -4.174,
+          "page_num": 4
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(b) Unless the context otherwise requires: (i) words importing one gender include the other gender; (ii) words importing the singular include the plural and vice versa; (iii) any reference to a statut...",
+          "score": -4.612,
+          "page_num": 2
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(d)The clauses 3, 5, 6, 7, 8 and 9 of this Agreement shall be effective from the Effective Date. (e)The Employee understands, acknowledges, and agrees that these benefits exceed what the Employee is o...",
+          "score": -4.627,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "SEPARATION AND RELEASE OF CLAIMS This Separation and Release of Claims Agreement (\u201c Agreement\u201d), dated as of 1st September 2025 (Effective Date), executed by and between (1)Example Corp Technology...",
+          "score": -4.661,
+          "page_num": 1
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "d discharges the Company, together with their predecessors, successors, direct and indirect parent companies, direct and indirect subsidiary companies, companies under common control with any of the f...",
+          "score": -5.393,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "ion for the Employee's execution of and compliance with this Agreement, including the Employee's waiver and release of claims in this Agreement and all other post-termination obligations, the Company ...",
+          "score": -5.489,
+          "page_num": 2
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1833,
+        "rouge_1": 0.3222,
+        "semantic_similarity": 0.9127
+      },
+      "latency_ms": 9931.7,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q2",
+      "question": "How much is the garden leave and what is the notice pay?",
+      "difficulty": "easy",
+      "category": "classification",
+      "our_answer": "Based on the provided context:\n\n**Garden Leave:**\n*   **Duration:** The Employee shall be placed on garden leave from the Effective Date (September 1, 2025) until the Separation Date (October 31, 2025) [Source 1, Source 5].\n*   **Payment during Garden Leave:** During Garden Leave, the Employee shall remain employed by the Company and will be paid for this period. Even if the Company shortens the Garden Leave period and terminates employment with written notice, the Company shall still pay the Employee for the remainder of the Garden Leave period [Source 1].\n*   The documents do not specify a fixed monetary amount for the garden leave.\n\n**Notice Pay:**\n*   The documents do not explicitly define a separate \"notice pay\" amount or duration.\n*   However, if the Company, at its sole discretion, shortens the Garden Leave period and terminates the Employee\u2019s employment by providing a written notice, the Company \"shall nonetheless pay the Employee for the remainder of the Garden Leave period\" [Source 1]. This payment for the remainder of the Garden Leave period would serve a similar function to notice pay in the event of early termination of the garden leave.",
+      "claude_answer": "Based on the document:\nNotice Pay: \u20b9X,XX,XXX (as listed in Annexure 1)\nGarden Leave Period: September 1, 2025 to October 31, 2025 (approximately 2 months)\nThe document doesn't list a separate monetary amount for \"garden leave pay.\" During garden leave, the employee remains employed by the company and would continue receiving their regular salary. The garden leave period essentially serves as the notice period where the employee is relieved of active duties but stays on payroll.\nSo in practical terms, the employee receives their normal salary during those two months of garden leave, plus the \u20b9X,XX,XXX notice pay and \u20b9XX,XXX leave encashment as part of the final settlement.",
+      "sources": [
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(b) Unless the context otherwise requires: (i) words importing one gender include the other gender; (ii) words importing the singular include the plural and vice versa; (iii) any reference to a statut...",
+          "score": 0.309,
+          "page_num": 2
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "ion for the Employee's execution of and compliance with this Agreement, including the Employee's waiver and release of claims in this Agreement and all other post-termination obligations, the Company ...",
+          "score": -2.316,
+          "page_num": 2
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(d)The clauses 3, 5, 6, 7, 8 and 9 of this Agreement shall be effective from the Effective Date. (e)The Employee understands, acknowledges, and agrees that these benefits exceed what the Employee is o...",
+          "score": -2.593,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": -5.624,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "SEPARATION AND RELEASE OF CLAIMS This Separation and Release of Claims Agreement (\u201c Agreement\u201d), dated as of 1st September 2025 (Effective Date), executed by and between (1)Example Corp Technology...",
+          "score": -5.652,
+          "page_num": 1
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(a)The Employee understands and acknowledges that by virtue of the Employee's employment with the Employer, the Employee had access to and knowledge of Confidential Information, was in a position of t...",
+          "score": -5.672,
+          "page_num": 4
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "Agreement will not be affected or impaired. (d)Waiver Waiver of any one default will not waive subsequent defaults of the same or different kind, and no failure or delay of either Party to exercise or...",
+          "score": -5.673,
+          "page_num": 6
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "operty The Employee agrees and acknowledges that any and all intellectual property developed by the Employee in connection with the Business during the tenure of their employment with the Company shal...",
+          "score": -5.677,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "d discharges the Company, together with their predecessors, successors, direct and indirect parent companies, direct and indirect subsidiary companies, companies under common control with any of the f...",
+          "score": -5.678,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "s not and shall not share, disseminate, copy, divulge or disclose any Company\u2019s Information including information of our employees, agents, partners, shareholders, officers, directors and affiliated c...",
+          "score": -5.684,
+          "page_num": 4
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.229,
+        "rouge_1": 0.33,
+        "semantic_similarity": 0.8723
+      },
+      "latency_ms": 14230.9,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q3",
+      "question": "What are the conditions of termination?",
+      "difficulty": "medium",
+      "category": "specifications",
+      "our_answer": "The conditions of termination, as outlined in the provided context, include several key aspects related to the separation date, financial settlement, return of property, waiver of claims, and ongoing obligations:\n\n**1. Separation Date and Garden Leave**\n*   The Employee's duty to work with the Company irrevocably ceases as of **October 31, 2025** (\"Separation Date\"). [Source 4]\n*   From the Effective Date (September 1, 2025), the Employee will be placed on \"Garden Leave\" until the Separation Date. During this period, the Employee remains employed and owes a duty of loyalty and fiduciary duty to the Company. [Source 4, Source 8]\n*   During Garden Leave, the Company reserves the right to:\n    *   Remove the Employee from active duties. [Source 4]\n    *   Restrict the Employee's access to the workplace. [Source 4]\n    *   Limit or prohibit contact with Company staff and customers/clients. [Source 4]\n    *   Limit or cut off access to Company computer systems, email, and information. [Source 4]\n    *   Shorten the Garden Leave period and terminate employment with written notice, while still paying the Employee for the remainder of the original Garden Leave period. [Source 4]\n\n**2. Full and Final Settlement (F&F Payment)**\n*   As consideration for the Employee's execution and compliance with the Agreement, including the waiver and release of claims, the Company will pay a full and final settlement of all salaries, benefits, and entitlements (\"F&F Payment\"). [Source 4, Source 5]\n*   The F&F Payment will be made within 45 days from the Separation Date (October 31, 2025) or **November 20, 2025**, whichever is earlier (\"Settlement Date\"). [Source 4, Source 5]\n*   The payment will be transferred to the Employee's bank account on record with the Company, and the bank transfer evidence will serve as a valid receipt. [Source 5]\n*   The Company waives and will not enforce any \"clawback\" provisions for retention or joining bonuses from the Offer Letter. [Source 5]\n*   The F&F Payment is in full settlement of all claims or losses the Employee has or may have had against the Company, including any ESOPs related payment. [Source 7]\n*   The Employee acknowledges that these benefits exceed what they are otherwise entitled to and are given in exchange for executing the Agreement. The Employee is not entitled to any additional payment or consideration not specifically referenced. [Source 1]\n*   The Company reserves the right to recoup or cancel any payment if the Employee does not comply with obligations set out in the Agreement or any agreed to in writing. [Source 1]\n*   The Employee is solely responsible for and legally bound to pay any required taxes (e.g., income taxes) on these payments. [Source 1]\n\n**3. Return of Property**\n*   By the Separation Date, the Employee must return all Employer property, including identification cards, access codes, keys, laptops, computers, phones, electronic devices, credit cards, electronically stored documents, physical files, and any other Employer property in their possession, unless otherwise agreed in writing or specified in Annexure 1. [Source 1]\n*   Failure to return company property will result in its value being deducted from the final F&F Payment. [Source 1]\n*   The Employee acknowledges no longer having access to or claiming ownership of the Employer's cloud storage or social media accounts. [Source 1]\n*   The Employee confirms having returned and/or removed all Company's Information and surrendered all tangible property, including laptops, keys, products, access cards, telephones, computers, and other related equipment and vehicles. [Source 9]\n\n**4. Waiver and Release of Claims**\n*   Subject to receiving the F&F Payment, the Employee releases and discharges the Company and its associated entities (predecessors, successors, affiliates, officers, directors, employees, etc.) from all claims of any nature whatsoever, whether known or unknown, that the Employee has or may have had against the Company up to and including the Effective Date or Separation Date. [Source 1, Source 7]\n*   By accepting the consideration, the Employee waives the right to seek further monetary or other relief from the Company for acts or omissions up to and including the Effective Date or Separation Date. [Source 7]\n*   The Employee acknowledges reading and understanding the Agreement, and knowingly, freely, and voluntarily assents to all terms, including the waiver, release, and covenants, in exchange for good and valuable consideration. [Source 6]\n*   No separate action or acceptance is required from the Employee for this Separation and Release of Claims document, and it shall be deemed accepted upon receipt. [Source 6]\n\n**5. Confidentiality**\n*   The Employee is bound by all terms pertaining to Confidentiality, Company's information, and Intellectual Property established in the offer letter and/or Company's Policies and Procedures. [Source 9]\n*   The Employee acknowledges having access to and knowledge of Confidential Information and being in a position of trust. [Source 9]\n*   The Employee confirms they have treated and will treat all Confidential Information as strictly confidential. [Source 9]\n*   The Employee will not share, disseminate, copy, divulge, or disclose any Company's Information or Confidential Information (e.g., trade secrets, patents, copyrights, business plans, customer details, designs, know-how, research and development activities, private processes, books and records). [Source 3, Source 9]\n*   The Employee will not attempt to reverse engineer, disassemble, or gain access to any Confidential Information and/or Intellectual Property by accessing systems, talking to previous employees, or any other means. [Source 3]\n*   The Employee shall not access or use any Confidential Information, copy any documents, records, files, media, or other resources containing Confidential Information, or remove any such resources from the Employer's premises or control. [Source 3]\n*   The Agreement and its contents shall remain confidential and not be disclosed to any third party, except to the Parties' counsel, accountants, financial advisors, tax professionals, or governmental authorities. [Source 6]\n\n**6. Intellectual Property**\n*   Any and all intellectual property developed by the Employee in connection with the Business during their employment shall be the sole and exclusive property of the Company. [Source 2, Source 6]",
+      "claude_answer": "Based on the document, here are the key conditions surrounding this separation:\nNature of Separation:\nThis is a resignation accepted by the company (not a termination initiated by the employer). The employee is placed on garden leave from September 1, 2025 until the separation date of October 31, 2025.\nDuring Garden Leave, the Company Can:\n\nRemove the employee from active duties (fully or partially)\nRestrict workplace access\nLimit contact with staff and customers/clients\nCut off access to computer systems, email, and documents\nShorten the garden leave period with written notice (but must still pay for the full period)\n\nEmployee Obligations:\n\nReturn all company property (laptops, ID cards, access devices, keys, phones, files, etc.) by the separation date\nMaintain strict confidentiality of all company information indefinitely\nNot disparage the company, its employees, officers, or directors\nSurrender all intellectual property developed during employment\nBe responsible for any applicable income taxes on the settlement\n\nCompany Obligations:\n\nPay the F&F settlement (\u20b9X,XX,XXX total) by November 20, 2025\nContinue family insurance coverage until October 26, 2025\nWaive any clawback of retention or joining bonuses\nHonor the X,XXX vested ESOPs (exercisable for 10 years)\n\nCompany's Right to Recoup Payment:\nThe company can cancel or recoup payments if the employee fails to comply with obligations under this agreement or any written commitments.",
+      "sources": [
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(d)The clauses 3, 5, 6, 7, 8 and 9 of this Agreement shall be effective from the Effective Date. (e)The Employee understands, acknowledges, and agrees that these benefits exceed what the Employee is o...",
+          "score": -1.518,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "operty The Employee agrees and acknowledges that any and all intellectual property developed by the Employee in connection with the Business during the tenure of their employment with the Company shal...",
+          "score": -2.262,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "s not and shall not share, disseminate, copy, divulge or disclose any Company\u2019s Information including information of our employees, agents, partners, shareholders, officers, directors and affiliated c...",
+          "score": -2.28,
+          "page_num": 4
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(b) Unless the context otherwise requires: (i) words importing one gender include the other gender; (ii) words importing the singular include the plural and vice versa; (iii) any reference to a statut...",
+          "score": -2.882,
+          "page_num": 2
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "ion for the Employee's execution of and compliance with this Agreement, including the Employee's waiver and release of claims in this Agreement and all other post-termination obligations, the Company ...",
+          "score": -3.727,
+          "page_num": 2
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": -3.904,
+          "page_num": 5
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "d discharges the Company, together with their predecessors, successors, direct and indirect parent companies, direct and indirect subsidiary companies, companies under common control with any of the f...",
+          "score": -4.676,
+          "page_num": 3
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "SEPARATION AND RELEASE OF CLAIMS This Separation and Release of Claims Agreement (\u201c Agreement\u201d), dated as of 1st September 2025 (Effective Date), executed by and between (1)Example Corp Technology...",
+          "score": -4.809,
+          "page_num": 1
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(a)The Employee understands and acknowledges that by virtue of the Employee's employment with the Employer, the Employee had access to and knowledge of Confidential Information, was in a position of t...",
+          "score": -5.058,
+          "page_num": 4
+        },
+        {
+          "doc_id": "7ec9dc35-5dda-4ea4-a545-3c71f4c97770",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "Agreement will not be affected or impaired. (d)Waiver Waiver of any one default will not waive subsequent defaults of the same or different kind, and no failure or delay of either Party to exercise or...",
+          "score": -5.103,
+          "page_num": 6
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1444,
+        "rouge_1": 0.2536,
+        "semantic_similarity": 0.8867
+      },
+      "latency_ms": 19452.6,
+      "low_confidence": false
+    }
+  ],
+  "summary": {
+    "retrieval": {
+      "avg_mrr": 0.0,
+      "avg_precision@1": 0.0,
+      "avg_recall@1": 0.0,
+      "avg_ndcg@1": 0.0,
+      "avg_precision@3": 0.0,
+      "avg_recall@3": 0.0,
+      "avg_ndcg@3": 0.0,
+      "avg_precision@5": 0.0,
+      "avg_recall@5": 0.0,
+      "avg_ndcg@5": 0.0,
+      "avg_precision@10": 0.0,
+      "avg_recall@10": 0.0,
+      "avg_ndcg@10": 0.0
+    },
+    "answer_quality": {
+      "avg_rouge_l": 0.1856,
+      "avg_rouge_1": 0.3019,
+      "avg_semantic_similarity": 0.8906
+    },
+    "performance": {
+      "query_count": 3,
+      "latency_ms": {
+        "min": 9931.7,
+        "max": 19452.6,
+        "mean": 14538.4,
+        "p50": 14230.9,
+        "p95": 19452.6,
+        "p99": 19452.6
+      },
+      "throughput": {
+        "total_seconds": 46.4,
+        "queries_per_second": 0.06
+      }
+    }
+  }
+}

@@ -55,6 +55,7 @@ async def ask_question(http_request: Request, query: QueryRequest):
         use_query_expansion = query.use_query_expansion if query.use_query_expansion is not None else _str_to_bool(os.getenv("USE_QUERY_EXPANSION", "false"))
         use_rrf = query.use_rrf if query.use_rrf is not None else _str_to_bool(os.getenv("USE_RRF", "true"))
         rerank_blending = query.rerank_blending if query.rerank_blending is not None else os.getenv("RERANKER_BLENDING", "position_aware")
+        use_query_decomposition = query.use_query_decomposition if query.use_query_decomposition is not None else _str_to_bool(os.getenv("USE_QUERY_DECOMPOSITION", "false"))
 
         # Run RAG pipeline with validated doc_ids and configuration
         result = qa_engine.answer_question(
@@ -66,7 +67,8 @@ async def ask_question(http_request: Request, query: QueryRequest):
             use_reranking=use_reranking,
             use_query_expansion=use_query_expansion,
             use_rrf=use_rrf,
-            rerank_blending=rerank_blending
+            rerank_blending=rerank_blending,
+            use_query_decomposition=use_query_decomposition
         )
 
         # Convert sources to schema format
