@@ -79,6 +79,7 @@ async def lifespan(app: FastAPI):
     app.state.upload_dir = upload_dir
     app.state.chunk_size = chunk_size
     app.state.chunk_overlap = chunk_overlap
+    app.state.use_semantic_chunking = os.getenv("USE_SEMANTIC_CHUNKING", "false").lower() == "true"
 
     print("Application initialized successfully!")
 

@@ -22,6 +22,7 @@ from api.schemas import (
 from src.models import DocumentMetadata, DocumentChunk
 from src.document_processor import DocumentProcessor
 from src.chunker import TextChunker
+from src.semantic_chunker import SemanticChunker
 
 router = APIRouter()
 
@@ -85,9 +86,15 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         file_size_mb = processor.get_file_size_mb(file_path)
 
         # Chunk text with page tracking
-        print("Chunking text...")
-        chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        chunk_data = chunker.chunk_with_page_tracking(page_data)
+        use_semantic = getattr(request.app.state, "use_semantic_chunking", False)
+        if use_semantic:
+            print("Chunking text (semantic)...")
+            chunker = SemanticChunker(embedder=embedder)
+            chunk_data = chunker.chunk_with_page_tracking(page_data)
+        else:
+            print("Chunking text (fixed-size)...")
+            chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            chunk_data = chunker.chunk_with_page_tracking(page_data)
         print(f"Created {len(chunk_data)} chunks")
 
         if not chunk_data:

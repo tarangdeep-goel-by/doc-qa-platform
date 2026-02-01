@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 from src.models import DocumentStore, DocumentChunk
 from src.document_processor import DocumentProcessor
 from src.chunker import TextChunker
+from src.semantic_chunker import SemanticChunker
 from src.embedder import Embedder
 from src.vector_store import VectorStore
 
@@ -137,6 +138,7 @@ def main():
     embedding_model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     chunk_size = int(os.getenv("CHUNK_SIZE", "2500"))
     chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "500"))
+    use_semantic = os.getenv("USE_SEMANTIC_CHUNKING", "false").lower() == "true"
 
     print(f"\nConfiguration:")
     print(f"  Data directory: {data_dir}")
@@ -144,11 +146,11 @@ def main():
     print(f"  Embedding model: {embedding_model}")
     print(f"  Chunk size: {chunk_size}")
     print(f"  Chunk overlap: {chunk_overlap}")
+    print(f"  Semantic chunking: {use_semantic}")
 
     # Initialize components
     print("\nInitializing components...")
     document_store = DocumentStore(data_dir=data_dir)
-    chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "384"))
     embedder = Embedder(
@@ -156,6 +158,10 @@ def main():
         gemini_api_key=gemini_api_key,
         output_dimensionality=embedding_dim,
     )
+    if use_semantic:
+        chunker = SemanticChunker(embedder=embedder)
+    else:
+        chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     vector_store = VectorStore(
         host=qdrant_host, port=qdrant_port, vector_size=embedding_dim
     )
