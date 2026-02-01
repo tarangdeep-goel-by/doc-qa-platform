@@ -54,19 +54,12 @@ def init_components():
     from src.vector_store import VectorStore
     from src.qa_engine import QAEngine
 
-    embedding_model = os.getenv(
-        "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
-    )
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-    if not gemini_api_key:
-        print("ERROR: GEMINI_API_KEY not set in .env")
-        sys.exit(1)
-
-    embedding_dim = int(os.getenv("EMBEDDING_DIM", "384"))
+    embedding_model = os.environ["EMBEDDING_MODEL"]
+    qdrant_host = os.environ["QDRANT_HOST"]
+    qdrant_port = int(os.environ["QDRANT_PORT"])
+    gemini_api_key = os.environ["GEMINI_API_KEY"]
+    model_name = os.environ["GEMINI_MODEL"]
+    embedding_dim = int(os.environ["EMBEDDING_DIM"])
 
     print("Initializing components...")
     embedder = Embedder(
@@ -89,21 +82,19 @@ def init_components():
 def get_rag_config() -> dict:
     """Read current RAG config from environment."""
     return {
-        "embedding_model": os.getenv(
-            "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
-        ),
-        "embedding_dim": os.getenv("EMBEDDING_DIM", "384"),
-        "chunk_size": os.getenv("CHUNK_SIZE", "2500"),
-        "chunk_overlap": os.getenv("CHUNK_OVERLAP", "500"),
-        "top_k": os.getenv("TOP_K_RESULTS", "12"),
-        "use_hybrid": os.getenv("USE_HYBRID_SEARCH", "true"),
-        "hybrid_alpha": os.getenv("HYBRID_ALPHA", "0.5"),
-        "use_reranking": os.getenv("USE_RERANKING", "true"),
-        "use_query_expansion": os.getenv("USE_QUERY_EXPANSION", "true"),
-        "query_expansion_variants": os.getenv("QUERY_EXPANSION_VARIANTS", "2"),
-        "use_rrf": os.getenv("USE_RRF", "true"),
-        "reranker_blending": os.getenv("RERANKER_BLENDING", "position_aware"),
-        "min_confidence": os.getenv("MIN_CONFIDENCE_SCORE", "0.3"),
+        "embedding_model": os.environ["EMBEDDING_MODEL"],
+        "embedding_dim": os.environ["EMBEDDING_DIM"],
+        "chunk_size": os.environ["CHUNK_SIZE"],
+        "chunk_overlap": os.environ["CHUNK_OVERLAP"],
+        "top_k": os.environ["TOP_K_RESULTS"],
+        "use_hybrid": os.environ["USE_HYBRID_SEARCH"],
+        "hybrid_alpha": os.environ["HYBRID_ALPHA"],
+        "use_reranking": os.environ["USE_RERANKING"],
+        "use_query_expansion": os.environ["USE_QUERY_EXPANSION"],
+        "query_expansion_variants": os.environ["QUERY_EXPANSION_VARIANTS"],
+        "use_rrf": os.environ["USE_RRF"],
+        "reranker_blending": os.environ["RERANKER_BLENDING"],
+        "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"],
     }
 
 
@@ -140,14 +131,14 @@ def run_evaluation(
     perf.start_suite()
 
     # Read RAG params from env
-    top_k = int(os.getenv("TOP_K_RESULTS", "12"))
-    use_hybrid = os.getenv("USE_HYBRID_SEARCH", "true").lower() == "true"
-    hybrid_alpha = float(os.getenv("HYBRID_ALPHA", "0.5"))
-    use_reranking = os.getenv("USE_RERANKING", "true").lower() == "true"
-    use_query_expansion = os.getenv("USE_QUERY_EXPANSION", "true").lower() == "true"
-    query_expansion_variants = int(os.getenv("QUERY_EXPANSION_VARIANTS", "2"))
-    use_rrf = os.getenv("USE_RRF", "true").lower() == "true"
-    rerank_blending = os.getenv("RERANKER_BLENDING", "position_aware")
+    top_k = int(os.environ["TOP_K_RESULTS"])
+    use_hybrid = os.environ["USE_HYBRID_SEARCH"].lower() == "true"
+    hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
+    use_reranking = os.environ["USE_RERANKING"].lower() == "true"
+    use_query_expansion = os.environ["USE_QUERY_EXPANSION"].lower() == "true"
+    query_expansion_variants = int(os.environ["QUERY_EXPANSION_VARIANTS"])
+    use_rrf = os.environ["USE_RRF"].lower() == "true"
+    rerank_blending = os.environ["RERANKER_BLENDING"]
 
     per_query_results = []
     all_retrieval_metrics = []

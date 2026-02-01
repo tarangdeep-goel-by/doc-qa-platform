@@ -21,7 +21,7 @@ services:
     volumes:
       - ./backend/data:/app/data
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - GEMINI_API_KEY=REDACTED_GEMINI_API_KEY
       - GEMINI_MODEL=gemini-2.5-flash
       - API_HOST=0.0.0.0
       - API_PORT=8000
@@ -39,7 +39,6 @@ services:
       - USE_HYBRID_SEARCH=true
       - HYBRID_ALPHA=0.5
       - USE_RERANKING=true
-      - MIN_CONFIDENCE_SCORE=0.3
       - USE_QUERY_EXPANSION=true
       - QUERY_EXPANSION_VARIANTS=2
       - USE_RRF=true
@@ -62,11 +61,30 @@ services:
     environment:
       - TEST_BASE_URL=http://backend:8000
       - TEST_PDF_PATH=tests/fixtures/test.pdf
-      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - GEMINI_API_KEY=REDACTED_GEMINI_API_KEY
+      - GEMINI_MODEL=gemini-2.5-flash
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-      - EMBEDDING_DIM=384
+      - DATA_DIR=data
+      - UPLOAD_DIR=data/uploads
+      - EMBEDDING_MODEL=gemini-embedding-001
+      - EMBEDDING_DIM=768
+      - CHUNK_SIZE=2500
+      - CHUNK_OVERLAP=500
+      - USE_SEMANTIC_CHUNKING=false
+      - TOP_K_RESULTS=12
+      - USE_HYBRID_SEARCH=true
+      - HYBRID_ALPHA=0.5
+      - USE_RERANKING=true
+      - USE_QUERY_EXPANSION=true
+      - USE_RRF=true
+      - USE_QUERY_DECOMPOSITION=true
+      - QUERY_EXPANSION_VARIANTS=2
+      - BM25_CACHE_DIR=data/bm25
+      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+      - RERANKER_BLENDING=position_aware
     depends_on:
       - backend
       - qdrant
@@ -83,7 +101,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - GEMINI_API_KEY=REDACTED_GEMINI_API_KEY
     command: pytest tests/test_bm25_index.py tests/test_reranker.py -v --tb=short
     profiles:
       - test
@@ -97,11 +115,11 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - GEMINI_API_KEY=REDACTED_GEMINI_API_KEY
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-      - EMBEDDING_DIM=384
+      - EMBEDDING_MODEL=gemini-embedding-001
+      - EMBEDDING_DIM=768
     depends_on:
       - qdrant
     command: pytest tests/test_hybrid_search.py tests/test_qa_guardrails.py tests/test_rag_pipeline_integration.py -v --tb=short
@@ -119,7 +137,7 @@ services:
     environment:
       - TEST_BASE_URL=http://backend:8000
       - TEST_PDF_PATH=tests/fixtures/test.pdf
-      - GEMINI_API_KEY=${GEMINI_API_KEY2:-}
+      - GEMINI_API_KEY=REDACTED_GEMINI_API_KEY
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
     depends_on:

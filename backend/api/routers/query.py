@@ -49,13 +49,13 @@ async def ask_question(http_request: Request, query: QueryRequest):
             doc_ids = valid_doc_ids
 
         # Get configuration from request or environment variables
-        use_hybrid = query.use_hybrid if query.use_hybrid is not None else _str_to_bool(os.getenv("USE_HYBRID_SEARCH", "true"))
-        hybrid_alpha = query.hybrid_alpha if query.hybrid_alpha is not None else float(os.getenv("HYBRID_ALPHA", "0.5"))
-        use_reranking = query.use_reranking if query.use_reranking is not None else _str_to_bool(os.getenv("USE_RERANKING", "true"))
-        use_query_expansion = query.use_query_expansion if query.use_query_expansion is not None else _str_to_bool(os.getenv("USE_QUERY_EXPANSION", "false"))
-        use_rrf = query.use_rrf if query.use_rrf is not None else _str_to_bool(os.getenv("USE_RRF", "true"))
-        rerank_blending = query.rerank_blending if query.rerank_blending is not None else os.getenv("RERANKER_BLENDING", "position_aware")
-        use_query_decomposition = query.use_query_decomposition if query.use_query_decomposition is not None else _str_to_bool(os.getenv("USE_QUERY_DECOMPOSITION", "false"))
+        use_hybrid = query.use_hybrid if query.use_hybrid is not None else _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
+        hybrid_alpha = query.hybrid_alpha if query.hybrid_alpha is not None else float(os.environ["HYBRID_ALPHA"])
+        use_reranking = query.use_reranking if query.use_reranking is not None else _str_to_bool(os.environ["USE_RERANKING"])
+        use_query_expansion = query.use_query_expansion if query.use_query_expansion is not None else _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
+        use_rrf = query.use_rrf if query.use_rrf is not None else _str_to_bool(os.environ["USE_RRF"])
+        rerank_blending = query.rerank_blending if query.rerank_blending is not None else os.environ["RERANKER_BLENDING"]
+        use_query_decomposition = query.use_query_decomposition if query.use_query_decomposition is not None else _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
 
         # Run RAG pipeline with validated doc_ids and configuration
         result = qa_engine.answer_question(

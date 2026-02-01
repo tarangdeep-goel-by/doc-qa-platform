@@ -132,13 +132,13 @@ def main():
     print("="*80)
 
     # Load configuration from .env
-    data_dir = os.getenv("DATA_DIR", "data")
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-    embedding_model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    chunk_size = int(os.getenv("CHUNK_SIZE", "2500"))
-    chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "500"))
-    use_semantic = os.getenv("USE_SEMANTIC_CHUNKING", "false").lower() == "true"
+    data_dir = os.environ["DATA_DIR"]
+    qdrant_host = os.environ["QDRANT_HOST"]
+    qdrant_port = int(os.environ["QDRANT_PORT"])
+    embedding_model = os.environ["EMBEDDING_MODEL"]
+    chunk_size = int(os.environ["CHUNK_SIZE"])
+    chunk_overlap = int(os.environ["CHUNK_OVERLAP"])
+    use_semantic = os.environ["USE_SEMANTIC_CHUNKING"].lower() == "true"
 
     print(f"\nConfiguration:")
     print(f"  Data directory: {data_dir}")
@@ -151,8 +151,8 @@ def main():
     # Initialize components
     print("\nInitializing components...")
     document_store = DocumentStore(data_dir=data_dir)
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-    embedding_dim = int(os.getenv("EMBEDDING_DIM", "384"))
+    gemini_api_key = os.environ["GEMINI_API_KEY"]
+    embedding_dim = int(os.environ["EMBEDDING_DIM"])
     embedder = Embedder(
         model_name=embedding_model,
         gemini_api_key=gemini_api_key,

@@ -21,17 +21,17 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     """Initialize and cleanup application resources."""
     # Load configuration
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-    embedding_model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    embedding_dim = int(os.getenv("EMBEDDING_DIM", "384"))
-    data_dir = os.getenv("DATA_DIR", "data")
-    upload_dir = os.getenv("UPLOAD_DIR", "data/uploads")
-    use_reranking = os.getenv("USE_RERANKING", "true").lower() == "true"
-    chunk_size = int(os.getenv("CHUNK_SIZE", "2500"))
-    chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "500"))
+    gemini_api_key = os.environ["GEMINI_API_KEY"]
+    gemini_model = os.environ["GEMINI_MODEL"]
+    qdrant_host = os.environ["QDRANT_HOST"]
+    qdrant_port = int(os.environ["QDRANT_PORT"])
+    embedding_model = os.environ["EMBEDDING_MODEL"]
+    embedding_dim = int(os.environ["EMBEDDING_DIM"])
+    data_dir = os.environ["DATA_DIR"]
+    upload_dir = os.environ["UPLOAD_DIR"]
+    use_reranking = os.environ["USE_RERANKING"].lower() == "true"
+    chunk_size = int(os.environ["CHUNK_SIZE"])
+    chunk_overlap = int(os.environ["CHUNK_OVERLAP"])
 
     # Ensure directories exist
     os.makedirs(data_dir, exist_ok=True)
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
     app.state.upload_dir = upload_dir
     app.state.chunk_size = chunk_size
     app.state.chunk_overlap = chunk_overlap
-    app.state.use_semantic_chunking = os.getenv("USE_SEMANTIC_CHUNKING", "false").lower() == "true"
+    app.state.use_semantic_chunking = os.environ["USE_SEMANTIC_CHUNKING"].lower() == "true"
 
     print("Application initialized successfully!")
 

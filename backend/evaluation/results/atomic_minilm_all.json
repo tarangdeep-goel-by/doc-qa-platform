@@ -1,0 +1,408 @@
+{
+  "timestamp": "2026-02-01T14:34:42.029514",
+  "dataset": "Atomic Habits Q&A",
+  "document": "Atomic Habits by James Clear",
+  "query_count": 3,
+  "config": {
+    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "embedding_dim": "384",
+    "chunk_size": "2500",
+    "chunk_overlap": "500",
+    "top_k": "12",
+    "use_hybrid": "true",
+    "hybrid_alpha": "0.5",
+    "use_reranking": "true",
+    "use_query_expansion": "true",
+    "query_expansion_variants": "2",
+    "use_rrf": "true",
+    "reranker_blending": "position_aware",
+    "use_query_decomposition": "true"
+  },
+  "queries": [
+    {
+      "question_id": "q1",
+      "question": "Can you tell me what is this book about",
+      "difficulty": "medium",
+      "category": "product_info",
+      "our_answer": "This book, *Atomic Habits*, offers a step-by-step plan for building better habits that can last a lifetime [Source 5]. It serves as an operating manual, explaining the science behind creating and changing habits in an easy-to-understand and applicable way [Source 5].\n\nKey aspects of the book include:\n*   **Practical Advice and Science** The book synthesizes the best ideas from various fields such as biology, neuroscience, philosophy, and psychology, along with recent scientific discoveries. Its goal is to connect these ideas in a highly actionable manner [Source 5].\n*   **Identity-Based Habits** A central theme is the concept of identity-based habits, which focuses on becoming the type of person who can achieve desired results, rather than just focusing on the outcomes themselves. The book explains that habits shape identity, and identity, in turn, shapes habits, forming a two-way feedback loop driven by values, principles, and identity [Source 8].\n*   **Author's Personal Experience** The author, James Clear, learned about the ideas presented in the book by living them. He relied on small habits to recover from an injury, improve physical strength, perform at a high level, become a writer, build a successful business, and develop into a responsible adult [Source 5].",
+      "claude_answer": "The book in your project is Atomic Habits by James Clear, published in 2018.\nWhat it's about:\nThe book is a practical guide to building good habits and breaking bad ones. James Clear argues that small, incremental changes\u2014what he calls \"atomic\" habits\u2014compound over time to produce remarkable results. The core message is that you don't need massive transformation; instead, getting just 1% better each day leads to significant long-term improvement.\nKey concepts include:\nThe Four Laws of Behavior Change \u2014 Clear's framework for building habits based on four stages: cue, craving, response, and reward. Each law provides actionable strategies:\n\nMake it obvious (cue)\nMake it attractive (craving)\nMake it easy (response)\nMake it satisfying (reward)\n\nTo break bad habits, you invert these laws.\nIdentity-based habits \u2014 Rather than focusing on goals or outcomes, Clear emphasizes becoming the type of person who naturally does what you want to do. The question isn't \"What do I want to achieve?\" but \"Who do I want to become?\"\nThe author's personal story \u2014 Clear shares how he recovered from a severe baseball injury in high school using small habits, eventually becoming an Academic All-American athlete. This experience led him to study and write about habit formation, building a massive following through his website and newsletter.\nThe book draws on biology, neuroscience, psychology, and philosophy, but is designed as a practical operating manual rather than an academic text. It's aimed at anyone looking to make lasting improvements in their life, work, or relationships.",
+      "sources": [
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "T What Should You Read Next? HANK YOU SO much for taking the time to read this book. It has been a pleasure sharing my work with you. If you are looking for something to read next, allow me to of fer ...",
+          "score": -0.548,
+          "page_num": 209
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* The irony of how closely this story matches my process of writing this book is not lost on me. Although my publisher was much more accommodating, and my closet remained full, I did feel like I had t...",
+          "score": -0.615,
+          "page_num": 277
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "IAcknowledgments HAVE RELIED HEA VILY on others during the creation of this book. Before anyone else, I must thank my wife, Kristy , who has been indispensable throughout this process. She has played ...",
+          "score": -1.438,
+          "page_num": 217
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "What\u2019s next on your reading list? Discover your next great read! Get personalized book picks and up-to-date news about this author . Sign up now .",
+          "score": -1.652,
+          "page_num": 256
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "At the start of 2017, I launched the Habits Academy , which became the premier training platform for or ganizations and individuals interested in building better habits in life and work. * Fortune 500...",
+          "score": -2.345,
+          "page_num": 14
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* A similar story is told in the book Art & Fear by David Bayles and T ed Orland. It has been adapted here with permission. See the endnotes for a full explanation.",
+          "score": -2.609,
+          "page_num": 272
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "am indebted to Blake Atwood and Robin Dellabough for transforming my ugly and insanely long first drafts into a tight, readable manuscript. And I am thankful to Anne Barngrover for her ability to add ...",
+          "score": -2.708,
+          "page_num": 218
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "These are big questions, and many people aren\u2019 t sure where to begin\u2014 but they do know what kind of results they want: to get six-pack abs or to feel less anxious or to double their salary . That\u2019 s f...",
+          "score": -3.58,
+          "page_num": 40
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* I\u2019m so happy I was able to fit a Game of Thr ones reference into this book.",
+          "score": -3.708,
+          "page_num": 270
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* Fogg refers to this strategy as the \u201cT iny Habits recipe,\u201d but I'll call it the habit stacking formula throughout the book.",
+          "score": -4.214,
+          "page_num": 267
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* Charles Duhigg and Nir Eyal deserve special recognition for their influence on this image. This representation of the habit loop is a combination of language that was popularized by Duhigg\u2019 s book, ...",
+          "score": -4.355,
+          "page_num": 263
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "each book you r ead not only teaches : This idea\u2014that learning new ideas increases the value of your old ideas\u2014is something I first heard about from Patrick O\u2019Shaughnessy , who writes, \u201cThis is why kn...",
+          "score": -4.366,
+          "page_num": 222
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1345,
+        "rouge_1": 0.3453,
+        "semantic_similarity": 0.8402
+      },
+      "latency_ms": 10220.2,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q2",
+      "question": "What are the 4 laws of behavior change?",
+      "difficulty": "easy",
+      "category": "classification",
+      "our_answer": "The four laws of behavior change are a simple set of rules used to build better habits [Source 6]. They are:\n\n1.  **Make It Obvious** [Source 2, Source 6, Source 10]\n2.  **Make It Attractive** [Source 2, Source 6, Source 10]\n3.  **Make It Easy** [Source 2, Source 6, Source 10]\n4.  **Make It Satisfying** [Source 1, Source 2, Source 6, Source 10]\n\nThese laws increase the odds that a behavior will be performed (the first three laws) and repeated (the fourth law) [Source 1, Source 4]. They are derived from the four-step model of habits: cue, craving, response, and reward [Source 3, Source 6, Source 10, Source 11].",
+      "claude_answer": "The Four Laws of Behavior Change are James Clear's practical framework for building good habits and breaking bad ones. They're based on the four stages of a habit: cue, craving, response, and reward.\nTo Create a Good Habit:\n1st Law \u2014 Make It Obvious (Cue)\n\nUse implementation intentions: \"I will [behavior] at [time] in [location]\"\nUse habit stacking: \"After [current habit], I will [new habit]\"\nDesign your environment so cues for good habits are visible\n\n2nd Law \u2014 Make It Attractive (Craving)\n\nUse temptation bundling: pair something you want to do with something you need to do\nJoin a culture where your desired behavior is normal\nCreate a motivation ritual before difficult habits\n\n3rd Law \u2014 Make It Easy (Response)\n\nReduce friction for good behaviors\nPrime your environment\nUse the Two-Minute Rule: scale habits down to take two minutes or less to start\n\n4th Law \u2014 Make It Satisfying (Reward)\n\nUse reinforcement\u2014give yourself an immediate reward when you complete a habit\nUse habit tracking to make progress visible\nNever miss twice\n\nTo Break a Bad Habit (Invert the Laws):\n\nMake it invisible \u2014 Remove cues from your environment\nMake it unattractive \u2014 Reframe your mindset; highlight the benefits of avoiding the bad habit\nMake it difficult \u2014 Increase friction; use commitment devices\nMake it unsatisfying \u2014 Get an accountability partner; create a habit contract\n\nClear suggests using these as diagnostic questions: whenever you want to change behavior, ask yourself how you can make it obvious, attractive, easy, and satisfying\u2014or the inverse for habits you want to eliminate.",
+      "sources": [
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "In summary , a habit needs to be enjoyable for it to last. Simple bits of reinforcement\u2014like soap that smells great or toothpaste that has a refreshing mint flavor or seeing $50 hit your savings accou...",
+          "score": 3.948,
+          "page_num": 160
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Chapter Summary The inversion of the 3rd Law of Behavior Change is make it difficult . A commitment device is a choice you make in the present that locks in better behavior in the future. The ultimate...",
+          "score": 2.859,
+          "page_num": 149
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "credit to the many experts who preceded me. Anything foolish, assume it is my error . The backbone of this book is my four -step model of habits\u2014cue, craving, response, and reward\u2014and the four laws of...",
+          "score": 2.725,
+          "page_num": 15
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "The first three laws of behavior change\u2014 make it obvious, make it attractive, and make it easy \u2014increase the odds that a behavior will be performed this time. The fourth law of behavior change\u2014 make i...",
+          "score": 2.545,
+          "page_num": 155
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Inversion of the 2nd law (Craving): Make it unattractive. Inversion of the 3rd law (Response): Make it dif ficult. Inversion of the 4th law (Reward): Make it unsatisfying. It would be irresponsible fo...",
+          "score": 2.469,
+          "page_num": 53
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "A habit is a behavior that has been repeated enough times to become automatic. The ultimate purpose of habits is to solve the problems of life with as little ener gy and ef fort as possible. Any habit...",
+          "score": 2.393,
+          "page_num": 54
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "The 3rd Law Make It Easy 11 Walk Slowly , but Never Backward 12 The Law of Least Ef fort 13 How to Stop Procrastinating by Using the T wo-Minute Rule 14 How to Make Good Habits Inevitable and Bad Habi...",
+          "score": 2.179,
+          "page_num": 7
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Habits Scorecard, 64 \u201366 habit stacking, 74 \u201379, 110 \u201311 habit tracking, 197 implementation intention, 69 \u201372 making the cues of bad habits invisible, 94 \u201395 Fisher , Roger , 205 \u2013206 flow state, 224 ...",
+          "score": 1.978,
+          "page_num": 246
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Chapter Summary The 1st Law of Behavior Change is make it obvious . The two most common cues are time and location. Creating an implementation intention is a strategy you can use to pair a new habit w...",
+          "score": 1.629,
+          "page_num": 74
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Solution phase 3. Response: You flip the light switch. 4. Reward: You satisfy your craving to see. T urning on the light switch becomes associated with being in a dark room. By the time we become adul...",
+          "score": 1.443,
+          "page_num": 52
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "I Little Lessons from the Four Laws N THIS BOOK , I have introduced a four -step model for human behavior: cue, craving, response, reward. This framework not only teaches us how to create new habits b...",
+          "score": 1.142,
+          "page_num": 210
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "for automating a habit, 173 \u201375 social media, 174 \u201375 temptation bundling, 108 \u201311 3rd Law of Behavior Change (Make It Easy) agricultural expansion example of using the least ef fort, 149 \u201351 energy r...",
+          "score": 0.334,
+          "page_num": 253
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.0984,
+        "rouge_1": 0.1694,
+        "semantic_similarity": 0.8342
+      },
+      "latency_ms": 10275.9,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q3",
+      "question": "What type of changes succeed in applying habits?",
+      "difficulty": "medium",
+      "category": "specifications",
+      "our_answer": "The most effective way to change habits and succeed in applying them is to focus on **identity change** [Source 1, Source 3].\n\nKey aspects of this approach include:\n*   **Focus on \"Who\" over \"What\" or \"How\"**: Instead of concentrating on what you want to achieve (outcome-based habits), the initial step is to determine who you wish to become (identity-based habits) [Source 1, Source 3].\n*   **Identity as the North Star**: Identity change serves as the guiding principle for habit change [Source 1].\n*   **Three Levels of Change**: There are three levels of change: outcome change, process change, and identity change. Focusing on identity change is highlighted as the most effective method [Source 1].\n*   **Habits Shape Identity**: Habits are the means through which you develop your deepest beliefs about yourself, and you quite literally become your habits. Every action is a \"vote\" for the type of person you aspire to be [Source 1].\n*   **Continuous Evolution**: Becoming the best version of yourself involves continuously editing your beliefs and upgrading and expanding your identity [Source 1].",
+      "claude_answer": "According to James Clear, identity-based changes are the type that succeed in building lasting habits, as opposed to outcome-based changes. Here's the key distinction:\nThe Three Layers of Behavior Change\nClear describes change as happening at three levels, like layers of an onion:\n\nOutcomes \u2014 What you get (results like losing weight, publishing a book, earning more money)\nProcesses \u2014 What you do (your habits and systems)\nIdentity \u2014 What you believe (your worldview, self-image, beliefs about yourself)\n\nWhy Most Changes Fail\nMost people start with outcomes: \"I want to lose weight, so I'll diet.\" This is outcome-based change and it rarely lasts because:\n\nBehavior that is incongruent with your self-image won't stick\nYou're fighting against who you believe yourself to be\nMotivation fades, but identity remains\n\nWhat Actually Works: Identity-Based Change\nThe changes that succeed focus on who you wish to become, not what you want to achieve.\nClear illustrates this with two people refusing a cigarette:\n\nPerson A: \"No thanks, I'm trying to quit.\" (Still identifies as a smoker)\nPerson B: \"No thanks, I'm not a smoker.\" (Identity has shifted)\n\nThe reframe:\n\nInstead of \"I want to read more books\" \u2192 \"I want to become a reader\"\nInstead of \"I want to run a marathon\" \u2192 \"I want to become a runner\"\nInstead of \"I want to lose weight\" \u2192 \"What would a healthy person do?\"\n\nThe Two-Step Process for Successful Change\n\nDecide the type of person you want to be \u2014 Ask: \"Who is the type of person that could get the outcome I want?\"\nProve it to yourself with small wins \u2014 Each habit is a \"vote\" for your new identity\n\nWhy Small Changes Compound\nClear emphasizes that meaningful change doesn't require radical transformation. Small habits provide evidence of a new identity, and that evidence accumulates:\n\nEach time you write a page, you're a writer\nEach time you practice violin, you're a musician\nEach time you work out, you're an athlete\n\nYou don't need a unanimous vote\u2014you just need a majority. Over time, the story you tell yourself changes, and the habits become self-reinforcing because they're now part of who you are.",
+      "sources": [
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "THE REAL REASON HABITS MA TTER Identity change is the North Star of habit change. The remainder of this book will provide you with step-by-step instructions on how to build better habits in yourself, ...",
+          "score": 1.382,
+          "page_num": 41
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Chapter Summary The 1st Law of Behavior Change is make it obvious . The two most common cues are time and location. Creating an implementation intention is a strategy you can use to pair a new habit w...",
+          "score": 0.708,
+          "page_num": 74
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "of change are useful in their own way . The problem is the dir ection of change. Many people begin the process of changing their habits by focusing on what they want to achieve. This leads us to outco...",
+          "score": 0.415,
+          "page_num": 33
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Habits are the compound interest of self-improvement. Getting 1 percent better every day counts for a lot in the long-run. Habits are a double-edged sword. They can work for you or against you, which ...",
+          "score": 0.27,
+          "page_num": 30
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "A habit is a behavior that has been repeated enough times to become automatic. The ultimate purpose of habits is to solve the problems of life with as little ener gy and ef fort as possible. Any habit...",
+          "score": 0.215,
+          "page_num": 54
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Over the course of this book, we\u2019ve looked at dozens of stories about top performers. W e\u2019ve heard about Olympic gold medalists, award-winning artists, business leaders, lifesaving physicians, and sta...",
+          "score": 0.101,
+          "page_num": 206
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "habits can be easier to change in a new envir onment : S. Thompson, J. Michaelson, S. Abdallah, V. Johnson, D. Morris, K. Riley , and A. Simms, \u2018 Moments of Change\u2019 as Opportunities for Influencing Be...",
+          "score": -0.162,
+          "page_num": 227
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Budris, Caed, 260 building a habit four-step process 1. cue, 47 \u201348 2. craving, 48 3. response, 48 \u201349 4. reward, 49 problem phase and solution phase, 51 \u201353 lessons from, 259 \u201364 business application...",
+          "score": -0.304,
+          "page_num": 244
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "that happens in your bedroom. If you want behaviors that are stable and predictable, you need an environment that is stable and predictable. A stable environment where everything has a place and a pur...",
+          "score": -0.716,
+          "page_num": 83
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Chapter Summary The inversion of the 3rd Law of Behavior Change is make it difficult . A commitment device is a choice you make in the present that locks in better behavior in the future. The ultimate...",
+          "score": -0.968,
+          "page_num": 149
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "take to make progress. Whether an action is fully automatic is of less importance. To build a habit, you need to practice it. And the most ef fective way to make practice happen is to adhere to the 3r...",
+          "score": -1.099,
+          "page_num": 125
+        },
+        {
+          "doc_id": "3bb3200b-6b49-49b7-a18a-ceb63f2c1824",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "about life? Three deep breaths and smile. Once a habit has been built, the cue can prompt a craving, even if it has little to do with the original situation. The key to finding and fixing the causes o...",
+          "score": -1.321,
+          "page_num": 116
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1394,
+        "rouge_1": 0.2938,
+        "semantic_similarity": 0.7661
+      },
+      "latency_ms": 8020.2,
+      "low_confidence": false
+    }
+  ],
+  "summary": {
+    "retrieval": {
+      "avg_mrr": 0.0,
+      "avg_precision@1": 0.0,
+      "avg_recall@1": 0.0,
+      "avg_ndcg@1": 0.0,
+      "avg_precision@3": 0.0,
+      "avg_recall@3": 0.0,
+      "avg_ndcg@3": 0.0,
+      "avg_precision@5": 0.0,
+      "avg_recall@5": 0.0,
+      "avg_ndcg@5": 0.0,
+      "avg_precision@10": 0.0,
+      "avg_recall@10": 0.0,
+      "avg_ndcg@10": 0.0
+    },
+    "answer_quality": {
+      "avg_rouge_l": 0.1241,
+      "avg_rouge_1": 0.2695,
+      "avg_semantic_similarity": 0.8135
+    },
+    "performance": {
+      "query_count": 3,
+      "latency_ms": {
+        "min": 8020.2,
+        "max": 10275.9,
+        "mean": 9505.4,
+        "p50": 10220.2,
+        "p95": 10275.9,
+        "p99": 10275.9
+      },
+      "throughput": {
+        "total_seconds": 28.8,
+        "queries_per_second": 0.1
+      }
+    }
+  }
+}
