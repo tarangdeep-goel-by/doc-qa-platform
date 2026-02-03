@@ -32,6 +32,8 @@ async def lifespan(app: FastAPI):
     use_reranking = os.environ["USE_RERANKING"].lower() == "true"
     chunk_size = int(os.environ["CHUNK_SIZE"])
     chunk_overlap = int(os.environ["CHUNK_OVERLAP"])
+    bm25_cache_dir = os.environ["BM25_CACHE_DIR"]
+    reranker_model = os.environ["RERANKER_MODEL"]
 
     # Ensure directories exist
     os.makedirs(data_dir, exist_ok=True)
@@ -52,7 +54,8 @@ async def lifespan(app: FastAPI):
         host=qdrant_host,
         port=qdrant_port,
         collection_name="documents",
-        vector_size=embedding_dim
+        vector_size=embedding_dim,
+        bm25_cache_dir=bm25_cache_dir
     )
 
     print("Initializing document store...")
@@ -67,7 +70,8 @@ async def lifespan(app: FastAPI):
         vector_store=vector_store,
         gemini_api_key=gemini_api_key,
         model_name=gemini_model,
-        use_reranker=use_reranking
+        use_reranker=use_reranking,
+        reranker_model=reranker_model
     )
 
     # Store in app state

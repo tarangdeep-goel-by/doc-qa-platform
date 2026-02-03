@@ -1,0 +1,440 @@
+{
+  "timestamp": "2026-02-01T11:34:05.487514",
+  "dataset": "Separation Letter Q&A",
+  "document": "Separation and Release of Claims Agreement",
+  "query_count": 3,
+  "config": {
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dim": "768",
+    "chunk_size": "2500",
+    "chunk_overlap": "500",
+    "top_k": "12",
+    "use_hybrid": "true",
+    "hybrid_alpha": "0.5",
+    "use_reranking": "false",
+    "use_query_expansion": "true",
+    "query_expansion_variants": "2",
+    "use_rrf": "true",
+    "reranker_blending": "position_aware",
+    "min_confidence": "0.3"
+  },
+  "queries": [
+    {
+      "question_id": "q1",
+      "question": "What is the uploaded document about?",
+      "difficulty": "medium",
+      "category": "product_info",
+      "our_answer": "The uploaded documents are about three distinct subjects:\n\n1.  **\"Atomic Habits by James Clear.pdf\"**: This document is a book titled \"Atomic Habits by James Clear\" [Source 1, Source 4, Source 8, Source 9, Source 10]. It includes an appendix [Source 1] and notes that it was downloaded from the Z-Library project [",
+      "claude_answer": "This is a Separation and Release of Claims Agreement between Example Corp Private Limited (the company behind Example Gaming Platform, an esports and online gaming company) and an employee named John Doe.\nThe key points of this employment separation agreement are:\nDates and Timeline:\n\nEffective Date: September 1, 2025\nSeparation Date: October 31, 2025\nThe employee is placed on \"garden leave\" (paid leave with restricted duties/access) from the effective date until separation\n\nFinancial Settlement (F&F Payment):\n\nNotice Pay: \u20b9X,XX,XXX\nLeave Encashment: \u20b9XX,XXX\nX,XXX vested ESOP units (exercisable for 10 years from vesting date)\nFamily insurance coverage continues until October 26, 2025\nPayment due by November 20, 2025\n\nKey Obligations on the Employee:\n\nReturn all company property by separation date\nMaintain confidentiality of company information\nNon-disparagement clause (cannot make negative public statements about the company)\nAll intellectual property developed during employment belongs to the company\nRelease of all legal claims against the company\n\nGoverning Law: Indian law, with Bangalore courts having exclusive jurisdiction\nThe agreement also notes that the company waives any \"clawback\" of retention or joining bonuses, and that no separate acceptance is required\u2014receiving the agreement via email constitutes acceptance.",
+      "sources": [
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Appendix",
+          "score": 1.0,
+          "page_num": 208
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": 0.558,
+          "page_num": 5
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "I 295MEMO",
+          "score": 0.437,
+          "page_num": 297
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Your gateway to knowledge and culture. Accessible for everyone. O\ufb03cial Telegram channel Z-Access https://wikipedia.org/wiki/Z-Library z-library.sk z-lib.gs z-lib.fm go-to-library.sk This file was down...",
+          "score": 0.318,
+          "page_num": 292
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 289 Compliance with EU Directive (CE marking). . . . . . . . . . . . . . . . . . . . . . . . . . . . ....",
+          "score": 0.239,
+          "page_num": 27
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "5 S SD LED . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .70 SD memory card disable switch . . . . . . . . . . . . . .68 SD memory card slot . . . . . . . . . . . . . . . . . . . . . .68...",
+          "score": 0.123,
+          "page_num": 296
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "23 CONTENTSTerminal layout . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 149 External dimensions . ....",
+          "score": 0.049,
+          "page_num": 25
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* To be fair , this still sounds like an amazing night.",
+          "score": 0.048,
+          "page_num": 275
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "\u2014May 2018",
+          "score": 0.042,
+          "page_num": 219
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* I\u2019m so happy I was able to fit a Game of Thr ones reference into this book.",
+          "score": 0.029,
+          "page_num": 270
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 265 16.7 Initializing the CPU Module . . . . . . . . . . . . . . . . . . ....",
+          "score": 0.024,
+          "page_num": 26
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": ". 155 CHAPTER 11 SD MEMORY CARD PERFORMANCE SPECIFICATIONS 156 11.1 Handling of the SD Memory Card . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ....",
+          "score": 0.021,
+          "page_num": 25
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.0656,
+        "rouge_1": 0.1148,
+        "semantic_similarity": 0.5363,
+        "llm_judge": {
+          "relevance": 1,
+          "completeness": 1,
+          "accuracy": 1,
+          "organization": 4,
+          "overall": 1.75,
+          "explanation": "The system answer completely misunderstands the uploaded document. The reference answer clearly identifies the document as a \"Separation and Release of Claims Agreement,\" while the system answer claims it is \"Atomic Habits by James Clear.pdf.\" This fundamental error makes the system's response entirely irrelevant, incomplete, and inaccurate regarding the actual document the question is about. While the organization of the system's hallucinated content is clear and well-structured, the content itself is a complete fabrication in the context of the provided reference.",
+          "error": false
+        }
+      },
+      "latency_ms": 13931.9,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q2",
+      "question": "How much is the garden leave and what is the notice pay?",
+      "difficulty": "easy",
+      "category": "classification",
+      "our_answer": "The provided documents state the following regarding garden leave and notice pay:\n\n*   **Garden Leave Duration:** The Employee will be placed on garden leave from the Effective Date until the Separation Date, which is **October 31, 2025** [Source 1]. During this period, the Employee remains employed by the Company and continues to owe a duty of loyalty and fiduciary duty [Source 1].\n*   **Garden Leave Payment:** The Company reserves the right to shorten the Garden Leave period and terminate employment with written notice. In such a case, the Company **shall nonetheless pay the Employee for the remainder of the Garden Leave period** [Source 1]. The documents do not specify a fixed monetary amount for the entire garden leave period, only that the Employee will be paid for its duration.\n*   **Notice Pay:** The documents do not define a separate \"notice pay\" amount. However, the provision to pay the Employee for the remainder of the Garden Leave period if it is shortened serves a similar function to notice pay [Source 1].",
+      "claude_answer": "Based on the document:\nNotice Pay: \u20b9X,XX,XXX (as listed in Annexure 1)\nGarden Leave Period: September 1, 2025 to October 31, 2025 (approximately 2 months)\nThe document doesn't list a separate monetary amount for \"garden leave pay.\" During garden leave, the employee remains employed by the company and would continue receiving their regular salary. The garden leave period essentially serves as the notice period where the employee is relieved of active duties but stays on payroll.\nSo in practical terms, the employee receives their normal salary during those two months of garden leave, plus the \u20b9X,XX,XXX notice pay and \u20b9XX,XXX leave encashment as part of the final settlement.",
+      "sources": [
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(b) Unless the context otherwise requires: (i) words importing one gender include the other gender; (ii) words importing the singular include the plural and vice versa; (iii) any reference to a statut...",
+          "score": 1.0,
+          "page_num": 2
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "ion for the Employee's execution of and compliance with this Agreement, including the Employee's waiver and release of claims in this Agreement and all other post-termination obligations, the Company ...",
+          "score": 0.196,
+          "page_num": 2
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(d)The clauses 3, 5, 6, 7, 8 and 9 of this Agreement shall be effective from the Effective Date. (e)The Employee understands, acknowledges, and agrees that these benefits exceed what the Employee is o...",
+          "score": 0.194,
+          "page_num": 3
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "table by scientific technology standards at time of shipment from Mitsubishi. 7. Any other failure found not to be the responsibility of Mitsubishi or that admitted not to be so by the user. 8.Mitsubi...",
+          "score": 0.079,
+          "page_num": 299
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* In addition to her payment for the library , Catherine the Great asked Diderot to keep the books until she needed them and of fered to pay him a yearly salary to act as her librarian.",
+          "score": 0.066,
+          "page_num": 266
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "297WARRANTY Please confirm the following product warranty details before using this product. [Gratis Warranty Term] The gratis warranty term of the product shall be for one year after the date of purc...",
+          "score": 0.031,
+          "page_num": 299
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "d discharges the Company, together with their predecessors, successors, direct and indirect parent companies, direct and indirect subsidiary companies, companies under common control with any of the f...",
+          "score": 0.024,
+          "page_num": 3
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "SEPARATION AND RELEASE OF CLAIMS This Separation and Release of Claims Agreement (\u201c Agreement\u201d), dated as of 1st September 2025 (Effective Date), executed by and between (1)Example Corp Technology...",
+          "score": 0.024,
+          "page_num": 1
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "operty The Employee agrees and acknowledges that any and all intellectual property developed by the Employee in connection with the Business during the tenure of their employment with the Company shal...",
+          "score": 0.021,
+          "page_num": 5
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "s not and shall not share, disseminate, copy, divulge or disclose any Company\u2019s Information including information of our employees, agents, partners, shareholders, officers, directors and affiliated c...",
+          "score": 0.02,
+          "page_num": 4
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(a)The Employee understands and acknowledges that by virtue of the Employee's employment with the Employer, the Employee had access to and knowledge of Confidential Information, was in a position of t...",
+          "score": 0.019,
+          "page_num": 4
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": 0.017,
+          "page_num": 5
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.2086,
+        "rouge_1": 0.3453,
+        "semantic_similarity": 0.8779,
+        "llm_judge": {
+          "relevance": 2,
+          "completeness": 1,
+          "accuracy": 1,
+          "organization": 4,
+          "overall": 2.0,
+          "explanation": "The system answer is well-organized but critically fails on accuracy and completeness. It completely misses the explicit notice pay amount of \u20b9X,XX,XXX provided in the reference, instead incorrectly stating that the documents do not define a separate \"notice pay\" amount. For garden leave, it misses the specific start date (September 1, 2025) and the approximate duration (2 months), and its explanation of garden leave payment is less direct than the reference's mention of \"regular salary.\" These significant omissions and factual inaccuracies make the answer largely unhelpful in addressing the monetary aspects of the question.",
+          "error": false
+        }
+      },
+      "latency_ms": 12559.8,
+      "low_confidence": false
+    },
+    {
+      "question_id": "q3",
+      "question": "What are the conditions of termination?",
+      "difficulty": "medium",
+      "category": "specifications",
+      "our_answer": "The conditions of termination are as follows:\n\n1.  **Separation Date and Garden Leave**\n    *   The Employee's duty to work with the Company will irrevocably cease as of October 31, 2025 (\"Separation Date\"). [Source 6]\n    *   From the \"Effective Date\" until the Separation Date, the Employee will be on \"Garden",
+      "claude_answer": "Based on the document, here are the key conditions surrounding this separation:\nNature of Separation:\nThis is a resignation accepted by the company (not a termination initiated by the employer). The employee is placed on garden leave from September 1, 2025 until the separation date of October 31, 2025.\nDuring Garden Leave, the Company Can:\n\nRemove the employee from active duties (fully or partially)\nRestrict workplace access\nLimit contact with staff and customers/clients\nCut off access to computer systems, email, and documents\nShorten the garden leave period with written notice (but must still pay for the full period)\n\nEmployee Obligations:\n\nReturn all company property (laptops, ID cards, access devices, keys, phones, files, etc.) by the separation date\nMaintain strict confidentiality of all company information indefinitely\nNot disparage the company, its employees, officers, or directors\nSurrender all intellectual property developed during employment\nBe responsible for any applicable income taxes on the settlement\n\nCompany Obligations:\n\nPay the F&F settlement (\u20b9X,XX,XXX total) by November 20, 2025\nContinue family insurance coverage until October 26, 2025\nWaive any clawback of retention or joining bonuses\nHonor the X,XXX vested ESOPs (exercisable for 10 years)\n\nCompany's Right to Recoup Payment:\nThe company can cancel or recoup payments if the employee fails to comply with obligations under this agreement or any written commitments.",
+      "sources": [
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(d)The clauses 3, 5, 6, 7, 8 and 9 of this Agreement shall be effective from the Effective Date. (e)The Employee understands, acknowledges, and agrees that these benefits exceed what the Employee is o...",
+          "score": 1.0,
+          "page_num": 3
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "Appendix",
+          "score": 0.738,
+          "page_num": 208
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "table by scientific technology standards at time of shipment from Mitsubishi. 7. Any other failure found not to be the responsibility of Mitsubishi or that admitted not to be so by the user. 8.Mitsubi...",
+          "score": 0.716,
+          "page_num": 299
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "operty The Employee agrees and acknowledges that any and all intellectual property developed by the Employee in connection with the Business during the tenure of their employment with the Company shal...",
+          "score": 0.653,
+          "page_num": 5
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* The irony of how closely this story matches my process of writing this book is not lost on me. Although my publisher was much more accommodating, and my closet remained full, I did feel like I had t...",
+          "score": 0.483,
+          "page_num": 277
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "(b) Unless the context otherwise requires: (i) words importing one gender include the other gender; (ii) words importing the singular include the plural and vice versa; (iii) any reference to a statut...",
+          "score": 0.45,
+          "page_num": 2
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "s not and shall not share, disseminate, copy, divulge or disclose any Company\u2019s Information including information of our employees, agents, partners, shareholders, officers, directors and affiliated c...",
+          "score": 0.295,
+          "page_num": 4
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "furnished the same Confidential Information to the Employee in the first instance. (b)Parties expressly understand and agree that this Agreement and its contents shall remain CONFIDENTIAL and shall no...",
+          "score": 0.281,
+          "page_num": 5
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* The phrase addition by subtraction is also used by teams and businesses to describe removing people from a group in order to make the team stronger overall.",
+          "score": 0.256,
+          "page_num": 274
+        },
+        {
+          "doc_id": "e4c6305f-c749-4ff5-8c41-5b43143af19e",
+          "doc_title": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
+          "chunk_text": "297WARRANTY Please confirm the following product warranty details before using this product. [Gratis Warranty Term] The gratis warranty term of the product shall be for one year after the date of purc...",
+          "score": 0.245,
+          "page_num": 299
+        },
+        {
+          "doc_id": "2fa778b4-9ab5-4c39-a2af-ad8a6dcb3a74",
+          "doc_title": "Atomic Habits by James Clear.pdf",
+          "chunk_text": "* A similar story is told in the book Art & Fear by David Bayles and T ed Orland. It has been adapted here with permission. See the endnotes for a full explanation.",
+          "score": 0.209,
+          "page_num": 272
+        },
+        {
+          "doc_id": "ba3aab88-14f5-4fcf-a8ac-a145fe7ad7ac",
+          "doc_title": "Separation Letter Apr 25.pdf",
+          "chunk_text": "SEPARATION AND RELEASE OF CLAIMS This Separation and Release of Claims Agreement (\u201c Agreement\u201d), dated as of 1st September 2025 (Effective Date), executed by and between (1)Example Corp Technology...",
+          "score": 0.078,
+          "page_num": 1
+        }
+      ],
+      "retrieval_metrics": {
+        "mrr": 0.0,
+        "precision@1": 0.0,
+        "recall@1": 0.0,
+        "ndcg@1": 0.0,
+        "precision@3": 0.0,
+        "recall@3": 0.0,
+        "ndcg@3": 0.0,
+        "precision@5": 0.0,
+        "recall@5": 0.0,
+        "ndcg@5": 0.0,
+        "precision@10": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0
+      },
+      "answer_metrics": {
+        "rouge_l": 0.1364,
+        "rouge_1": 0.197,
+        "semantic_similarity": 0.822,
+        "llm_judge": {
+          "relevance": 3,
+          "completeness": 1,
+          "accuracy": 5,
+          "organization": 2,
+          "overall": 2.75,
+          "explanation": "The system answer is relevant as it directly addresses the question by starting with key conditions of termination, specifically the separation date and garden leave. The information it provides is accurate and consistent with the reference. However, its completeness is extremely poor; it only covers a tiny fraction of the conditions listed in the reference answer and abruptly cuts off mid-sentence. While it attempts to use a structured format with a heading and bullet points, the severe incompleteness and sudden stop significantly hinder its overall organization and readability as a comprehensive answer.",
+          "error": false
+        }
+      },
+      "latency_ms": 15035.9,
+      "low_confidence": false
+    }
+  ],
+  "summary": {
+    "retrieval": {
+      "avg_mrr": 0.0,
+      "avg_precision@1": 0.0,
+      "avg_recall@1": 0.0,
+      "avg_ndcg@1": 0.0,
+      "avg_precision@3": 0.0,
+      "avg_recall@3": 0.0,
+      "avg_ndcg@3": 0.0,
+      "avg_precision@5": 0.0,
+      "avg_recall@5": 0.0,
+      "avg_ndcg@5": 0.0,
+      "avg_precision@10": 0.0,
+      "avg_recall@10": 0.0,
+      "avg_ndcg@10": 0.0
+    },
+    "answer_quality": {
+      "avg_rouge_l": 0.1369,
+      "avg_rouge_1": 0.219,
+      "avg_semantic_similarity": 0.7454,
+      "avg_judge_relevance": 2.0,
+      "avg_judge_completeness": 1.0,
+      "avg_judge_accuracy": 2.33,
+      "avg_judge_organization": 3.33,
+      "avg_judge_overall": 2.17
+    },
+    "performance": {
+      "query_count": 3,
+      "latency_ms": {
+        "min": 12559.8,
+        "max": 15035.9,
+        "mean": 13842.6,
+        "p50": 13931.9,
+        "p95": 15035.9,
+        "p99": 15035.9
+      },
+      "throughput": {
+        "total_seconds": 61.8,
+        "queries_per_second": 0.05
+      }
+    }
+  }
+}

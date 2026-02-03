@@ -49,6 +49,7 @@ async def ask_question(http_request: Request, query: QueryRequest):
             doc_ids = valid_doc_ids
 
         # Get configuration from request or environment variables
+        top_k = query.top_k if query.top_k is not None else int(os.environ["TOP_K_RESULTS"])
         use_hybrid = query.use_hybrid if query.use_hybrid is not None else _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
         hybrid_alpha = query.hybrid_alpha if query.hybrid_alpha is not None else float(os.environ["HYBRID_ALPHA"])
         use_reranking = query.use_reranking if query.use_reranking is not None else _str_to_bool(os.environ["USE_RERANKING"])
@@ -60,7 +61,7 @@ async def ask_question(http_request: Request, query: QueryRequest):
         # Run RAG pipeline with validated doc_ids and configuration
         result = qa_engine.answer_question(
             question=query.question,
-            top_k=query.top_k,
+            top_k=top_k,
             doc_ids=doc_ids,
             use_hybrid=use_hybrid,
             hybrid_alpha=hybrid_alpha,

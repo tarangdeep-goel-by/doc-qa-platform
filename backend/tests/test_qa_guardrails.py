@@ -10,21 +10,22 @@ from src.vector_store import VectorStore
 @pytest.fixture
 def embedder():
     """Embedder instance."""
-    return Embedder()
+    return Embedder(
+        model_name=os.environ["EMBEDDING_MODEL"],
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
+    )
 
 
 @pytest.fixture
 def vector_store():
     """VectorStore instance."""
-    import os
-    # Use environment variables for host/port (Docker compatibility)
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-
     store = VectorStore(
-        host=qdrant_host,
-        port=qdrant_port,
-        collection_name="test_qa_guardrails"
+        host=os.environ["QDRANT_HOST"],
+        port=int(os.environ["QDRANT_PORT"]),
+        collection_name="test_qa_guardrails",
+        vector_size=int(os.environ["EMBEDDING_DIM"]),
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
     yield store
     # Cleanup
@@ -37,12 +38,13 @@ def vector_store():
 @pytest.fixture
 def qa_engine(embedder, vector_store):
     """QA engine instance."""
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "test_key")
     return QAEngine(
         embedder=embedder,
         vector_store=vector_store,
-        gemini_api_key=gemini_api_key,
-        use_reranker=True
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        model_name=os.environ["GEMINI_MODEL"],
+        use_reranker=os.environ["USE_RERANKING"].lower() == "true",
+        reranker_model=os.environ["RERANKER_MODEL"],
     )
 
 
@@ -219,12 +221,14 @@ class TestQAGuardrails:
         # Very low threshold (should pass)
         result_low = qa_engine.answer_question(
             question=question,
+            top_k=5,
             min_score=0.1
         )
 
         # Very high threshold (might reject)
         result_high = qa_engine.answer_question(
             question=question,
+            top_k=5,
             min_score=0.9
         )
 
@@ -253,6 +257,7 @@ class TestQAGuardrails:
         # Ask unrelated question to trigger low confidence
         result = qa_engine.answer_question(
             question="What is quantum physics?",
+            top_k=5,
             min_score=0.6  # High threshold
         )
 
@@ -267,6 +272,7 @@ class TestQAGuardrails:
         # All semantic (alpha=1.0)
         result_semantic = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=1.0,
             min_score=0.1
@@ -275,6 +281,7 @@ class TestQAGuardrails:
         # All keyword (alpha=0.0)
         result_keyword = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=0.0,
             min_score=0.1
@@ -283,6 +290,7 @@ class TestQAGuardrails:
         # Balanced (alpha=0.5)
         result_balanced = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=0.5,
             min_score=0.1
@@ -298,6 +306,7 @@ class TestQAGuardrails:
         # Filter to specific doc
         result = qa_engine.answer_question(
             question="PTO policy",
+            top_k=5,
             doc_ids=["policy1"],
             min_score=0.2
         )

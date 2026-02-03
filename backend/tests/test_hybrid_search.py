@@ -1,6 +1,7 @@
 """Tests for hybrid search (vector + BM25)."""
 
 import pytest
+import os
 import numpy as np
 from src.vector_store import VectorStore
 from src.embedder import Embedder
@@ -9,22 +10,22 @@ from src.embedder import Embedder
 @pytest.fixture
 def embedder():
     """Embedder instance for testing."""
-    return Embedder()
+    return Embedder(
+        model_name=os.environ["EMBEDDING_MODEL"],
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
+    )
 
 
 @pytest.fixture
 def vector_store():
     """VectorStore instance for testing."""
-    import os
-    # Use environment variables for host/port (Docker compatibility)
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-
-    # Use test collection name
     store = VectorStore(
-        host=qdrant_host,
-        port=qdrant_port,
-        collection_name="test_hybrid_search"
+        host=os.environ["QDRANT_HOST"],
+        port=int(os.environ["QDRANT_PORT"]),
+        collection_name="test_hybrid_search",
+        vector_size=int(os.environ["EMBEDDING_DIM"]),
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
     yield store
     # Cleanup - delete test collection
@@ -308,13 +309,12 @@ class TestHybridSearch:
         assert os.path.exists(cache_file)
 
         # Create new vector store and load cache
-        qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-        qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-
         new_store = VectorStore(
-            host=qdrant_host,
-            port=qdrant_port,
-            collection_name="test_hybrid_search"
+            host=os.environ["QDRANT_HOST"],
+            port=int(os.environ["QDRANT_PORT"]),
+            collection_name="test_hybrid_search",
+            vector_size=int(os.environ["EMBEDDING_DIM"]),
+            bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
         )
         loaded = new_store.bm25_index.load_cache()
 

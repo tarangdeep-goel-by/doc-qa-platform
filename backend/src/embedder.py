@@ -10,7 +10,7 @@ class Embedder:
 
     def __init__(
         self,
-        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        model_name: str,
         gemini_api_key: str = None,
         output_dimensionality: int = 768,
     ):
@@ -32,7 +32,7 @@ class Embedder:
         if self.use_gemini:
             from google import genai
 
-            api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
+            api_key = gemini_api_key
             if not api_key:
                 raise ValueError("GEMINI_API_KEY required for Gemini embeddings")
 

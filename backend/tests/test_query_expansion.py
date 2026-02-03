@@ -11,19 +11,22 @@ from src.vector_store import VectorStore
 @pytest.fixture
 def embedder():
     """Embedder instance for testing."""
-    return Embedder()
+    return Embedder(
+        model_name=os.environ["EMBEDDING_MODEL"],
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
+    )
 
 
 @pytest.fixture
 def vector_store():
     """VectorStore instance for testing."""
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-
     store = VectorStore(
-        host=qdrant_host,
-        port=qdrant_port,
-        collection_name="test_query_expansion"
+        host=os.environ["QDRANT_HOST"],
+        port=int(os.environ["QDRANT_PORT"]),
+        collection_name="test_query_expansion",
+        vector_size=int(os.environ["EMBEDDING_DIM"]),
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
     yield store
     # Cleanup
@@ -36,15 +39,13 @@ def vector_store():
 @pytest.fixture
 def qa_engine(embedder, vector_store):
     """QAEngine instance for testing."""
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    if not gemini_api_key:
-        pytest.skip("GEMINI_API_KEY not set")
-
     return QAEngine(
         embedder=embedder,
         vector_store=vector_store,
-        gemini_api_key=gemini_api_key,
-        use_reranker=False  # Disable reranker for faster tests
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        model_name=os.environ["GEMINI_MODEL"],
+        use_reranker=False,  # Disable reranker for faster tests
+        reranker_model=os.environ["RERANKER_MODEL"],
     )
 
 

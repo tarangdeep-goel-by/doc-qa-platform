@@ -12,21 +12,22 @@ from src.reranker import Reranker
 @pytest.fixture
 def embedder():
     """Embedder instance."""
-    return Embedder()
+    return Embedder(
+        model_name=os.environ["EMBEDDING_MODEL"],
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
+    )
 
 
 @pytest.fixture
 def vector_store():
     """VectorStore instance."""
-    import os
-    # Use environment variables for host/port (Docker compatibility)
-    qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-    qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-
     store = VectorStore(
-        host=qdrant_host,
-        port=qdrant_port,
-        collection_name="test_rag_pipeline"
+        host=os.environ["QDRANT_HOST"],
+        port=int(os.environ["QDRANT_PORT"]),
+        collection_name="test_rag_pipeline",
+        vector_size=int(os.environ["EMBEDDING_DIM"]),
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
     yield store
     # Cleanup
@@ -39,12 +40,13 @@ def vector_store():
 @pytest.fixture
 def qa_engine(embedder, vector_store):
     """QA engine with all features enabled."""
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "test_key")
     return QAEngine(
         embedder=embedder,
         vector_store=vector_store,
-        gemini_api_key=gemini_api_key,
-        use_reranker=True
+        gemini_api_key=os.environ["GEMINI_API_KEY"],
+        model_name=os.environ["GEMINI_MODEL"],
+        use_reranker=os.environ["USE_RERANKING"].lower() == "true",
+        reranker_model=os.environ["RERANKER_MODEL"],
     )
 
 
@@ -184,6 +186,7 @@ class TestRAGPipelineIntegration:
         """Test pipeline with guardrails - relevant query should pass."""
         result = qa_engine.answer_question(
             question="What are popular Python libraries?",
+            top_k=5,
             use_hybrid=True,
             use_reranking=True,
             min_score=0.3
@@ -201,6 +204,7 @@ class TestRAGPipelineIntegration:
         """Test pipeline with guardrails - unrelated query should be rejected."""
         result = qa_engine.answer_question(
             question="What is the capital of France?",
+            top_k=5,
             use_hybrid=False,  # Raw vector scores needed for min_score threshold
             use_reranking=False,  # Reranker uses different score scale
             min_score=0.6  # High threshold
@@ -216,6 +220,7 @@ class TestRAGPipelineIntegration:
         """Test pipeline with document filtering."""
         result = qa_engine.answer_question(
             question="PTO policy",
+            top_k=5,
             doc_ids=["hr_policy"],
             use_hybrid=True,
             use_reranking=True,
@@ -230,6 +235,7 @@ class TestRAGPipelineIntegration:
         # Search for specific term "scikit-learn"
         result = qa_engine.answer_question(
             question="scikit-learn",
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=0.3,  # Favor keyword matching
             use_reranking=False,
@@ -244,6 +250,7 @@ class TestRAGPipelineIntegration:
         # Search with semantic question (no exact keywords)
         result = qa_engine.answer_question(
             question="programming language for data analysis",
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=0.8,  # Favor semantic matching
             use_reranking=True,
@@ -271,6 +278,7 @@ class TestRAGPipelineIntegration:
         """Test that source metadata is preserved through pipeline."""
         result = qa_engine.answer_question(
             question="Python programming",
+            top_k=5,
             use_hybrid=True,
             use_reranking=True,
             min_score=0.1
@@ -288,6 +296,7 @@ class TestRAGPipelineIntegration:
         """Test pipeline handles empty query gracefully."""
         result = qa_engine.answer_question(
             question="",
+            top_k=5,
             use_hybrid=True,
             use_reranking=True
         )
@@ -301,6 +310,7 @@ class TestRAGPipelineIntegration:
 
         result = qa_engine.answer_question(
             question=long_query,
+            top_k=5,
             use_hybrid=True,
             use_reranking=True,
             min_score=0.1
@@ -315,6 +325,7 @@ class TestRAGPipelineIntegration:
 
         result1 = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             use_reranking=True,
             min_score=0.2
@@ -322,6 +333,7 @@ class TestRAGPipelineIntegration:
 
         result2 = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             use_reranking=True,
             min_score=0.2
@@ -338,6 +350,7 @@ class TestRAGPipelineIntegration:
         # All keyword (alpha=0)
         result_keyword = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=0.0,
             use_reranking=False,
@@ -347,6 +360,7 @@ class TestRAGPipelineIntegration:
         # All semantic (alpha=1)
         result_semantic = qa_engine.answer_question(
             question=question,
+            top_k=5,
             use_hybrid=True,
             hybrid_alpha=1.0,
             use_reranking=False,

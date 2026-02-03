@@ -1,5 +1,6 @@
 """Tests for cross-encoder reranker."""
 
+import os
 import pytest
 from src.reranker import Reranker
 
@@ -7,7 +8,7 @@ from src.reranker import Reranker
 @pytest.fixture
 def reranker():
     """Reranker instance for testing."""
-    return Reranker()
+    return Reranker(model_name=os.environ["RERANKER_MODEL"])
 
 
 @pytest.fixture
@@ -59,17 +60,17 @@ class TestReranker:
     def test_initialization(self, reranker):
         """Test reranker initialization."""
         assert reranker.model is not None
-        assert reranker.model_name == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        assert reranker.model_name == os.environ["RERANKER_MODEL"]
 
     def test_rerank_basic(self, reranker, sample_chunks):
         """Test basic reranking functionality."""
         query = "What is Python used for in machine learning?"
 
         # Rerank chunks
-        reranked = reranker.rerank(query, sample_chunks, top_k=3)
+        reranked = reranker.rerank(query, sample_chunks)
 
-        # Should return top_k results
-        assert len(reranked) == 3
+        # Should return all candidates
+        assert len(reranked) == len(sample_chunks)
 
         # Check structure
         assert "rerank_score" in reranked[0]
@@ -85,7 +86,7 @@ class TestReranker:
         query = "machine learning in Python"
 
         # Rerank
-        reranked = reranker.rerank(query, sample_chunks, top_k=4)
+        reranked = reranker.rerank(query, sample_chunks)
 
         # The chunk about "Machine learning in Python" should rank higher
         # than other chunks after reranking
@@ -97,7 +98,7 @@ class TestReranker:
         """Test that reranking updates the main score field."""
         query = "Python programming"
 
-        reranked = reranker.rerank(query, sample_chunks, top_k=3)
+        reranked = reranker.rerank(query, sample_chunks)
 
         # Main score should be updated to rerank_score
         for chunk in reranked:
@@ -107,7 +108,7 @@ class TestReranker:
         """Test that original retrieval score is preserved."""
         query = "Python"
 
-        reranked = reranker.rerank(query, sample_chunks, top_k=3)
+        reranked = reranker.rerank(query, sample_chunks)
 
         # Original scores should be preserved
         original_scores = {c["id"]: c["score"] for c in sample_chunks}
@@ -119,27 +120,17 @@ class TestReranker:
         """Test reranking with empty chunks list."""
         query = "test query"
 
-        reranked = reranker.rerank(query, [], top_k=5)
+        reranked = reranker.rerank(query, [])
 
         assert len(reranked) == 0
 
-    def test_rerank_top_k_limit(self, reranker, sample_chunks):
-        """Test that top_k limit is respected."""
+    def test_rerank_returns_all_candidates(self, reranker, sample_chunks):
+        """Test that rerank returns all scored candidates (no truncation)."""
         query = "Python"
 
-        # Request only 2 results
-        reranked = reranker.rerank(query, sample_chunks, top_k=2)
+        reranked = reranker.rerank(query, sample_chunks)
 
-        assert len(reranked) == 2
-
-    def test_rerank_top_k_larger_than_chunks(self, reranker, sample_chunks):
-        """Test top_k larger than available chunks."""
-        query = "Python"
-
-        # Request more than available
-        reranked = reranker.rerank(query, sample_chunks, top_k=10)
-
-        # Should return all chunks
+        # Should return ALL chunks, not a subset
         assert len(reranked) == len(sample_chunks)
 
     def test_rerank_single_chunk(self, reranker):
@@ -153,7 +144,7 @@ class TestReranker:
             }
         }]
 
-        reranked = reranker.rerank(query, chunk, top_k=1)
+        reranked = reranker.rerank(query, chunk)
 
         assert len(reranked) == 1
         assert "rerank_score" in reranked[0]
@@ -162,7 +153,7 @@ class TestReranker:
         """Test that reranking preserves all chunk metadata."""
         query = "Python"
 
-        reranked = reranker.rerank(query, sample_chunks, top_k=3)
+        reranked = reranker.rerank(query, sample_chunks)
 
         # Check that all original fields are preserved
         for chunk in reranked:
@@ -176,7 +167,7 @@ class TestReranker:
         """Test that rerank scores are reasonable."""
         query = "Python machine learning"
 
-        reranked = reranker.rerank(query, sample_chunks, top_k=4)
+        reranked = reranker.rerank(query, sample_chunks)
 
         # Rerank scores should be floats
         for chunk in reranked:
@@ -190,8 +181,8 @@ class TestReranker:
         query1 = "Python programming language"
         query2 = "JavaScript web development"
 
-        reranked1 = reranker.rerank(query1, sample_chunks, top_k=3)
-        reranked2 = reranker.rerank(query2, sample_chunks, top_k=3)
+        reranked1 = reranker.rerank(query1, sample_chunks)
+        reranked2 = reranker.rerank(query2, sample_chunks)
 
         # Top results should be different for different queries
         top1_text = reranked1[0]["payload"]["text"]
@@ -218,7 +209,7 @@ class TestReranker:
             }
         ]
 
-        reranked = reranker.rerank(query, chunks, top_k=2)
+        reranked = reranker.rerank(query, chunks)
 
         # Should still work and return results
         assert len(reranked) == 2
@@ -228,9 +219,9 @@ class TestReranker:
         """Test reranking with a long query."""
         query = "I want to learn about Python programming language and how it is used in machine learning and data science applications with libraries like TensorFlow"
 
-        reranked = reranker.rerank(query, sample_chunks, top_k=3)
+        reranked = reranker.rerank(query, sample_chunks)
 
-        assert len(reranked) == 3
+        assert len(reranked) == len(sample_chunks)
         # Should rank machine learning + Python chunk high
         assert any("machine learning" in c["payload"]["text"].lower()
                    for c in reranked[:2])
@@ -242,11 +233,11 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=3,
             blend_strategy="position_aware"
         )
 
-        assert len(reranked) == 3
+        # Should return all candidates
+        assert len(reranked) == len(sample_chunks)
 
         # Check that blending metadata is present
         for chunk in reranked:
@@ -262,7 +253,6 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=4,
             blend_strategy="position_aware"
         )
 
@@ -286,7 +276,6 @@ class TestReranker:
         position_aware = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=3,
             blend_strategy="position_aware"
         )
 
@@ -294,13 +283,12 @@ class TestReranker:
         replace = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=3,
             blend_strategy="replace"
         )
 
-        # Both should return results
-        assert len(position_aware) == 3
-        assert len(replace) == 3
+        # Both should return all candidates
+        assert len(position_aware) == len(sample_chunks)
+        assert len(replace) == len(sample_chunks)
 
         # Position-aware should have blend_weights
         assert "blend_weights" in position_aware[0]
@@ -315,7 +303,6 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=4,
             blend_strategy="position_aware"
         )
 
@@ -340,7 +327,6 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=[],
-            top_k=5,
             blend_strategy="position_aware"
         )
 
@@ -353,7 +339,6 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=3,
             blend_strategy="position_aware"
         )
 
@@ -386,7 +371,6 @@ class TestReranker:
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=chunks,
-            top_k=15,
             blend_strategy="position_aware"
         )
 
@@ -397,15 +381,14 @@ class TestReranker:
         assert len(reranked) == 15
         assert all("blend_weights" in c for c in reranked)
 
-    def test_position_aware_top_k_limit(self, reranker, sample_chunks):
-        """Test that position-aware blending respects top_k."""
+    def test_position_aware_returns_all_candidates(self, reranker, sample_chunks):
+        """Test that position-aware blending returns all candidates (no truncation)."""
         query = "Python"
 
         reranked = reranker.rerank_with_position_blending(
             query=query,
             chunks=sample_chunks,
-            top_k=2,
             blend_strategy="position_aware"
         )
 
-        assert len(reranked) == 2
+        assert len(reranked) == len(sample_chunks)

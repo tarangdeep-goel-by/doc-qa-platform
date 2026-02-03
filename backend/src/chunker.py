@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 class TextChunker:
     """Chunks text into overlapping segments for better retrieval."""
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, chunk_size: int, chunk_overlap: int):
         """
         Initialize chunker.
 

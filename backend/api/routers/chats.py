@@ -1,5 +1,6 @@
 """Chat session endpoints for multi-chat interface."""
 
+import os
 import uuid
 from datetime import datetime
 from typing import List
@@ -23,6 +24,11 @@ from api.schemas import (
 from src.models import ChatMessage
 
 router = APIRouter()
+
+
+def _str_to_bool(value: str) -> bool:
+    """Convert string to boolean."""
+    return value.lower() in ("true", "1", "yes")
 
 
 @router.post("", response_model=ChatResponse)
@@ -291,12 +297,29 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
                 )
             )
 
+        # Read RAG config from environment
+        top_k = body.top_k if body.top_k is not None else int(os.environ["TOP_K_RESULTS"])
+        use_hybrid = _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
+        hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
+        use_reranking = _str_to_bool(os.environ["USE_RERANKING"])
+        use_query_expansion = _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
+        use_rrf = _str_to_bool(os.environ["USE_RRF"])
+        rerank_blending = os.environ["RERANKER_BLENDING"]
+        use_query_decomposition = _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
+
         # Run RAG pipeline with available documents only
         result = qa_engine.answer_question(
             question=body.question,
-            top_k=body.top_k,
+            top_k=top_k,
             doc_ids=available_doc_ids,
-            chat_history=chat.gemini_chat_history
+            chat_history=chat.gemini_chat_history,
+            use_hybrid=use_hybrid,
+            hybrid_alpha=hybrid_alpha,
+            use_reranking=use_reranking,
+            use_query_expansion=use_query_expansion,
+            use_rrf=use_rrf,
+            rerank_blending=rerank_blending,
+            use_query_decomposition=use_query_decomposition
         )
 
         # Create user message

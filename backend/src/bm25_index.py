@@ -37,7 +37,7 @@ def tokenize(text: str) -> List[str]:
 class BM25Index:
     """BM25 keyword search index for documents."""
 
-    def __init__(self, cache_dir: str = "data/bm25"):
+    def __init__(self, cache_dir: str):
         """
         Initialize BM25 index.
 
@@ -81,7 +81,7 @@ class BM25Index:
     def search(
         self,
         query: str,
-        top_k: int = 20,
+        top_k: int,
         doc_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """

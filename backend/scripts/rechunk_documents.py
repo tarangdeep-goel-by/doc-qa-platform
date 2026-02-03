@@ -163,7 +163,10 @@ def main():
     else:
         chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     vector_store = VectorStore(
-        host=qdrant_host, port=qdrant_port, vector_size=embedding_dim
+        host=qdrant_host, port=qdrant_port,
+        collection_name="documents",
+        vector_size=embedding_dim,
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
     processor = DocumentProcessor()
     print("✓ Components initialized")

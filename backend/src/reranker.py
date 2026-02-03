@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 class Reranker:
     """Cross-encoder reranker for retrieved chunks."""
 
-    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+    def __init__(self, model_name: str):
         """
         Initialize reranker with cross-encoder model.
 
@@ -23,21 +23,19 @@ class Reranker:
         self,
         query: str,
         chunks: List[Dict[str, Any]],
-        top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """
         Rerank retrieved chunks using cross-encoder.
 
-        The cross-encoder evaluates how well each chunk answers the specific query,
-        providing more accurate relevance scores than bi-encoder similarity alone.
+        Returns ALL scored candidates sorted by relevance (no truncation).
+        The caller is responsible for applying any cutoff.
 
         Args:
             query: User question
             chunks: Retrieved chunks from first-stage retrieval
-            top_k: Number of top chunks to return after reranking
 
         Returns:
-            Reranked chunks with updated scores (sorted by relevance)
+            All reranked chunks with updated scores (sorted by relevance)
         """
         if not chunks:
             return []
@@ -77,39 +75,34 @@ class Reranker:
         # Sort by rerank score (descending)
         reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
 
-        # Return top k
-        return reranked[:top_k]
+        return reranked
 
     def rerank_with_position_blending(
         self,
         query: str,
         chunks: List[Dict[str, Any]],
-        top_k: int = 5,
-        blend_strategy: str = "position_aware"
+        blend_strategy: str
     ) -> List[Dict[str, Any]]:
         """
         Rerank chunks with position-aware score blending.
 
-        Instead of replacing retrieval scores entirely, this method blends
-        retrieval and reranker scores based on position. Top results get
-        more weight from retrieval (which already ranked them highly), while
-        lower results get more weight from the reranker.
+        Returns ALL scored candidates sorted by blended score (no truncation).
+        The caller is responsible for applying any cutoff.
 
         Args:
             query: User question
             chunks: Retrieved chunks from first-stage retrieval
-            top_k: Number of top chunks to return after reranking
             blend_strategy: "position_aware" or "replace" (default reranking)
 
         Returns:
-            Reranked chunks with blended scores (sorted by relevance)
+            All reranked chunks with blended scores (sorted by relevance)
         """
         if not chunks:
             return []
 
         # If replace strategy, use standard reranking
         if blend_strategy == "replace":
-            return self.rerank(query, chunks, top_k)
+            return self.rerank(query, chunks)
 
         # First, get rerank scores for all chunks
         chunk_texts = []
@@ -167,5 +160,4 @@ class Reranker:
         # Sort by blended score (descending)
         reranked.sort(key=lambda x: x["score"], reverse=True)
 
-        # Return top k
-        return reranked[:top_k]
+        return reranked

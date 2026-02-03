@@ -22,10 +22,11 @@ class VectorStore:
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 6333,
-        collection_name: str = "documents",
-        vector_size: int = 384
+        host: str,
+        port: int,
+        collection_name: str,
+        vector_size: int,
+        bm25_cache_dir: str
     ):
         """
         Initialize Qdrant client and collection.
@@ -48,7 +49,7 @@ class VectorStore:
         self._init_collection()
 
         # Initialize BM25 index
-        self.bm25_index = BM25Index()
+        self.bm25_index = BM25Index(cache_dir=bm25_cache_dir)
         self.bm25_index.load_cache()  # Try to load cached index
 
     def _init_collection(self):
@@ -110,7 +111,7 @@ class VectorStore:
     def search(
         self,
         query_vector: np.ndarray,
-        top_k: int = 5,
+        top_k: int,
         doc_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -309,7 +310,7 @@ class VectorStore:
         self,
         query_vector: np.ndarray,
         query_text: str,
-        top_k: int = 5,
+        top_k: int,
         doc_ids: Optional[List[str]] = None,
         alpha: float = 0.5,
         use_rrf: bool = True
@@ -427,7 +428,7 @@ class VectorStore:
         query_variants: List[str],
         query_embeddings: List[np.ndarray],
         query_weights: List[float],
-        top_k: int = 5,
+        top_k: int,
         doc_ids: Optional[List[str]] = None,
         alpha: float = 0.5,
         use_rrf: bool = True

@@ -322,12 +322,19 @@ def main():
         gemini_api_key=gemini_api_key,
         output_dimensionality=embedding_dim,
     )
-    vector_store = VectorStore(host=qdrant_host, port=qdrant_port)
+    vector_store = VectorStore(
+        host=qdrant_host, port=qdrant_port,
+        collection_name="documents",
+        vector_size=embedding_dim,
+        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
+    )
     qa_engine = QAEngine(
         embedder=embedder,
         vector_store=vector_store,
         gemini_api_key=gemini_api_key,
         model_name=model_name,
+        use_reranker=os.environ["USE_RERANKING"].lower() == "true",
+        reranker_model=os.environ["RERANKER_MODEL"],
     )
 
     # Step 1: Upload or use existing document
