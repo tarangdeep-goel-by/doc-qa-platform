@@ -1,7 +1,9 @@
+import { useRef } from 'react'
 import { User, Bot } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ChatMessage } from '../../types'
-import { SourceCitation } from '../SourceCitation'
+import { SourcesBadge, type SourcesBadgeRef } from '../SourcesBadge'
+import { MarkdownContent } from '../markdown/MarkdownContent'
 
 interface Props {
   message: ChatMessage
@@ -10,6 +12,14 @@ interface Props {
 export function ChatMessageItem({ message }: Props) {
   const isUser = message.role === 'user'
   const timeAgo = formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })
+
+  // Ref for SourcesBadge (for scrolling on citation click)
+  const sourcesBadgeRef = useRef<SourcesBadgeRef>(null)
+
+  const handleCitationClick = (index: number) => {
+    // Call scrollToSource on SourcesBadge (0-indexed)
+    sourcesBadgeRef.current?.scrollToSource(index - 1)
+  }
 
   return (
     <div className={`flex gap-fluid-md ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -29,23 +39,22 @@ export function ChatMessageItem({ message }: Props) {
               : 'bg-ink/5 text-ink'
           }`}
         >
-          <p className="font-sans text-fluid-base whitespace-pre-wrap">
-            {message.content}
-          </p>
+          {isUser ? (
+            <p className="font-sans text-fluid-base whitespace-pre-wrap">
+              {message.content}
+            </p>
+          ) : (
+            <MarkdownContent
+              content={message.content}
+              sources={message.sources}
+              onCitationClick={handleCitationClick}
+            />
+          )}
         </div>
 
         {/* Sources for assistant messages */}
         {!isUser && message.sources && message.sources.length > 0 && (
-          <div className="mt-fluid-sm space-y-2">
-            <p className="font-sans text-fluid-xs text-ink/50 uppercase tracking-wider">
-              Sources
-            </p>
-            <div className="space-y-1">
-              {message.sources.map((source, idx) => (
-                <SourceCitation key={idx} source={source} index={idx} />
-              ))}
-            </div>
-          </div>
+          <SourcesBadge ref={sourcesBadgeRef} sources={message.sources} />
         )}
 
         {/* Timestamp */}
