@@ -16,8 +16,9 @@ class QAEngine:
         embedder: Embedder,
         vector_store: VectorStore,
         gemini_api_key: str,
-        model_name: str = "gemini-2.5-flash",
-        use_reranker: bool = True
+        model_name: str,
+        use_reranker: bool,
+        reranker_model: str
     ):
         """
         Initialize QA engine.
@@ -28,6 +29,7 @@ class QAEngine:
             gemini_api_key: Google Gemini API key
             model_name: Gemini model name
             use_reranker: Whether to initialize reranker (slower startup, better quality)
+            reranker_model: Cross-encoder model name for reranking
         """
         self.embedder = embedder
         self.vector_store = vector_store
@@ -37,9 +39,9 @@ class QAEngine:
         self.client = genai.Client(api_key=gemini_api_key)
 
         # Initialize reranker if enabled
-        self.reranker = Reranker() if use_reranker else None
+        self.reranker = Reranker(model_name=reranker_model) if use_reranker else None
 
-    def _expand_query(self, question: str, num_variants: int = 2) -> List[str]:
+    def _expand_query(self, question: str, num_variants: int) -> List[str]:
         """
         Generate alternative phrasings of the question to improve recall.
 
@@ -229,7 +231,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
     def answer_question(
         self,
         question: str,
-        top_k: int = 10,
+        top_k: int,
         doc_ids: Optional[List[str]] = None,
         chat_history: Optional[List[Dict]] = None,
         use_hybrid: bool = True,
@@ -312,6 +314,9 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                     "sub_questions": [sr["question"] for sr in sub_results],
                 }
 
+        # Pipeline config logging
+        print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}")
+
         # Step 1: Query expansion (if enabled)
         if use_query_expansion:
             query_variants = self._expand_query(question, num_variants=query_expansion_variants)
@@ -356,24 +361,33 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 doc_ids=doc_ids
             )
 
-        # Step 2.5: Rerank if enabled
+        print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
+
+        # Step 2.5: Rerank if enabled (returns ALL scored candidates)
         if use_reranking and self.reranker and search_results:
+            pre_rerank_count = len(search_results)
             search_results = self.reranker.rerank_with_position_blending(
                 query=question,
                 chunks=search_results,
-                top_k=top_k,
                 blend_strategy=rerank_blending
             )
+            print(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
 
         # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
         search_results = self._deduplicate_chunks(search_results)
 
-        # Step 2.7: Structure-aware boosting
+        # Step 2.7: Filter noise chunks (very short/substance-free)
+        search_results = self._filter_noise_chunks(search_results)
+
+        # Step 2.8: Dynamic score cutoff (replaces hardcoded top_k from reranker)
+        search_results = self._dynamic_score_cutoff(search_results)
+
+        # Step 2.9: Structure-aware boosting
         query_type = self._classify_query_type(question)
         if query_type != "general":
             search_results = self._boost_by_structure(search_results, query_type)
 
-        # Step 2.8: Check if we have confident results
+        # Step 2.10: Check if we have confident results
         reranking_applied = use_reranking and self.reranker and len(search_results) > 0
 
         if not search_results:
@@ -417,6 +431,8 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "top_score": top_score
             }
 
+        print(f"Pipeline: {len(search_results)} chunks sent to LLM")
+
         # Step 3: Build context from retrieved chunks with enhanced formatting
         context = self._format_context_with_sources(search_results)
 
@@ -435,7 +451,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             })
 
         # Step 4: Generate answer with Gemini
-        prompt = self._build_prompt(question, context)
+        prompt = self._build_prompt(question, context, query_type)
         answer = self._generate_answer(prompt)
 
         return {
@@ -472,40 +488,121 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             print(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
         return unique
 
-    def _build_prompt(self, question: str, context: str) -> str:
+    def _filter_noise_chunks(self, chunks: List[Dict], min_length: int = 50) -> List[Dict]:
+        """Remove very short or noise-only chunks that add no substance."""
+        filtered = [c for c in chunks if len(c["payload"]["text"].strip()) >= min_length]
+        if len(filtered) < len(chunks):
+            print(f"Noise filter: {len(chunks)} → {len(filtered)} chunks (removed {len(chunks) - len(filtered)} short chunks)")
+        return filtered if filtered else chunks  # fallback: keep originals if all filtered
+
+    def _dynamic_score_cutoff(self, chunks, max_chunks=15, drop_ratio=0.6):
+        """Keep chunks in the top portion of the score range.
+
+        Uses score range (top - bottom) to set cutoff, which works for
+        any score scale (positive, negative, blended).
+
+        Adaptive minimum: keeps at least 50% of small pools (floor of 3).
+        For small candidate pools (<=12), uses wider ratio (0.8) to avoid
+        over-filtering.
         """
-        Build prompt for Gemini with strict grounding instructions.
+        # Adaptive minimum: keep at least 50% of small pools, floor of 3
+        min_chunks = max(3, int(len(chunks) * 0.5))
+
+        if len(chunks) <= min_chunks:
+            return chunks
+
+        # For small candidate pools (≤12), use wider ratio to avoid over-filtering
+        effective_ratio = 0.8 if len(chunks) <= 12 else drop_ratio
+
+        top_score = chunks[0]["score"]
+        bottom_score = chunks[-1]["score"]
+        score_range = top_score - bottom_score
+
+        if score_range <= 0:
+            return chunks[:max_chunks]
+
+        cutoff = top_score - effective_ratio * score_range
+        kept = [c for c in chunks if c["score"] >= cutoff]
+
+        if len(kept) < min_chunks:
+            kept = chunks[:min_chunks]
+        elif len(kept) > max_chunks:
+            kept = kept[:max_chunks]
+
+        print(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
+        return kept
+
+    def _reorder_top_and_tail(self, chunks):
+        """Place best chunks at start and end, weakest in middle.
+
+        LLMs attend most to the beginning and end of context (lost-in-the-middle).
+        Interleave: best→position 1, 2nd best→position N, 3rd→position 2, etc.
+        """
+        if len(chunks) <= 2:
+            return chunks
+        reordered = [None] * len(chunks)
+        left, right = 0, len(chunks) - 1
+        for i, chunk in enumerate(chunks):
+            if i % 2 == 0:
+                reordered[left] = chunk
+                left += 1
+            else:
+                reordered[right] = chunk
+                right -= 1
+        return reordered
+
+    def _build_prompt(self, question: str, context: str, query_type: str = "general") -> str:
+        """
+        Build prompt for Gemini with per-source engagement and few-shot example.
 
         Args:
             question: User question
             context: Retrieved context from documents
+            query_type: Classified query type (table, list, specification, general)
 
         Returns:
             Formatted prompt string
         """
-        return f"""You are a precise document assistant. Answer questions using ONLY the provided context.
+        type_hints = {
+            "table": "\nPresent specifications or model data in a markdown table.",
+            "list": "\nPresent the answer as a clean numbered or bulleted list.",
+            "specification": "\nInclude exact values, units, and tolerances. Use a table if comparing multiple specs.",
+        }
+        suffix = type_hints.get(query_type, "")
+
+        return f"""You are an expert technical writer producing a detailed reference answer. Use ONLY the provided sources.
 
 INSTRUCTIONS:
-1. READ all sources carefully - evaluate each source independently regardless of relevance score
-2. PRIORITIZE completeness and accuracy over source ranking (lower-ranked sources may contain tables/lists with complete data)
-3. SYNTHESIZE information across multiple sources if needed
-4. ORGANIZE your answer logically (use bullet points, numbered lists, or sections)
-5. CITE sources using the format: [Source N] or [Document: "title"]
-6. If information spans multiple sources, mention all relevant sources
-7. NEVER use knowledge outside the provided context
+1. Read every source. Extract specific details — numbers, dates, names, conditions, definitions, amounts.
+2. For each major point, describe it fully using information from the sources. Do not merely name a concept; explain what it is, why it matters, and include any qualifications or exceptions found in the sources.
+3. If multiple sources cover the same topic, merge their details into one comprehensive description.
+4. Cite sources inline as [Source N]. Every factual claim must have a citation.
+5. NEVER say information is "not provided" if it appears in any source.
+6. Use structured formatting (headings, bullets, tables) when covering multiple items.
+7. Never claim that information is absent or a feature does not exist unless sources explicitly state so.
+
+EXAMPLE:
+Sources:
+  Source 1: "The XR-7 has a 48V DC motor rated at 750W continuous, 1200W peak. Weight is 12.3 kg."
+  Source 2: "XR-7 uses regenerative braking with 15% energy recovery. Battery is 48V 20Ah lithium-ion."
+
+Q: What are the XR-7 specifications?
+
+A: The XR-7 is an electric system with the following specifications:
+
+- **Motor**: 48V DC, rated at 750W continuous and 1200W peak power [Source 1].
+- **Battery**: 48V 20Ah lithium-ion pack [Source 2].
+- **Braking**: Regenerative braking system that recovers approximately 15% of kinetic energy [Source 2].
+- **Weight**: 12.3 kg [Source 1].
+
+---
 
 Context from documents:
 {context}
 
 Question: {question}
-
-Think step-by-step:
-1. What is the user really asking?
-2. Which sources contain relevant information?
-3. How can I organize this information clearly?
-4. What specific quotes support my answer?
-
-Answer (be comprehensive and well-organized):"""
+{suffix}
+Answer:"""
 
     def _format_context_with_sources(self, search_results: List[Dict]) -> str:
         """
@@ -517,19 +614,18 @@ Answer (be comprehensive and well-organized):"""
         Returns:
             Formatted context string with visual hierarchy
         """
+        # Reorder: best chunks at start and end (lost-in-the-middle mitigation)
+        search_results = self._reorder_top_and_tail(search_results)
+
         context_parts = []
         for i, result in enumerate(search_results, 1):
             payload = result["payload"]
-            score = result["score"]
-
-            # Add relevance indicator
-            relevance = "★★★" if score >= 0.8 else "★★" if score >= 0.6 else "★"
 
             # Add page number if available
             page_info = f", Page {payload.get('page_num')}" if payload.get('page_num') else ""
 
-            # Format without bias - show all sources equally
-            source_info = f"[{relevance}] Source {i}: \"{payload['doc_title']}\"{page_info} (Relevance: {score:.0%})"
+            # Clean source header — no scores or stars to avoid LLM bias
+            source_info = f"Source {i}: \"{payload['doc_title']}\"{page_info}"
 
             context_parts.append(f"{source_info}\n{payload['text']}")
 
@@ -542,9 +638,9 @@ Answer (be comprehensive and well-organized):"""
                 model=self.model_name,
                 contents=prompt,
                 config={
-                    "temperature": 0.3,        # More factual (vs default 0.7)
+                    "temperature": 0.4,        # Balanced: factual but not overly terse
                     "topP": 0.9,              # Reasonable diversity (camelCase!)
-                    "maxOutputTokens": 2048   # Prevent runaway responses (camelCase!)
+                    "maxOutputTokens": 8192   # Allow thorough answers (camelCase!)
                 }
             )
             return response.text.strip()
