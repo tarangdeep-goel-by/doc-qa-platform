@@ -1,7 +1,7 @@
 {
   "dataset_name": "FX5U Manual Q&A",
   "document": "MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware)",
-  "version": "1.0",
+  "version": "2.0",
   "description": "Gold standard Q&A pairs from Claude.ai conversation for evaluating RAG quality on the FX5U hardware manual.",
   "questions": [
     {
@@ -40,6 +40,206 @@
       "claude_answer": "The document is the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual (Hardware).\nThis manual covers the hardware aspects of Mitsubishi's MELSEC iQ-F series programmable logic controllers (PLCs), specifically the FX5S, FX5UJ, FX5U, and FX5UC models.\nThe manual typically includes information about:\n\nProduct specifications - Technical specifications for different CPU models and their variants\nHardware configuration - Physical dimensions, mounting methods, and system configuration\nI/O specifications - Input/output characteristics, wiring diagrams, and electrical specifications\nCommunication ports - Details about built-in communication interfaces (USB, RS-422/485, Ethernet)\nExpansion modules - Information about compatible I/O expansion modules and special function modules\nInstallation guidelines - Mounting instructions, wiring methods, and installation precautions\nMaintenance - Troubleshooting, diagnostics, and maintenance procedures\nSafety information - Precautions and safety guidelines for proper operation\n\nThis is a hardware-focused manual, so it concentrates on the physical aspects, wiring, installation, and hardware specifications rather than programming or software configuration (which would typically be covered in separate programming manuals).",
       "difficulty": "easy",
       "category": "overview",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q5",
+      "question": "Which safety circuits must be configured externally to the programmable controller to ensure system safety?",
+      "claude_answer": "According to the design precautions in the manual, several critical safety circuits must be set up outside the programmable controller to prevent serious accidents during power supply problems or PLC failure. These include emergency stop circuits, protection circuits, and protective interlock circuits for conflicting operations like forward/reverse rotations. Additionally, interlock circuits for preventing equipment damage, such as upper and lower limit positioning, must also be configured externally. The manual emphasizes that backup or failsafe functions should be systematically provided outside the device because an error in an output circuit component like a relay or transistor could cause an output to stay on or off.",
+      "difficulty": "medium",
+      "category": "safety_precautions",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q6",
+      "question": "What are the specific environmental restrictions for operating the FX5S and FX5UJ CPU modules compared to the FX5U and FX5UC?",
+      "claude_answer": "The general specifications state that the FX5S and FX5UJ CPU modules have a more restricted operating ambient temperature range of 0 to 55\u00b0C. In contrast, the FX5U and FX5UC CPU modules can operate in a wider range from -20 to 55\u00b0C, provided there is no freezing. For all models, the operating ambient humidity must remain between 5 to 95%RH without condensation. Furthermore, the manual specifies that certain devices, such as the FX3U-32BL battery and specific Motion modules, cannot be used at all in temperatures below 0\u00b0C.",
+      "difficulty": "medium",
+      "category": "technical_specs",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q7",
+      "question": "What is the maximum data transmission speed and total extension distance for the built-in RS-485 communication port?",
+      "claude_answer": "The communication specifications for the built-in RS-485 port of the CPU module list a maximum data transmission speed of 115.2 kbps. The total extension distance for this communication type is limited to a maximum of 50 metres. This port supports several protocols, including MELSOFT connection, MODBUS RTU, and N:N network. It uses a European-type terminal block and includes built-in terminal resistors that can be set to Open, 110 \u03a9, or 330 \u03a9.",
+      "difficulty": "easy",
+      "category": "communication",
+      "expected_sources": [],
+      "requires_synthesis": false,
+      "requires_organization": true
+    },
+    {
+      "id": "q8",
+      "question": "What are the clearance requirements when laying out the programmable controller in a control panel?",
+      "claude_answer": "When installing the programmable controller components in a control panel, a space of at least 50 mm must be kept between the module main body and other structures or devices. This applies to both 1-stage and 2-stage (upper and lower) layouts to prevent temperature rise. Additionally, the manual instructs that the programmable controller should be separated from high-voltage lines, high-voltage devices, and power devices whenever possible. For multiple modules, a small gap of approximately 2 mm should be maintained between the products.",
+      "difficulty": "medium",
+      "category": "installation",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q9",
+      "question": "Which programming languages are supported by the MELSEC iQ-F series according to the CPU specifications?",
+      "claude_answer": "The CPU performance specifications state that the system supports several programming languages: Ladder diagram (LD), Structured text (ST), and Function block diagram/ladder diagram (FBD/LD). It also supports Sequential function chart (SFC), although this may depend on the specific version. Programming extension functions are available, including Function blocks (FB), Functions (FUN), and both local and global label programming. However, it should be noted that SFC is not supported by the FX5S or FX5UJ models.",
+      "difficulty": "medium",
+      "category": "technical_specs",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": false
+    },
+    {
+      "id": "q10",
+      "question": "What are the grounding requirements for the MELSEC iQ-F system to prevent malfunctions?",
+      "claude_answer": "The manual requires Class D grounding for the system, which entails a grounding resistance of 100 \u03a9 or less. For FX5S, FX5UJ, and FX5U CPU modules, a wire size of 14 AWG (2 mm\u00b2) or thicker must be used for the grounding terminal. The grounding point should be kept as close to the programmable controller as possible to shorten the ground wire. Critically, the manual states that common grounding with heavy electrical systems is not allowed. If independent grounding is not possible, shared grounding is acceptable, but it must not be commoned with high-power equipment.",
+      "difficulty": "hard",
+      "category": "wiring",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q11",
+      "question": "What is the physical insertion/removal limit for the SD memory card, and why does it exist?",
+      "claude_answer": "After the first use of an SD memory card, it must not be inserted or removed more than 500 times. The manual warns that exceeding this limit of 500 times may cause the module to malfunction. To prevent data corruption, users must always disable access to the SD memory card using the disable switch or specific software flags (SM606/SM607) before physical removal. Mitsubishi Electric recommends using their own NZ1MEM-GBSD series cards to ensure operational compatibility and compliance with IEC 61131-2.",
+      "difficulty": "medium",
+      "category": "maintenance",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": false
+    },
+    {
+      "id": "q12",
+      "question": "What are the tightening torque specifications for the M3 terminal screws on the CPU and I/O modules?",
+      "claude_answer": "According to the wiring preparation section, the terminal block screws for both the CPU module and I/O modules (M3 size) should be tightened to a torque of 0.5 to 0.8 N\u00b7m. The terminal block mounting screws, which are also M3 size, have a slightly lower tightening torque requirement of 0.4 to 0.5 N\u00b7m. Using torque beyond these specified ranges may cause device failures or malfunctions. For European-type terminal blocks used in analog or RS-485 communication, the torque is even lower, ranging from 0.20 to 0.25 N\u00b7m depending on the specific module.",
+      "difficulty": "hard",
+      "category": "installation",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q13",
+      "question": "How are input and output numbers (X and Y) assigned in the system, and what numerical base is used?",
+      "claude_answer": "Input and output numbers are assigned using an octal numbering system. Inputs are designated with the letter 'X' and outputs with the letter 'Y'. These numbers are automatically assigned in sequences such as X0 to X7, X10 to X17, and so on. When adding an I/O module, the input and output numbers follow the preceding device's numbers, but the last digit of the newly assigned numbers must always begin with 0. Vacant numbers exist in certain models, such as X16 and X17 for the FX5UJ-24M.",
+      "difficulty": "medium",
+      "category": "product_info",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": false
+    },
+    {
+      "id": "q14",
+      "question": "What protocols are supported by the built-in Ethernet port, and what is the limit on simultaneous connections?",
+      "claude_answer": "The built-in Ethernet port supports a wide range of protocols, including CC-Link IE Field Network Basic, MELSOFT connection, SLMP server (3E/1E frame), and MODBUS/TCP communication. It also supports Socket communication, FTP Server/Client, SNTP client, Web server (HTTP), and Simple CPU communication functions. The port allows for a total of 8 simultaneous connections. It is important to note that the first device for a MELSOFT connection is not counted toward this limit, but subsequent MELSOFT devices are.",
+      "difficulty": "medium",
+      "category": "communication",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q15",
+      "question": "What are the recommended diagnostic actions if the PWR LED on the CPU module is off?",
+      "claude_answer": "If the PWR LED is off, the first step is to measure the voltage being supplied to the CPU module to ensure it is correct. If the power source is correct, the next action is to remove all extension modules and all wiring except for the power supply, then turn the power back on. If the LED turns on in this isolated state, it indicates that the 24VDC service power supply was likely shorted or overloaded. In this case, the user should reconnect modules and wiring one by one to identify the specific cause. If the LED remains off after these steps, there may be a hardware issue, and a Mitsubishi Electric representative should be consulted.",
+      "difficulty": "medium",
+      "category": "troubleshooting",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q16",
+      "question": "What is the expected life of the FX3U-32BL battery, and how does temperature affect it?",
+      "claude_answer": "The FX3U-32BL battery has a standard life of 5 years when kept at an ambient temperature of 25\u00b0C. The manual notes that battery life changes significantly with respect to the ambient temperature. Higher temperatures will result in a shorter retention time and overall battery life. When the battery voltage drops, the BAT LED on the panel will flash red and specific special relays (SM51/SM52) will turn on. Memory can generally be retained for about one month after the low-voltage LED begins flashing.",
+      "difficulty": "easy",
+      "category": "maintenance",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": false
+    },
+    {
+      "id": "q17",
+      "question": "What precautions should be taken regarding wiring distance to prevent noise-related malfunctions?",
+      "claude_answer": "To prevent malfunctions caused by noise, the manual instructs users not to bundle power lines, control lines, and communication cables together. As a specific guideline, these lines should be laid at least 100 mm away from the main circuit, high-voltage lines, load lines, or other power lines. Furthermore, shields for shielded wires or cables should be grounded at a single point on the programmable controller, but never via a common grounding with heavy electrical systems. For built-in Ethernet, the use of shielded twisted pair cables is required, with the shield grounded on both sides.",
+      "difficulty": "medium",
+      "category": "wiring",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q18",
+      "question": "What are the response time differences between relay outputs and transistor outputs?",
+      "claude_answer": "Relay outputs have a response time of approximately 10 ms for both Off to On and On to Off transitions. Transistor outputs are significantly faster, with specific high-speed terminals (Y0 to Y3) having a response time of 5 \u03bcs or less (or 2.5 \u03bcs depending on the model) when used with 10 mA or more at 5-24VDC. Standard transistor output terminals (Y4 or later) have a response time of 0.2 ms or less for a 200 mA load. It should be noted that transistor OFF time is longer under lighter loads; for instance, a 40 mA load results in a response time of approximately 0.3 ms.",
+      "difficulty": "hard",
+      "category": "technical_specs",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q19",
+      "question": "What wiring length and cable type are required when capturing high-speed pulses?",
+      "claude_answer": "When capturing high-speed pulses with a response frequency between 50 kHz and 200 kHz using inputs X0 to X7, the wiring length must be 5 metres or less. Users must use shielded twisted-pair cables for these connections. The shield of each cable should be grounded only on the CPU module side. Additionally, a 1.5 k\u03a9 (1 W or more) bleeder resistance should be connected to the input terminal to ensure the sum of the load current of the open collector transistor and the CPU input current is 20 mA or more. These restrictions may vary based on the specifications of the connected device, such as an encoder.",
+      "difficulty": "hard",
+      "category": "wiring",
+      "expected_sources": [],
+      "requires_synthesis": false,
+      "requires_organization": true
+    },
+    {
+      "id": "q20",
+      "question": "What are the primary hardware differences between the FX5S and FX5U CPU modules?",
+      "claude_answer": "According to the MELSEC iQ-F FX5S/FX5UJ/FX5U/FX5UC User's Manual, there are several key hardware and software differences between the FX5S and FX5U CPU modules:\n\n*   Built-in Features: The FX5U is standard-equipped with built-in analog I/O (2-channel input, 1-channel output) and an RS-485 port, whereas the FX5S does not have built-in analog and uses a USB (Mini-B) connector for peripheral communication.\n*   SD Memory Card: The FX5U includes a built-in SD memory card slot. The FX5S does not have a standard slot but can support one via an optional FX5-SDCD module.\n*   Expansion Capacity: The FX5S cannot connect to extension modules (on the right side), while the FX5U can connect up to 16 extension modules (with a maximum of 12 directly to the CPU).\n*   Program Capacity: The FX5U supports a significantly larger program capacity of up to 128k steps, compared to the FX5S limit of 48k steps.\n*   I/O Points: The FX5U can control up to 512 total I/O points (including remote I/O), while the FX5S is capped at 80 points total.",
+      "difficulty": "hard",
+      "category": "product_comparison",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q21",
+      "question": "What is the procedure and time limit for replacing the battery in an FX5U CPU module?",
+      "claude_answer": "Based on the maintenance section of the manual, the battery replacement for an FX5U module must be performed with specific timing to avoid data loss. \n\n1.  Preparation: Turn on the power for at least 10 seconds, then back up the CPU data using an engineering tool before turning the power off.\n2.  Time Limit: Steps 5 and 6 of the replacement (removing the old battery and installing the new one) must be completed within 20 seconds. This is because the built-in capacitor only holds memory data for a 20-second power interruption.\n3.  Physical Steps: Remove the expansion board connector cover, extract the old battery from the holder, disconnect the connector, and then connect and fit the new FX3U-32BL battery.\n4.  Verification: After replacement, you must check if the clock data and latch devices are backed up correctly before running the controller.",
+      "difficulty": "medium",
+      "category": "maintenance",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q22",
+      "question": "Define 'Sink Input' and 'Source Input' as used in this system.",
+      "claude_answer": "As defined in the 'Generic Terms and Abbreviations' and 'Wiring' sections of the manual:\n\n*   Sink Input: This refers to a DC input signal where the current flows from the input (X) terminal. It is also referred to as a -common circuit.\n*   Source Input: This refers to a DC input signal where the current flows into the input (X) terminal. It is also referred to as a +common circuit.\n\nIt is important to note that sink input and source input cannot be mixed within the same system for certain CPU modules.",
+      "difficulty": "easy",
+      "category": "technical_definitions",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": false
+    },
+    {
+      "id": "q23",
+      "question": "What are the maximum limits for connecting extension modules to an FX5UC CPU module?",
+      "claude_answer": "The manual specifies the following limits for the FX5UC CPU module configuration:\n\n*   Direct Connection: A maximum of 12 extension modules can be connected to the right side of the CPU module.\n*   Overall System: When using a powered I/O module or extension power supply module, the total number of extension modules in the system can increase to 16.\n*   Intelligent Function Modules: There is a specific restriction of 8 intelligent function modules maximum. However, if a connector conversion module and powered I/O module are used, this limit can extend to 15 modules.\n*   FX3 Extension: A maximum of 6 FX3 extension modules can be connected to the right side of a bus conversion module.",
+      "difficulty": "hard",
+      "category": "system_configuration",
+      "expected_sources": [],
+      "requires_synthesis": true,
+      "requires_organization": true
+    },
+    {
+      "id": "q24",
+      "question": "What should be done if the ERR LED is flashing on a CPU module?",
+      "claude_answer": "If the ERR LED is flashing, the manual suggests checking the following causes and taking these actions:\n\n1.  Missing or Damaged Data: The ERR LED flashes if there are no programs or if parameters are damaged. You should write the system parameters, CPU parameters, and program files, then cycle the power.\n2.  Watchdog Timer Error: Set the CPU module to STOP and turn the power on again. If the LED stops flashing, a watchdog timer error likely occurred. Measures include reviewing the program to ensure scan time does not exceed the monitoring limit or adding WDT instructions to reset the timer.\n3.  Factory Default State: A CPU module with factory default settings will flash the ERR LED because it contains no program.",
+      "difficulty": "medium",
+      "category": "troubleshooting",
       "expected_sources": [],
       "requires_synthesis": true,
       "requires_organization": true
