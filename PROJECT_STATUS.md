@@ -1,14 +1,14 @@
 # Project Status - Document Q&A Platform
 
-**Last Updated**: February 5, 2026
+**Last Updated**: February 6, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
 
 ---
 
-## Current Status: v2.0 Benchmark Evaluation Complete
+## Current Status: 4.72/5 — Highest Score Ever (Multi-Doc, 77 Questions)
 
-Expanded evaluation benchmarks to 80 questions across 3 datasets and ran full evaluation with LLM-as-judge. Results show strong performance: 4.49/5 average judge score, 0.861 semantic similarity. Completeness improved significantly from R3 baseline (3.17 → 4.11 avg). Repository is now private.
+Fixed eval harness bugs (broken doc_id resolution, missing pipeline params) and added pdfplumber table-aware extraction. Multi-doc benchmark now scores 4.72/5 across 77 questions spanning 3 diverse documents — up from 2.85 which was caused by eval bugs, not pipeline issues. Added eval history tracking for comparing runs over time.
 
 ---
 
@@ -54,6 +54,9 @@ Expanded evaluation benchmarks to 80 questions across 3 datasets and ran full ev
 - [x] Console + HTML reporters with experiment comparison
 - [x] Re-chunking migration script (`scripts/rechunk_documents.py`)
 - [x] **v2.0 benchmark datasets** — 80 questions across 3 documents
+- [x] **Eval history ledger** — JSONL append-only log with `--label` tagging ✨
+- [x] **History viewer** — `view_history.py` CLI with `--dataset`, `--last`, `--detail` filters ✨
+- [x] **Backfill script** — Import existing result JSONs into history (idempotent) ✨
 
 ### Multi-Chat System
 - [x] Create named chat sessions
@@ -84,6 +87,62 @@ Expanded evaluation benchmarks to 80 questions across 3 datasets and ran full ev
 ### Query Endpoints
 - [x] `POST /api/query/ask` - Ask questions with optional document filtering
 - [x] `GET /api/query/documents` - List available documents
+
+---
+
+## Recent Changes (February 6, 2026)
+
+### Eval History Tracking + Pipeline Fixes + pdfplumber
+
+**What was done:**
+
+1. **Eval history ledger** (`evaluation/results/history.jsonl`):
+   - Append-only JSONL file — each eval run auto-appends a summary line
+   - `--label` CLI arg to tag runs (e.g. `--label "pdfplumber + adaptive alpha"`)
+   - `view_history.py` CLI viewer with `--dataset`, `--last`, `--detail`, `--json` filters
+   - `backfill_history.py` to import all 38 existing result JSONs (idempotent, deduplicates)
+   - `--detail` flag shows full RAG config per run
+
+2. **Fixed eval harness bugs:**
+   - Replaced `resolve_doc_ids` string-matching heuristic with all-docs default (mirrors real user behavior)
+   - Wired `use_query_decomposition` and `use_adaptive_alpha` through to eval pipeline (were silently missing)
+   - Removed silent fallback defaults — eval now fast-fails on missing env vars
+
+3. **pdfplumber table-aware PDF extraction** (backend):
+   - `USE_PDFPLUMBER=true` toggle for table-aware extraction
+   - Adaptive alpha and query decomposition wired through API routers
+
+4. **Frontend improvements:**
+   - Markdown rendering for assistant messages
+   - Improved source citation components
+   - Chat interface and upload modal UI updates
+
+**Multi-Doc Benchmark Results (77 questions, all 3 documents):**
+
+| Metric | Before (broken doc_ids) | After (all docs default) |
+|--------|:-:|:-:|
+| Overall | 2.85 | **4.72** |
+| Accuracy | 2.39 | **4.78** |
+| Completeness | 2.31 | **4.40** |
+| Organization | 4.09 | **4.88** |
+| Relevance | 2.62 | **4.83** |
+| Semantic Similarity | 0.740 | **0.865** |
+| ROUGE-L | 0.114 | **0.222** |
+| Latency P50 | 19,870ms | **11,264ms** |
+
+**Root cause of previous 2.85 score:** `resolve_doc_ids` failed to match the multi-doc dataset name ("All Documents (FX5U Manual + Atomic Habits + Separation Agreement)") against individual document titles — FX5U queries were retrieving Atomic Habits chunks. The pipeline was never broken, just the eval setup.
+
+**Current RAG config:**
+- Embeddings: gemini-embedding-001 (768d)
+- LLM: gemini-2.5-flash
+- Chunking: 2500/500, pdfplumber
+- Search: hybrid (vector + BM25), adaptive alpha, RRF
+- Reranking: cross-encoder/ms-marco-MiniLM-L-6-v2, position_aware blending
+- Query expansion: off, Query decomposition: on
+- Top K: 12 (dynamic cutoff trims after retrieval)
+
+**Files created:** `evaluation/view_history.py`, `evaluation/backfill_history.py`, `evaluation/results/history.jsonl`
+**Files modified:** `evaluation/run_evaluation.py`, backend API routers, `qa_engine.py`, `document_processor.py`, frontend components
 
 ---
 
@@ -517,7 +576,7 @@ POST /api/chats/{chat_id}/ask
 | Keyword Search | BM25 (rank-bm25) | Stop words, regex tokenizer, cached to disk |
 | Reranker | CrossEncoder | ms-marco-MiniLM-L-6-v2 |
 | LLM | Google Gemini 2.5 Flash | Generation + Query Expansion |
-| Document Processing | PyPDF2 | PDF-only currently |
+| Document Processing | PyPDF2 + pdfplumber | Table-aware extraction (USE_PDFPLUMBER toggle) |
 | Metadata Store | JSON file | Simple file-based storage |
 | Retrieval Strategy | Hybrid + RRF | Vector + BM25 with Reciprocal Rank Fusion |
 | Score Optimization | Position-Aware | Context-sensitive reranker blending |
@@ -539,10 +598,10 @@ POST /api/chats/{chat_id}/ask
 - **Position-Aware Reranking**: <5ms additional overhead (negligible)
 - **Hybrid Search**: ~100-150ms (vector + BM25 + fusion)
 
-### Quality Improvements (Measured via v2.0 Benchmark — 80 Questions)
-- **Semantic Similarity**: 0.861 avg across 3 datasets / 80 questions (was 0.742 baseline, +16%)
-- **ROUGE-L**: 0.188 avg
-- **LLM Judge Overall**: 4.49/5 (Relevance 4.51, Completeness 4.11, Accuracy 4.46, Organization 4.88)
+### Quality Improvements (Measured via Multi-Doc Benchmark — 77 Questions)
+- **Semantic Similarity**: 0.865 avg across 3 documents / 77 questions (was 0.742 baseline, +17%)
+- **ROUGE-L**: 0.222 avg
+- **LLM Judge Overall**: 4.72/5 (Relevance 4.83, Completeness 4.40, Accuracy 4.78, Organization 4.88)
 - **Optimal chunk config**: 2500/500 (confirmed via 6-config experiment)
 
 ---
@@ -704,40 +763,40 @@ None currently! 🎉
 
 **For next session:**
 
-1. **To continue development**: `docker-compose up -d` then `docker-compose up -d --build backend` (ensures latest code)
+1. **To continue development**: `docker-compose up -d` then `docker-compose build backend && docker-compose up -d --force-recreate backend`
 2. **Recent context**:
-   - v2.0 benchmarks: 80 questions across 3 datasets, avg judge 4.49/5
-   - Completeness improved: 3.17 → 4.11 avg (FX5U 3.54, Atomic 4.79, Separation 4.00)
-   - API key secured: `.env` file, git history scrubbed, repo private
+   - Multi-doc benchmark: 77 questions, 4.72/5 overall — highest ever
+   - Eval history tracking live: `view_history.py --detail --last 5`
+   - pdfplumber enabled, adaptive alpha on, query decomposition on
    - Using Gemini pay-as-you-go ($300 credit)
-   - All eval results in `backend/evaluation/results/`
-3. **Current state**: v2.0 benchmarks complete, 3 PDFs uploaded, system healthy
-4. **3 benchmark datasets (v2.0)**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q)
+   - 39 eval runs tracked in `evaluation/results/history.jsonl`
+3. **Current state**: System healthy, 3 PDFs uploaded, all evals passing
+4. **Benchmark datasets**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q), `real_world_multi_doc.json` (77q)
 5. **Test Suite**: 136 tests
 6. **No blockers**: System stable
 
 **Suggested next steps (prioritized by expected impact):**
-- Fix PDF table extraction for Annexure I (would improve Separation completeness further)
-- Improve FX5U completeness (3.54/5 — weakest metric, technical manual specs)
-- Consider OCR/table-aware PDF extraction (pdfplumber or camelot)
+- Completeness is weakest metric at 4.40/5 — some FX5U questions (Q3, Q9, Q15) still low
 - Populate `expected_sources` in benchmark datasets to enable retrieval metrics (NDCG, MRR)
+- Consider streaming responses for better UX
+- Add more document types (DOCX, HTML, TXT)
 
 **Run evaluation:**
 
 ```bash
-# Run eval inside docker (no local Python needed)
-docker compose exec backend bash -c 'python evaluation/run_evaluation.py \
+# Run eval inside docker with label and history tracking
+docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
+  --dataset evaluation/datasets/real_world_multi_doc.json \
+  --output evaluation/results/latest.json \
+  --label "description of changes"
+
+# Without LLM judge (faster, no API cost)
+docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
   --dataset evaluation/datasets/fx5u_qa_benchmark.json \
   --output evaluation/results/latest.json \
-  --no-judge'
+  --no-judge --label "quick test"
 
-# With LLM judge (slower, costs API calls)
-docker compose exec backend bash -c 'python evaluation/run_evaluation.py \
-  --dataset "evaluation/datasets/atomic habits.json" \
-  --output evaluation/results/latest_judge.json'
-
-# Compare two runs
-docker compose exec backend python evaluation/run_evaluation.py \
-  --compare evaluation/results/baseline.json evaluation/results/latest.json \
-  --output evaluation/results/comparison.html
+# View eval history
+docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
+docker exec doc-qa-backend python evaluation/view_history.py --dataset fx5u
 ```
