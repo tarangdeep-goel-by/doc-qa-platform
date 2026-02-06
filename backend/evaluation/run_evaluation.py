@@ -74,6 +74,7 @@ def init_components():
         vector_size=embedding_dim,
         bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
+    fast_model_name = os.environ.get("GEMINI_FAST_MODEL", model_name)
     qa_engine = QAEngine(
         embedder=embedder,
         vector_store=vector_store,
@@ -81,6 +82,7 @@ def init_components():
         model_name=model_name,
         use_reranker=os.environ["USE_RERANKING"].lower() == "true",
         reranker_model=os.environ["RERANKER_MODEL"],
+        fast_model_name=fast_model_name,
     )
     print("Components ready.")
 
@@ -88,22 +90,23 @@ def init_components():
 
 
 def get_rag_config() -> dict:
-    """Read current RAG config from environment."""
+    """Read current RAG config from environment (typed values, fast-fail)."""
     return {
         "embedding_model": os.environ["EMBEDDING_MODEL"],
-        "embedding_dim": os.environ["EMBEDDING_DIM"],
-        "chunk_size": os.environ["CHUNK_SIZE"],
-        "chunk_overlap": os.environ["CHUNK_OVERLAP"],
-        "top_k": os.environ["TOP_K_RESULTS"],
-        "use_hybrid": os.environ["USE_HYBRID_SEARCH"],
-        "hybrid_alpha": os.environ["HYBRID_ALPHA"],
-        "use_reranking": os.environ["USE_RERANKING"],
-        "use_query_expansion": os.environ["USE_QUERY_EXPANSION"],
-        "query_expansion_variants": os.environ["QUERY_EXPANSION_VARIANTS"],
-        "use_rrf": os.environ["USE_RRF"],
+        "embedding_dim": int(os.environ["EMBEDDING_DIM"]),
+        "chunk_size": int(os.environ["CHUNK_SIZE"]),
+        "chunk_overlap": int(os.environ["CHUNK_OVERLAP"]),
+        "top_k": int(os.environ["TOP_K_RESULTS"]),
+        "use_hybrid": os.environ["USE_HYBRID_SEARCH"].lower() == "true",
+        "hybrid_alpha": float(os.environ["HYBRID_ALPHA"]),
+        "use_reranking": os.environ["USE_RERANKING"].lower() == "true",
+        "use_query_expansion": os.environ["USE_QUERY_EXPANSION"].lower() == "true",
+        "query_expansion_variants": int(os.environ["QUERY_EXPANSION_VARIANTS"]),
+        "use_rrf": os.environ["USE_RRF"].lower() == "true",
         "reranker_blending": os.environ["RERANKER_BLENDING"],
-        "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"],
-        "use_adaptive_alpha": os.environ.get("USE_ADAPTIVE_ALPHA", "true"),
+        "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true",
+        "use_adaptive_alpha": os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true",
+        "fast_model": os.environ.get("GEMINI_FAST_MODEL", os.environ["GEMINI_MODEL"]),
     }
 
 
@@ -219,6 +222,9 @@ def run_evaluation(
             "answer_metrics": answer_metrics,
             "latency_ms": round(total_timer.elapsed_ms, 1),
             "low_confidence": result.get("low_confidence", False),
+            "decomposed": result.get("decomposed", False),
+            "sub_questions": result.get("sub_questions", []),
+            "retrieved_count": result.get("retrieved_count", 0),
         }
         per_query_results.append(query_result)
 
@@ -315,8 +321,9 @@ def append_to_history(results: dict, output_path: str, label: str = ""):
     aq = summary.get("answer_quality", {})
     perf = summary.get("performance", {})
 
+    latency = perf.get("latency_ms", {})
     entry = {
-        "run_id": f"{datetime.now().strftime('%Y%m%d_%H%M')}_{Path(results.get('dataset', '')).stem[:20]}",
+        "run_id": f"{datetime.now().strftime('%Y%m%d_%H%M')}_{Path(output_path).stem[:30]}",
         "timestamp": results.get("timestamp", datetime.now().isoformat()),
         "dataset": results.get("dataset", ""),
         "document": results.get("document", ""),
@@ -331,7 +338,10 @@ def append_to_history(results: dict, output_path: str, label: str = ""):
             "semantic_similarity": round(aq.get("avg_semantic_similarity", 0), 4),
             "rouge_l": round(aq.get("avg_rouge_l", 0), 4),
             "avg_ndcg5": round(summary.get("retrieval", {}).get("avg_ndcg@5", 0), 4),
-            "latency_p50_ms": round(perf.get("latency_ms", {}).get("p50", 0), 1),
+            "latency_p50_ms": round(latency.get("p50", 0), 1),
+            "latency_p95_ms": round(latency.get("p95", 0), 1),
+            "latency_mean_ms": round(latency.get("mean", 0), 1),
+            "latency_max_ms": round(latency.get("max", 0), 1),
         },
         "label": label,
         "result_file": str(Path(output_path).name),
@@ -396,8 +406,8 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default="evaluation/results/eval_result.json",
-        help="Output path for results (JSON or HTML)",
+        default=None,
+        help="Output path for results (auto-generated if omitted)",
     )
     parser.add_argument(
         "--doc-ids",
@@ -431,6 +441,17 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Auto-generate output filename if not provided
+    if not args.output:
+        if args.compare:
+            args.output = "evaluation/results/comparison.json"
+        elif args.dataset:
+            ts = datetime.now().strftime("%Y%m%d_%H%M")
+            ds_stem = Path(args.dataset).stem[:30]
+            args.output = f"evaluation/results/{ts}_{ds_stem}.json"
+        else:
+            args.output = "evaluation/results/eval_result.json"
 
     # Comparison mode
     if args.compare:

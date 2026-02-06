@@ -26,6 +26,24 @@ def load_history() -> list[dict]:
     return entries
 
 
+def clean_history():
+    """Remove entries with empty dataset or 0 queries."""
+    entries = load_history()
+    before = len(entries)
+    kept = [e for e in entries if e.get("dataset", "").strip() and e.get("query_count", 0) > 0]
+    removed = before - len(kept)
+
+    if removed == 0:
+        print("No noise entries found.")
+        return
+
+    with open(HISTORY_PATH, "w") as f:
+        for e in kept:
+            f.write(json.dumps(e, default=str) + "\n")
+
+    print(f"Removed {removed} noise entries ({before} → {len(kept)})")
+
+
 def print_table(entries: list[dict]):
     """Print entries as a formatted table."""
     if not entries:
@@ -97,7 +115,8 @@ def print_detail(entries: list[dict]):
         print(f"    Sim={_fmt(m.get('semantic_similarity'), 3)}  "
               f"ROUGE-L={_fmt(m.get('rouge_l'), 3)}  "
               f"NDCG@5={_fmt(m.get('avg_ndcg5'), 3)}  "
-              f"P50={_fmt(m.get('latency_p50_ms'), 0)}ms")
+              f"P50={_fmt(m.get('latency_p50_ms'), 0)}ms  "
+              f"P95={_fmt(m.get('latency_p95_ms'), 0)}ms")
         print()
 
         # Config
@@ -126,7 +145,12 @@ def main():
     parser.add_argument("--last", type=int, help="Show only last N runs")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument("--detail", action="store_true", help="Show full config for each run")
+    parser.add_argument("--clean", action="store_true", help="Remove entries with empty dataset or 0 queries")
     args = parser.parse_args()
+
+    if args.clean:
+        clean_history()
+        return
 
     entries = load_history()
 
