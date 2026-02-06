@@ -48,6 +48,7 @@ from evaluation.metrics.performance import PerformanceTracker, Timer, LatencyRec
 from evaluation.reporters import console_reporter, html_reporter
 
 
+
 def init_components():
     """Initialize RAG pipeline components from .env config."""
     from src.embedder import Embedder
@@ -102,6 +103,7 @@ def get_rag_config() -> dict:
         "use_rrf": os.environ["USE_RRF"],
         "reranker_blending": os.environ["RERANKER_BLENDING"],
         "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"],
+        "use_adaptive_alpha": os.environ.get("USE_ADAPTIVE_ALPHA", "true"),
     }
 
 
@@ -146,6 +148,8 @@ def run_evaluation(
     query_expansion_variants = int(os.environ["QUERY_EXPANSION_VARIANTS"])
     use_rrf = os.environ["USE_RRF"].lower() == "true"
     rerank_blending = os.environ["RERANKER_BLENDING"]
+    use_adaptive_alpha = os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true"
+    use_query_decomposition = os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true"
 
     per_query_results = []
     all_retrieval_metrics = []
@@ -171,6 +175,8 @@ def run_evaluation(
                 query_expansion_variants=query_expansion_variants,
                 use_rrf=use_rrf,
                 rerank_blending=rerank_blending,
+                use_adaptive_alpha=use_adaptive_alpha,
+                use_query_decomposition=use_query_decomposition,
             )
 
         our_answer = result.get("answer", "")
@@ -266,7 +272,8 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
         ("no_query_expansion", {"use_query_expansion": False}),
         ("no_reranking", {"use_reranking": False}),
         ("no_rrf", {"use_rrf": False}),
-        ("vector_only", {"use_hybrid": False, "use_query_expansion": False}),
+        ("no_adaptive_alpha", {"use_adaptive_alpha": False}),
+        ("vector_only", {"use_hybrid": False, "use_query_expansion": False, "use_adaptive_alpha": False}),
     ]
 
     for name, overrides in configs:
@@ -282,6 +289,7 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
                 "use_reranking": True,
                 "use_query_expansion": True,
                 "use_rrf": True,
+                "use_adaptive_alpha": True,
             }
             params.update(overrides)
 
@@ -296,6 +304,43 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
         print(f"    avg_ndcg@5 = {ndcg:.4f}")
 
     return ablation
+
+
+def append_to_history(results: dict, output_path: str, label: str = ""):
+    """Append a summary line to the eval history ledger (JSONL)."""
+    history_path = Path(__file__).parent / "results" / "history.jsonl"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+
+    summary = results.get("summary", {})
+    aq = summary.get("answer_quality", {})
+    perf = summary.get("performance", {})
+
+    entry = {
+        "run_id": f"{datetime.now().strftime('%Y%m%d_%H%M')}_{Path(results.get('dataset', '')).stem[:20]}",
+        "timestamp": results.get("timestamp", datetime.now().isoformat()),
+        "dataset": results.get("dataset", ""),
+        "document": results.get("document", ""),
+        "query_count": results.get("query_count", 0),
+        "config": results.get("config", {}),
+        "metrics": {
+            "overall": aq.get("avg_judge_overall"),
+            "accuracy": aq.get("avg_judge_accuracy"),
+            "completeness": aq.get("avg_judge_completeness"),
+            "organization": aq.get("avg_judge_organization"),
+            "relevance": aq.get("avg_judge_relevance"),
+            "semantic_similarity": round(aq.get("avg_semantic_similarity", 0), 4),
+            "rouge_l": round(aq.get("avg_rouge_l", 0), 4),
+            "avg_ndcg5": round(summary.get("retrieval", {}).get("avg_ndcg@5", 0), 4),
+            "latency_p50_ms": round(perf.get("latency_ms", {}).get("p50", 0), 1),
+        },
+        "label": label,
+        "result_file": str(Path(output_path).name),
+    }
+
+    with open(history_path, "a") as f:
+        f.write(json.dumps(entry, default=str) + "\n")
+
+    print(f"History ledger updated: {history_path}")
 
 
 def compare_experiments(baseline_path: str, experiment_path: str, output_path: str):
@@ -374,6 +419,11 @@ def main():
         help="Also generate HTML report at this path",
     )
     parser.add_argument(
+        "--label",
+        default="",
+        help="Label for this eval run (e.g. 'pdfplumber + adaptive alpha')",
+    )
+    parser.add_argument(
         "--compare",
         nargs=2,
         metavar=("BASELINE", "EXPERIMENT"),
@@ -398,13 +448,24 @@ def main():
 
     embedder, vector_store, qa_engine, gemini_api_key, model_name = init_components()
 
+    # Use explicit doc_ids if provided, otherwise use all docs (mirrors real user behavior)
+    doc_ids = args.doc_ids
+    if not doc_ids:
+        doc_store_path = Path("data") / "documents.json"
+        if doc_store_path.exists():
+            with open(doc_store_path) as f:
+                doc_ids = list(json.load(f).keys())
+            print(f"  Using all {len(doc_ids)} documents (like a real user)")
+        else:
+            print("  WARNING: No document store found — searching unfiltered")
+
     results = run_evaluation(
         dataset=dataset,
         qa_engine=qa_engine,
         embedder=embedder,
         gemini_api_key=gemini_api_key,
         model_name=model_name,
-        doc_ids=args.doc_ids,
+        doc_ids=doc_ids if doc_ids else None,
         use_judge=not args.no_judge,
         feature_ablation=args.ablation,
     )
@@ -415,6 +476,9 @@ def main():
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2, default=str)
     print(f"\nResults saved to: {output_path}")
+
+    # Append to history ledger
+    append_to_history(results, str(output_path), label=args.label)
 
     # Console report
     console_reporter.report_summary(results)
