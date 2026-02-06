@@ -64,6 +64,8 @@ async def lifespan(app: FastAPI):
     print("Initializing chat manager...")
     chat_manager = ChatManager(base_dir=data_dir)
 
+    fast_model = os.environ.get("GEMINI_FAST_MODEL", gemini_model)
+
     print("Initializing QA engine...")
     qa_engine = QAEngine(
         embedder=embedder,
@@ -71,7 +73,8 @@ async def lifespan(app: FastAPI):
         gemini_api_key=gemini_api_key,
         model_name=gemini_model,
         use_reranker=use_reranking,
-        reranker_model=reranker_model
+        reranker_model=reranker_model,
+        fast_model_name=fast_model
     )
 
     # Store in app state

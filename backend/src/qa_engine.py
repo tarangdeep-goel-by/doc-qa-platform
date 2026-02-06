@@ -1,6 +1,7 @@
 """Question-answering engine using RAG (Retrieval Augmented Generation)."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional, Tuple
 from google import genai
 from .embedder import Embedder
@@ -21,7 +22,8 @@ class QAEngine:
         gemini_api_key: str,
         model_name: str,
         use_reranker: bool,
-        reranker_model: str
+        reranker_model: str,
+        fast_model_name: str = None
     ):
         """
         Initialize QA engine.
@@ -30,13 +32,15 @@ class QAEngine:
             embedder: Embedder instance
             vector_store: VectorStore instance
             gemini_api_key: Google Gemini API key
-            model_name: Gemini model name
+            model_name: Gemini model name (quality tier, kept for future use)
             use_reranker: Whether to initialize reranker (slower startup, better quality)
             reranker_model: Cross-encoder model name for reranking
+            fast_model_name: Fast Gemini model for all LLM calls (default: model_name)
         """
         self.embedder = embedder
         self.vector_store = vector_store
         self.model_name = model_name
+        self.fast_model_name = fast_model_name or model_name
 
         # Create Gemini client (new SDK)
         self.client = genai.Client(api_key=gemini_api_key)
@@ -66,7 +70,7 @@ Question: {question}
 Return ONLY the {num_variants} variants, one per line, without numbering or additional text."""
 
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=self.fast_model_name,
                 contents=prompt
             )
             variants_text = response.text.strip()
@@ -97,7 +101,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "Reply with ONLY the word SIMPLE or COMPLEX."
             )
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=self.fast_model_name,
                 contents=prompt,
                 config={"temperature": 0.0, "maxOutputTokens": 10}
             )
@@ -117,7 +121,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "Return ONLY the sub-questions, one per line, no numbering or bullets."
             )
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=self.fast_model_name,
                 contents=prompt,
                 config={"temperature": 0.2, "maxOutputTokens": 256}
             )
@@ -130,6 +134,78 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         except Exception as e:
             print(f"Warning: Query decomposition failed: {e}")
             return [question]
+
+    def _classify_and_expand(self, question: str, num_variants: int = 2) -> Dict[str, Any]:
+        """Classify question complexity and generate expansion variants in a single Gemini call.
+
+        Replaces separate _is_complex_question + _expand_query/_decompose_query calls,
+        saving one Gemini round-trip per question. Also fixes NoneType crash when
+        Gemini returns empty response for classification.
+
+        Returns:
+            dict with is_complex, variants (original + alternatives), sub_questions (if complex)
+        """
+        try:
+            prompt = (
+                f"Analyze this question. Respond in the EXACT format below.\n\n"
+                f"1. Classify as SIMPLE or COMPLEX:\n"
+                f"   - COMPLEX = asks about multiple distinct topics, requires comparing/contrasting, "
+                f"or needs information from different sections\n"
+                f"   - SIMPLE = asks about one specific thing\n\n"
+                f"2. Write {num_variants} alternative phrasings using different words or perspectives.\n\n"
+                f"3. If COMPLEX, also break into 2-4 simpler sub-questions (each independently answerable).\n\n"
+                f"Question: {question}\n\n"
+                f"CLASSIFICATION: [SIMPLE or COMPLEX]\n"
+                f"VARIANTS:\n"
+                f"1. [alternative phrasing]\n"
+                f"2. [alternative phrasing]\n"
+                f"SUB_QUESTIONS:\n"
+                f"1. [only if COMPLEX, otherwise write NONE]"
+            )
+            response = self.client.models.generate_content(
+                model=self.fast_model_name,
+                contents=prompt,
+                config={"temperature": 0.2, "maxOutputTokens": 512}
+            )
+
+            text = (response.text or "").strip()
+            if not text:
+                return {"is_complex": False, "variants": [question], "sub_questions": []}
+
+            is_complex = False
+            variants = []
+            sub_questions = []
+            section = None
+
+            for line in text.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                upper = line.upper()
+                if "CLASSIFICATION:" in upper:
+                    is_complex = "COMPLEX" in upper
+                    section = "classification"
+                elif upper.startswith("VARIANT"):
+                    section = "variants"
+                elif "SUB_QUESTION" in upper.replace("-", "_").replace(" ", "_"):
+                    section = "sub_questions"
+                elif section == "variants" and len(line) > 2 and line[0].isdigit():
+                    item = line.lstrip("0123456789.-) ").strip()
+                    if len(item) > 10:
+                        variants.append(item)
+                elif section == "sub_questions" and len(line) > 2 and line[0].isdigit():
+                    item = line.lstrip("0123456789.-) ").strip()
+                    if len(item) > 10:
+                        sub_questions.append(item)
+
+            return {
+                "is_complex": is_complex,
+                "variants": [question] + variants[:num_variants],
+                "sub_questions": sub_questions[:4] if is_complex else [],
+            }
+        except Exception as e:
+            print(f"Warning: classify_and_expand failed: {e}")
+            return {"is_complex": False, "variants": [question], "sub_questions": []}
 
     def _synthesize_answers(
         self, question: str, sub_results: List[Dict[str, Any]]
@@ -213,9 +289,9 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         alphas = [0.2, 0.5, 0.8]  # BM25-heavy, balanced, vector-heavy
         candidates = {}
 
-        for alpha in alphas:
-            # Run hybrid search with this alpha
-            results = self.vector_store.hybrid_search(
+        # Phase 1: Run all hybrid searches in parallel (stateless HTTP + read-only BM25)
+        def _search_for_alpha(alpha):
+            return alpha, self.vector_store.hybrid_search(
                 query_vector=query_embedding,
                 query_text=question,
                 top_k=top_k,
@@ -224,17 +300,24 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 use_rrf=True
             )
 
-            if not results:
-                continue
+        search_results_by_alpha = {}
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(_search_for_alpha, a) for a in alphas]
+            for future in futures:
+                try:
+                    alpha, results = future.result()
+                    if results:
+                        search_results_by_alpha[alpha] = results
+                except Exception as e:
+                    logger.warning(f"Alpha search failed: {e}")
 
-            # Score with reranker to determine confidence
+        # Phase 2: Rerank each sequentially (CrossEncoder model is not thread-safe)
+        for alpha, results in search_results_by_alpha.items():
             if self.use_reranking and self.reranker:
                 reranked = self.reranker.rerank(question, results)
-                # Use top reranker score as confidence metric
                 top_score = reranked[0]["rerank_score"] if reranked else -999
                 candidates[alpha] = (results, reranked, top_score)
             else:
-                # Fallback: use retrieval score
                 top_score = results[0]["score"] if results else -999
                 candidates[alpha] = (results, None, top_score)
 
@@ -337,119 +420,139 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         Returns:
             Dictionary with answer and sources
         """
-        # Step 0: Query decomposition (if enabled)
-        if use_query_decomposition and self._is_complex_question(question):
-            print(f"Query decomposition: question classified as COMPLEX")
-            sub_questions = self._decompose_query(question)
-            print(f"Query decomposition: {len(sub_questions)} sub-questions: {sub_questions}")
+        # Step 0+1: Combined classification + expansion (single Gemini call)
+        query_variants = [question]
+        query_weights = [1.0]
 
-            if len(sub_questions) > 1:
-                # Answer each sub-question through the full pipeline (without decomposition)
-                sub_results = []
-                all_sources = []
-                for sq in sub_questions:
-                    sr = self.answer_question(
-                        question=sq,
-                        top_k=top_k,
-                        doc_ids=doc_ids,
-                        use_hybrid=use_hybrid,
-                        hybrid_alpha=hybrid_alpha,
-                        use_reranking=use_reranking,
-                        min_score=min_score,
-                        use_query_expansion=use_query_expansion,
-                        query_expansion_variants=query_expansion_variants,
-                        use_rrf=use_rrf,
-                        rerank_blending=rerank_blending,
-                        use_query_decomposition=False,  # prevent recursion
-                        use_adaptive_alpha=use_adaptive_alpha,
-                    )
-                    sub_results.append(sr)
-                    all_sources.extend(sr.get("sources", []))
+        if use_query_decomposition or use_query_expansion:
+            # Parallel: classify+expand and embed original question concurrently
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                ce_future = executor.submit(self._classify_and_expand, question, query_expansion_variants)
+                embed_future = executor.submit(self.embedder.embed_text, question)
 
-                # Deduplicate sources across sub-answers
-                seen_texts = set()
-                unique_sources = []
-                for s in all_sources:
-                    key = s["chunk_text"][:100]
-                    if key not in seen_texts:
-                        seen_texts.add(key)
-                        unique_sources.append(s)
+                ce_result = ce_future.result()
+                original_embedding = embed_future.result()
 
-                # Synthesize final answer
-                answer = self._synthesize_answers(question, sub_results)
-                return {
-                    "question": question,
-                    "answer": answer,
-                    "sources": unique_sources[:top_k],
-                    "retrieved_count": len(unique_sources),
-                    "decomposed": True,
-                    "sub_questions": [sr["question"] for sr in sub_results],
-                }
+            # Handle complex question decomposition
+            if use_query_decomposition and ce_result["is_complex"]:
+                sub_questions = ce_result["sub_questions"]
+                print(f"Query decomposition: COMPLEX, {len(sub_questions)} sub-questions: {sub_questions}")
+
+                if len(sub_questions) > 1:
+                    def _run_sub_question(sq):
+                        return self.answer_question(
+                            question=sq,
+                            top_k=top_k,
+                            doc_ids=doc_ids,
+                            use_hybrid=use_hybrid,
+                            hybrid_alpha=hybrid_alpha,
+                            use_reranking=use_reranking,
+                            min_score=min_score,
+                            use_query_expansion=use_query_expansion,
+                            query_expansion_variants=query_expansion_variants,
+                            use_rrf=use_rrf,
+                            rerank_blending=rerank_blending,
+                            use_query_decomposition=False,
+                            use_adaptive_alpha=use_adaptive_alpha,
+                        )
+
+                    with ThreadPoolExecutor(max_workers=len(sub_questions)) as executor:
+                        sub_results = list(executor.map(_run_sub_question, sub_questions))
+
+                    all_sources = []
+                    for sr in sub_results:
+                        all_sources.extend(sr.get("sources", []))
+
+                    seen_texts = set()
+                    unique_sources = []
+                    for s in all_sources:
+                        key = s["chunk_text"][:100]
+                        if key not in seen_texts:
+                            seen_texts.add(key)
+                            unique_sources.append(s)
+
+                    answer = self._synthesize_answers(question, sub_results)
+                    return {
+                        "question": question,
+                        "answer": answer,
+                        "sources": unique_sources[:top_k],
+                        "retrieved_count": len(unique_sources),
+                        "decomposed": True,
+                        "sub_questions": [sr["question"] for sr in sub_results],
+                    }
+
+            # Use query variants for expansion (simple questions or decomp disabled)
+            if use_query_expansion:
+                query_variants = ce_result["variants"]
+                query_weights = [2.0] + [1.0] * (len(query_variants) - 1)
+
+            # Embed extra variants in batch (original already done in parallel)
+            if use_query_expansion and len(query_variants) > 1:
+                extra_variants = query_variants[1:]  # skip original
+                extra_embeddings = list(self.embedder.embed_texts(extra_variants))
+                query_embeddings = [original_embedding] + extra_embeddings
+            else:
+                query_embeddings = [original_embedding]
+        else:
+            query_embeddings = [self.embedder.embed_text(question)]
 
         # Pipeline config logging
         print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
 
-        # Step 1: Query expansion (if enabled)
-        if use_query_expansion:
-            query_variants = self._expand_query(question, num_variants=query_expansion_variants)
-            # Weight original query 2×, variants 1× each
-            query_weights = [2.0] + [1.0] * query_expansion_variants
-        else:
-            query_variants = [question]
-            query_weights = [1.0]
-
-        # Step 2: Embed all query variants
-        query_embeddings = [self.embedder.embed_text(q) for q in query_variants]
-
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
 
-        # Use adaptive alpha selection for single-query hybrid search (most impactful case)
+        # Phase A: Find best alpha via parallel search + sequential rerank
         alpha_selected = None
-        if use_adaptive_alpha and use_hybrid and not use_query_expansion and self.reranker:
-            # Adaptive alpha: try multiple alphas, pick best based on reranker confidence
-            search_results, alpha_selected = self._search_with_alpha_selection(
+        adaptive_results = None
+        if use_adaptive_alpha and use_hybrid and self.reranker:
+            adaptive_results, alpha_selected = self._search_with_alpha_selection(
                 question=question,
                 query_embedding=query_embeddings[0],
                 doc_ids=doc_ids,
                 top_k=retrieval_k
             )
-            print(f"Pipeline: {len(search_results)} chunks retrieved via adaptive alpha={alpha_selected}")
-            # Results are already reranked by _search_with_alpha_selection
-        elif use_query_expansion and len(query_variants) > 1:
-            # Multi-query search with fusion
+            print(f"Pipeline: adaptive alpha selected={alpha_selected}")
+
+        # Phase B: Main retrieval using best alpha (or default)
+        effective_alpha = alpha_selected if alpha_selected is not None else hybrid_alpha
+
+        if use_query_expansion and len(query_variants) > 1:
+            # Multi-query search with all variants + best alpha
             search_results = self.vector_store.multi_query_hybrid_search(
                 query_variants=query_variants,
                 query_embeddings=query_embeddings,
                 query_weights=query_weights,
                 top_k=retrieval_k,
                 doc_ids=doc_ids,
-                alpha=hybrid_alpha,
+                alpha=effective_alpha,
                 use_rrf=use_rrf
             )
+            adaptive_results = None  # Can't reuse — need broader retrieval from all variants
         elif use_hybrid:
-            # Single query hybrid search
-            search_results = self.vector_store.hybrid_search(
-                query_vector=query_embeddings[0],
-                query_text=query_variants[0],
-                top_k=retrieval_k,
-                doc_ids=doc_ids,
-                alpha=hybrid_alpha,
-                use_rrf=use_rrf
-            )
+            if adaptive_results is not None:
+                search_results = adaptive_results  # Reuse (already reranked by alpha selection)
+            else:
+                search_results = self.vector_store.hybrid_search(
+                    query_vector=query_embeddings[0],
+                    query_text=query_variants[0],
+                    top_k=retrieval_k,
+                    doc_ids=doc_ids,
+                    alpha=effective_alpha,
+                    use_rrf=use_rrf
+                )
         else:
-            # Single query vector search
             search_results = self.vector_store.search(
                 query_vector=query_embeddings[0],
                 top_k=retrieval_k,
                 doc_ids=doc_ids
             )
 
-        if alpha_selected is None:
-            print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
+        print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
 
-        # Step 2.5: Rerank if enabled (skip if already reranked by adaptive alpha)
-        if use_reranking and self.reranker and search_results and alpha_selected is None:
+        # Step 2.5: Rerank if enabled (skip if reusing adaptive results — already reranked)
+        already_reranked = adaptive_results is not None and search_results is adaptive_results
+        if use_reranking and self.reranker and search_results and not already_reranked:
             pre_rerank_count = len(search_results)
             search_results = self.reranker.rerank_with_position_blending(
                 query=question,
@@ -760,7 +863,7 @@ Answer:"""
         """Generate answer using Gemini."""
         try:
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=self.fast_model_name,
                 contents=prompt,
                 config={
                     "temperature": 0.4,        # Balanced: factual but not overly terse
@@ -806,7 +909,7 @@ Answer:"""
         try:
             # Try a simple generation
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model=self.fast_model_name,
                 contents="Test"
             )
             return True

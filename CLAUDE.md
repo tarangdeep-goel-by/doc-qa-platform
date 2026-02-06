@@ -9,222 +9,222 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A production-ready full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDFs, ask questions, get AI-powered answers with source citations.
+Full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDFs, ask questions, get AI-powered answers with source citations.
 
-**Architecture**: React frontend + FastAPI backend + Qdrant vector DB + Google Gemini
+**Stack**: React + TypeScript frontend, FastAPI backend, Qdrant vector DB, Google Gemini LLM
 
 ## Quick Start
 
 ```bash
-# 1. Start services
+# Start all services (Qdrant + backend)
 docker-compose up -d
 
-# 2. Start backend
-cd backend && python run_api.py
-
-# 3. Start frontend (separate terminal)
+# Frontend development (separate terminal)
 cd frontend && npm run dev
 
-# Access UI: http://localhost:3000
-# Access API: http://localhost:8000/docs
+# Access points
+# UI: http://localhost:3000
+# API docs: http://localhost:8000/docs
+# Qdrant: http://localhost:6333/dashboard
 ```
 
 ## Project Structure
 
 ```
 doc-qa-platform/
-├── frontend/          # React + TypeScript UI
-│   └── CLAUDE.md      # Frontend architecture & patterns
-├── backend/           # FastAPI + RAG pipeline
-│   └── CLAUDE.md      # Backend architecture & patterns
-├── PROJECT_STATUS.md  # Recent changes & roadmap
-└── README.md          # User documentation
+├── frontend/                # React + TypeScript + Zustand + Tailwind
+│   └── CLAUDE.md            # Frontend architecture & patterns
+├── backend/
+│   ├── api/                 # FastAPI routers (admin, query, chats)
+│   │   └── schemas.py       # Pydantic models
+│   ├── src/                 # Core pipeline
+│   │   ├── qa_engine.py     # RAG orchestrator (search → rerank → generate)
+│   │   ├── vector_store.py  # Qdrant + BM25 hybrid search
+│   │   ├── document_processor.py  # PDF extraction (PyPDF2 + pdfplumber)
+│   │   ├── embedder.py      # Gemini embeddings
+│   │   ├── chunker.py       # Text chunking with overlap
+│   │   ├── bm25_index.py    # Persistent BM25 keyword index
+│   │   └── chat_manager.py  # Chat session persistence (JSON files)
+│   ├── evaluation/          # Eval framework
+│   │   ├── run_evaluation.py      # Main eval harness
+│   │   ├── view_history.py        # CLI history viewer
+│   │   ├── backfill_history.py    # One-time ledger backfill
+│   │   ├── datasets/              # Benchmark question sets (JSON)
+│   │   └── results/               # Eval outputs + history.jsonl ledger
+│   ├── tests/               # 136 pytest tests
+│   └── CLAUDE.md            # Backend architecture & patterns
+├── docker-compose.yml       # Qdrant + backend + test services
+└── PROJECT_STATUS.md        # Current state, recent changes, roadmap
 ```
 
-## High-Level Architecture
+## Docker Development (Primary Workflow)
+
+**No local Python env** — all backend code runs inside Docker container `doc-qa-backend`.
+
+```bash
+# Rebuild after code changes (container only mounts data/, not code)
+docker-compose build backend && docker-compose up -d --force-recreate backend
+
+# Run tests
+docker-compose run --rm test
+
+# Run evals (always use -t for live progress output)
+docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
+  --dataset evaluation/datasets/real_world_multi_doc.json \
+  --output evaluation/results/output.json \
+  --label "description of changes"
+
+# View eval history
+docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
+
+# Check backend logs
+docker-compose logs -f backend
+```
+
+**Critical gotcha**: `docker-compose restart` does NOT pick up rebuilt images. Always use `docker-compose up -d --force-recreate backend` after `docker-compose build backend`.
+
+## RAG Pipeline Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│   React Frontend (Port 3000)            │
-│   • Zustand state management            │
-│   • Tailwind CSS design system          │
-│   • Type-safe API client                │
-└─────────────────────────────────────────┘
-              ↓ HTTP/REST
-┌─────────────────────────────────────────┐
-│   FastAPI Backend (Port 8000)           │
-│   • Document ingestion pipeline         │
-│   • Advanced RAG pipeline               │
-│   • Multi-chat system                   │
-└─────────────────────────────────────────┘
-    ↓                        ↓
-┌─────────┐            ┌─────────┐
-│ Qdrant  │            │ Gemini  │
-│ Vector  │            │   LLM   │
-│   DB    │            │   API   │
-└─────────┘            └─────────┘
+Question
+  ↓
+Query Decomposition (optional, splits complex multi-part questions)
+  ↓
+Query Expansion (optional, generates alternative phrasings via Gemini)
+  ↓
+Parallel Search: [Vector/Semantic] + [BM25/Keyword]
+  ↓
+Fusion: RRF (Reciprocal Rank Fusion) or Weighted (adaptive alpha)
+  ↓
+Dynamic Score Cutoff (step 2.8 — trims low-scoring chunks post-retrieval)
+  ↓
+Cross-Encoder Reranking + Position-Aware Blending
+  ↓
+Context Assembly → Gemini LLM → Answer with Source Citations
 ```
+
+### RAG Config (Environment Variables)
+
+All set in `docker-compose.yml`, read by backend at startup:
+
+| Variable | Current Value | Notes |
+|----------|--------------|-------|
+| `EMBEDDING_MODEL` | `gemini-embedding-001` | Changing requires Qdrant collection rebuild |
+| `EMBEDDING_DIM` | `768` | Must match embedding model |
+| `CHUNK_SIZE` | `2500` | Changing requires re-uploading all documents |
+| `CHUNK_OVERLAP` | `500` | Changing requires re-uploading all documents |
+| `TOP_K_RESULTS` | `12` | Initial fetch count; dynamic cutoff trims further |
+| `USE_HYBRID_SEARCH` | `true` | BM25 + vector fusion |
+| `HYBRID_ALPHA` | `0.5` | 0=keyword only, 1=semantic only |
+| `USE_ADAPTIVE_ALPHA` | `true` | Auto-adjusts alpha per query type |
+| `USE_RERANKING` | `true` | Cross-encoder reranking |
+| `RERANKER_BLENDING` | `position_aware` | Weight top results higher |
+| `USE_RRF` | `true` | Reciprocal Rank Fusion |
+| `USE_QUERY_EXPANSION` | `false` | Currently off (adds latency) |
+| `USE_QUERY_DECOMPOSITION` | `true` | Splits multi-part questions |
+| `USE_PDFPLUMBER` | `true` | Table-aware PDF extraction |
+
+**Data-breaking changes**: Changing `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `CHUNK_SIZE`, or `CHUNK_OVERLAP` requires:
+1. `docker-compose down -v` (deletes Qdrant data)
+2. `docker-compose up -d`
+3. Re-upload all documents
+
+## Evaluation Framework
+
+### Running Evals
+
+```bash
+# Multi-doc benchmark (77 questions, ~20 min)
+docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
+  --dataset evaluation/datasets/real_world_multi_doc.json \
+  --output evaluation/results/multi_doc_eval.json \
+  --label "description" --use-judge
+
+# View history (39+ runs tracked)
+docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
+
+# Filter by dataset
+docker exec doc-qa-backend python evaluation/view_history.py --dataset fx5u
+```
+
+### Eval Architecture
+
+- **Datasets**: JSON files in `evaluation/datasets/` with questions + expected answers
+- **Doc resolution**: Eval uses all doc_ids from `data/documents.json` (mirrors real user behavior)
+- **History ledger**: `evaluation/results/history.jsonl` — append-only JSONL, one line per run
+- **Metrics**: LLM judge (accuracy, completeness, organization, relevance), semantic similarity, ROUGE-L, latency
+- **Current best**: 4.72/5 overall on 77-question multi-doc benchmark
+
+### Eval Gotchas
+
+- Pipeline params (`use_query_decomposition`, `use_adaptive_alpha`) must be explicitly passed to `qa_engine.answer_question()` — easy to miss when adding new params
+- Env vars use fast-fail (`os.environ["KEY"]`) — missing vars raise KeyError immediately, no silent defaults
+- Always use `docker exec -t` (not `docker exec`) for live progress — without `-t`, stdout buffers until process exits
 
 ## Testing
 
 ```bash
-# Backend: 136 automated tests
+# All tests (136 tests, needs backend + Qdrant running)
 docker-compose run --rm test
 
-# Frontend: No test suite yet
-```
+# Unit tests only (fast)
+docker-compose run --rm unit-tests
 
-## Tech Stack Summary
+# Integration tests (needs Qdrant)
+docker-compose run --rm integration-tests
 
-**Frontend**: React 18, TypeScript, Zustand, React Router, Tailwind CSS, Vite
+# API tests (needs backend + Qdrant)
+docker-compose run --rm api-tests
 
-**Backend**: FastAPI, Qdrant, sentence-transformers, Google Gemini 2.5, BM25, cross-encoder reranking, PyPDF2, Pytest
-
-## Where to Find Detailed Information
-
-### Frontend Development
-👉 **See `frontend/CLAUDE.md`** for:
-- Component architecture
-- Zustand state management patterns
-- Design system (editorial aesthetic)
-- API client implementation
-- Development commands
-- Troubleshooting
-
-### Backend Development
-👉 **See `backend/CLAUDE.md`** for:
-- RAG pipeline architecture (query expansion, hybrid search, reranking)
-- Document processing pipeline
-- Chat management system
-- Testing strategy (136 tests)
-- Environment configuration
-- Performance optimization
-- Development commands
-- Troubleshooting
-
-### Project Status & Changes
-👉 **See `PROJECT_STATUS.md`** for:
-- Recent feature implementations
-- Completed features
-- Current status
-- Next steps
-- Known issues
-
-### User Documentation
-👉 **See `README.md`** for:
-- Installation instructions
-- Usage examples
-- API endpoints
-- Configuration options
-
-## Common Cross-Cutting Tasks
-
-### Adding a New Feature
-
-1. **Plan**: Determine if frontend, backend, or both
-2. **Backend first** (if needed):
-   - Add endpoint to appropriate router
-   - Update Pydantic schemas
-   - Add tests
-   - See `backend/CLAUDE.md` for details
-3. **Frontend second**:
-   - Update API client types
-   - Add store actions if needed
-   - Build UI components
-   - See `frontend/CLAUDE.md` for details
-
-### Debugging End-to-End
-
-1. **Check backend logs**: `docker-compose logs backend`
-2. **Check frontend console**: Browser DevTools
-3. **Check network tab**: See actual API requests/responses
-4. **Check Qdrant**: http://localhost:6333/dashboard
-
-### Working on Frontend Only
-
-You can develop the frontend independently using the running backend:
-```bash
-# Terminal 1: Keep backend running
-docker-compose up -d
-
-# Terminal 2: Frontend development
-cd frontend && npm run dev
-```
-
-### Working on Backend Only
-
-You can test the backend independently via API docs:
-```bash
-# Start services
-docker-compose up -d
-cd backend && python run_api.py
-
-# Test via Swagger UI
-open http://localhost:8000/docs
+# Specific test file
+docker-compose run --rm test pytest tests/test_api.py -v
 ```
 
 ## Key Design Decisions
 
-**Why Zustand?** - Minimal boilerplate, no context providers, perfect for React
+- **Zustand** for frontend state — minimal boilerplate, no providers
+- **Qdrant** for vectors — self-hosted, production-ready
+- **Gemini** for LLM + embeddings — large context window, fast, cheap
+- **Hybrid search** — semantic + keyword (BM25) for better recall
+- **JSON file storage** for chats/docs — simple, no DB migration needed yet
+- **pdfplumber** for PDF extraction — handles tables better than PyPDF2 (still available as fallback)
 
-**Why Qdrant?** - Self-hosted, production-ready, handles millions of vectors
+## Common Tasks
 
-**Why Gemini?** - Large context window (1M+ tokens), fast, cheap, good instruction following
+### Adding a New RAG Feature
 
-**Why hybrid search?** - Combines semantic (vector) + keyword (BM25) for better recall
+1. Add env var to `docker-compose.yml` (all services that need it)
+2. Implement in `backend/src/qa_engine.py` or `backend/src/vector_store.py`
+3. Wire through in `backend/api/routers/query.py` AND `backend/api/routers/chats.py`
+4. Wire through in `backend/evaluation/run_evaluation.py` (fast-fail env read + pass to answer_question)
+5. Add tests
+6. Rebuild container and run eval
 
-**Why multi-chat system?** - Users want to organize conversations by topic/document
+### Debugging RAG Quality
 
-## Important Files
+1. Run eval with `--use-judge` flag
+2. Check per-question scores in output JSON
+3. Look at `sources` in responses — are the right chunks being retrieved?
+4. Check if question type maps to the right search strategy (adaptive alpha)
+5. Compare against history: `view_history.py --detail --last 10`
 
-- `.env.example` (backend) - Environment variable template
-- `docker-compose.yml` - Service orchestration
-- `backend/requirements.txt` - Python dependencies
-- `frontend/package.json` - Node dependencies
-- `backend/tests/` - 136 automated tests
+## Detailed Guides
 
-## Troubleshooting Quick Reference
+- **Frontend**: `frontend/CLAUDE.md` — components, Zustand, design system, API client
+- **Backend**: `backend/CLAUDE.md` — RAG pipeline, testing, env config, error handling
+- **Project status**: `PROJECT_STATUS.md` — recent changes, metrics, roadmap
 
-**"Nothing works":**
+## Troubleshooting
+
+**Container has stale code**: Rebuild and force-recreate (restart alone doesn't work):
 ```bash
-docker-compose down && docker-compose up -d
-cd backend && python run_api.py
-cd frontend && npm run dev
+docker-compose build backend && docker-compose up -d --force-recreate backend
 ```
 
-**"Backend tests failing":**
-```bash
-docker-compose ps  # Ensure all services running
-docker-compose logs backend
-```
+**Eval shows wrong scores**: Check that all pipeline params are wired through to `qa_engine.answer_question()` in `run_evaluation.py`. Config dict logging can look correct while the actual function call misses params.
 
-**"Frontend can't reach API":**
-- Check backend is running: http://localhost:8000/health
-- Check proxy config in `frontend/vite.config.ts`
+**No live output from docker exec**: Use `docker exec -t` (allocate pseudo-TTY).
 
-**"Qdrant connection failed":**
-```bash
-docker logs doc-qa-qdrant
-docker-compose restart qdrant
-```
+**Qdrant connection failed**: `docker-compose restart qdrant` or full `docker-compose down && docker-compose up -d`.
 
-## Development Workflow
-
-1. **Before starting**: Read `PROJECT_STATUS.md` for current state
-2. **During development**: Refer to `frontend/CLAUDE.md` or `backend/CLAUDE.md`
-3. **After changes**: Update `PROJECT_STATUS.md` if significant
-4. **Before committing**: Run backend tests: `docker-compose run --rm test`
-5. **After committing**: Push to GitHub: `git push origin main`
-
-## Access Points
-
-- Frontend UI: http://localhost:3000
-- API Docs: http://localhost:8000/docs
-- API Health: http://localhost:8000/health
-- Qdrant Dashboard: http://localhost:6333/dashboard
-
----
-
-**Remember**: This file is the overview. Detailed implementation guidance lives in:
-- `frontend/CLAUDE.md` - React, TypeScript, Tailwind patterns
-- `backend/CLAUDE.md` - FastAPI, RAG, testing patterns
+**Frontend can't reach API**: Check backend is running at http://localhost:8000/health, check proxy in `frontend/vite.config.ts`.
