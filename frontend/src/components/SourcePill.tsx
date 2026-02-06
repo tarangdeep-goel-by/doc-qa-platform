@@ -10,7 +10,10 @@ interface Props {
 
 export const SourcePill = forwardRef<HTMLDivElement, Props>(
   ({ source, index }, ref) => {
-    const relevance = Math.round(source.score * 100)
+    const normalized = source.score >= 0 && source.score <= 1
+      ? source.score
+      : 1 / (1 + Math.exp(-source.score))
+    const relevance = Math.round(normalized * 100)
 
     const handleOpen = () => {
       if (source.page_num) {

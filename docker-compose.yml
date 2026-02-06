@@ -46,6 +46,10 @@ services:
       - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
       - RERANKER_BLENDING=position_aware
       - USE_QUERY_DECOMPOSITION=true
+      # Technical document retrieval improvements
+      - USE_ADAPTIVE_ALPHA=true
+      - USE_PDFPLUMBER=true
+      - USE_QUERY_EXPANSION=false
     depends_on:
       - qdrant
     restart: unless-stopped

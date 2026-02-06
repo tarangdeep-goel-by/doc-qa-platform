@@ -80,8 +80,11 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 
         # Process document
         print(f"Processing document: {file.filename}")
+        use_pdfplumber = os.environ.get("USE_PDFPLUMBER", "false").lower() == "true"
         processor = DocumentProcessor()
-        page_data, metadata = processor.process_document(file_path, file_extension)
+        page_data, metadata = processor.process_document(file_path, file_extension, use_pdfplumber=use_pdfplumber)
+        if use_pdfplumber:
+            print("Using pdfplumber for table-aware extraction")
 
         # Get file size
         file_size_mb = processor.get_file_size_mb(file_path)

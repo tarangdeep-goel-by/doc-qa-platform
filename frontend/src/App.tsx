@@ -8,7 +8,15 @@ import { DocumentsPage } from './pages/DocumentsPage'
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="bottom-right" />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: '#363636',
+            color: '#E4E4E4',
+          },
+        }}
+      />
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<WelcomeScreen />} />

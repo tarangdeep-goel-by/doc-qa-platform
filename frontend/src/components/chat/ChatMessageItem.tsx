@@ -11,7 +11,9 @@ interface Props {
 
 export function ChatMessageItem({ message }: Props) {
   const isUser = message.role === 'user'
-  const timeAgo = formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })
+  // Backend sends UTC timestamps without Z suffix — append Z so JS parses as UTC
+  const utcTimestamp = message.timestamp.endsWith('Z') ? message.timestamp : message.timestamp + 'Z'
+  const timeAgo = formatDistanceToNow(new Date(utcTimestamp), { addSuffix: true })
 
   // Ref for SourcesBadge (for scrolling on citation click)
   const sourcesBadgeRef = useRef<SourcesBadgeRef>(null)
@@ -25,8 +27,8 @@ export function ChatMessageItem({ message }: Props) {
     <div className={`flex gap-fluid-md ${isUser ? 'justify-end' : 'justify-start'}`}>
       {/* Avatar */}
       {!isUser && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-burgundy/10 flex items-center justify-center">
-          <Bot className="w-5 h-5 text-burgundy" />
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan/10 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-cyan" />
         </div>
       )}
 
@@ -36,7 +38,7 @@ export function ChatMessageItem({ message }: Props) {
           className={`inline-block p-fluid-md rounded-xl ${
             isUser
               ? 'bg-burgundy text-cream'
-              : 'bg-ink/5 text-ink'
+              : 'bg-cyan/10 text-ink'
           }`}
         >
           {isUser ? (

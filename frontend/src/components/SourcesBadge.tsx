@@ -72,7 +72,10 @@ export const SourcesBadge = forwardRef<SourcesBadgeRef, Props>(
         {isExpanded && (
           <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-burgundy/10">
             {sources.map((source, idx) => {
-              const relevance = Math.round(source.score * 100)
+              const normalized = source.score >= 0 && source.score <= 1
+                ? source.score
+                : 1 / (1 + Math.exp(-source.score))
+              const relevance = Math.round(normalized * 100)
 
               return (
                 <div

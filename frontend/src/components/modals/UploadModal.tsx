@@ -207,9 +207,9 @@ export function UploadModal({ onClose }: Props) {
 
           {/* Success Message */}
           {success && (
-            <div className="flex items-center gap-2 p-fluid-md bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <p className="font-sans text-fluid-sm text-green-800">
+            <div className="flex items-center gap-2 p-fluid-md bg-green-900/20 border border-green-700 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+              <p className="font-sans text-fluid-sm text-green-300">
                 Document uploaded successfully!
               </p>
             </div>
@@ -217,10 +217,10 @@ export function UploadModal({ onClose }: Props) {
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-start gap-2 p-fluid-md bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 p-fluid-md bg-red-900/20 border border-red-700 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-sans text-fluid-sm text-red-800 whitespace-pre-line">
+                <p className="font-sans text-fluid-sm text-red-300 whitespace-pre-line">
                   {error}
                 </p>
               </div>

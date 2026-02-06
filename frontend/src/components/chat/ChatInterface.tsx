@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/appStore'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessageItem } from './ChatMessageItem'
 import { MessageInput } from '../MessageInput'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Bot } from 'lucide-react'
 
 export function ChatInterface() {
   const { chatId } = useParams()
@@ -18,10 +18,10 @@ export function ChatInterface() {
     }
   }, [chatId, setActiveChat])
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change or loading starts
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loading])
 
   if (!activeChat) {
     return (
@@ -42,20 +42,20 @@ export function ChatInterface() {
 
       {/* Deleted Documents Warning */}
       {activeChat.missing_documents && activeChat.missing_documents.length > 0 && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-fluid-md mx-fluid-lg mt-fluid-md">
+        <div className="bg-yellow-900/20 border-l-4 border-yellow-400 p-fluid-md mx-fluid-lg mt-fluid-md">
           <div className="flex items-start gap-fluid-sm">
             <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-sans text-fluid-sm text-yellow-700 font-medium">
+              <p className="font-sans text-fluid-sm text-yellow-300 font-medium">
                 {activeChat.missing_documents.length} document(s) from this chat have been deleted
               </p>
               {activeChat.available_documents && activeChat.available_documents.length > 0 ? (
-                <p className="font-sans text-fluid-sm text-yellow-700 mt-fluid-xs">
+                <p className="font-sans text-fluid-sm text-yellow-300 mt-fluid-xs">
                   Questions will use the {activeChat.available_documents.length} remaining document(s): {' '}
                   {activeChat.available_documents.map(d => d.title).join(', ')}
                 </p>
               ) : (
-                <p className="font-sans text-fluid-sm text-yellow-700 mt-fluid-xs">
+                <p className="font-sans text-fluid-sm text-yellow-300 mt-fluid-xs">
                   This chat has no documents available. Consider adding new documents or archiving this chat.
                 </p>
               )}
@@ -83,6 +83,22 @@ export function ChatInterface() {
             messages.map(msg => (
               <ChatMessageItem key={msg.id} message={msg} />
             ))
+          )}
+
+          {/* Typing indicator while waiting for response */}
+          {loading && (
+            <div className="flex gap-fluid-md justify-start">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan/10 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-cyan" />
+              </div>
+              <div className="inline-block p-fluid-md rounded-xl bg-cyan/10">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:300ms]" />
+                </div>
+              </div>
+            </div>
           )}
 
           <div ref={messagesEndRef} />

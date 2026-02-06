@@ -23,7 +23,6 @@ export async function askQuestion(
     body: JSON.stringify({
       question,
       doc_ids: docIds,
-      top_k: 5,
     }),
   })
 
@@ -130,7 +129,6 @@ export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChat
 export async function askInChat(
   chatId: string,
   question: string,
-  topK: number = 10
 ): Promise<ChatMessage> {
   const response = await fetch(`${API_BASE}/chats/${chatId}/ask`, {
     method: 'POST',
@@ -139,7 +137,6 @@ export async function askInChat(
     },
     body: JSON.stringify({
       question,
-      top_k: topK,
     }),
   })
 

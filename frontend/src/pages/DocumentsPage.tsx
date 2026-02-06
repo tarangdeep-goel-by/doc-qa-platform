@@ -135,7 +135,7 @@ export function DocumentsPage() {
           )}
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-paper rounded-lg hover:bg-burgundy/90 transition-colors"
+            className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
           >
             <Upload className="w-4 h-4" />
             <span className="font-sans text-fluid-sm font-medium">Upload</span>
@@ -173,7 +173,7 @@ export function DocumentsPage() {
             </p>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-fluid-lg py-fluid-md bg-burgundy text-paper rounded-lg hover:bg-burgundy/90 transition-colors"
+              className="flex items-center gap-2 px-fluid-lg py-fluid-md bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
             >
               <Upload className="w-5 h-5" />
               <span className="font-sans text-fluid-base font-medium">Upload Document</span>

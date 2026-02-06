@@ -8,8 +8,11 @@ interface Props {
 }
 
 export function SourceCitation({ source, index }: Props) {
-  // Convert score to percentage for display
-  const relevance = Math.round(source.score * 100)
+  // Normalize score to 0-1: vector similarity is already 0-1, cross-encoder reranker scores can be -10 to +10
+  const normalized = source.score >= 0 && source.score <= 1
+    ? source.score
+    : 1 / (1 + Math.exp(-source.score))
+  const relevance = Math.round(normalized * 100)
 
   const handleOpenSource = () => {
     if (source.page_num) {

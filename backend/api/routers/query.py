@@ -48,15 +48,16 @@ async def ask_question(http_request: Request, query: QueryRequest):
 
             doc_ids = valid_doc_ids
 
-        # Get configuration from request or environment variables
-        top_k = query.top_k if query.top_k is not None else int(os.environ["TOP_K_RESULTS"])
-        use_hybrid = query.use_hybrid if query.use_hybrid is not None else _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
-        hybrid_alpha = query.hybrid_alpha if query.hybrid_alpha is not None else float(os.environ["HYBRID_ALPHA"])
-        use_reranking = query.use_reranking if query.use_reranking is not None else _str_to_bool(os.environ["USE_RERANKING"])
-        use_query_expansion = query.use_query_expansion if query.use_query_expansion is not None else _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
-        use_rrf = query.use_rrf if query.use_rrf is not None else _str_to_bool(os.environ["USE_RRF"])
-        rerank_blending = query.rerank_blending if query.rerank_blending is not None else os.environ["RERANKER_BLENDING"]
-        use_query_decomposition = query.use_query_decomposition if query.use_query_decomposition is not None else _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
+        # Get configuration from environment variables
+        top_k = int(os.environ["TOP_K_RESULTS"])
+        use_hybrid = _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
+        hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
+        use_reranking = _str_to_bool(os.environ["USE_RERANKING"])
+        use_query_expansion = _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
+        use_rrf = _str_to_bool(os.environ["USE_RRF"])
+        rerank_blending = os.environ["RERANKER_BLENDING"]
+        use_query_decomposition = _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
+        use_adaptive_alpha = _str_to_bool(os.environ.get("USE_ADAPTIVE_ALPHA", "true"))
 
         # Run RAG pipeline with validated doc_ids and configuration
         result = qa_engine.answer_question(
@@ -69,7 +70,8 @@ async def ask_question(http_request: Request, query: QueryRequest):
             use_query_expansion=use_query_expansion,
             use_rrf=use_rrf,
             rerank_blending=rerank_blending,
-            use_query_decomposition=use_query_decomposition
+            use_query_decomposition=use_query_decomposition,
+            use_adaptive_alpha=use_adaptive_alpha
         )
 
         # Convert sources to schema format

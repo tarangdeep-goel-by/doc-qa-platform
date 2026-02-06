@@ -298,7 +298,7 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
             )
 
         # Read RAG config from environment
-        top_k = body.top_k if body.top_k is not None else int(os.environ["TOP_K_RESULTS"])
+        top_k = int(os.environ["TOP_K_RESULTS"])
         use_hybrid = _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
         hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
         use_reranking = _str_to_bool(os.environ["USE_RERANKING"])
@@ -306,6 +306,7 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
         use_rrf = _str_to_bool(os.environ["USE_RRF"])
         rerank_blending = os.environ["RERANKER_BLENDING"]
         use_query_decomposition = _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
+        use_adaptive_alpha = _str_to_bool(os.environ.get("USE_ADAPTIVE_ALPHA", "true"))
 
         # Run RAG pipeline with available documents only
         result = qa_engine.answer_question(
@@ -319,7 +320,8 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
             use_query_expansion=use_query_expansion,
             use_rrf=use_rrf,
             rerank_blending=rerank_blending,
-            use_query_decomposition=use_query_decomposition
+            use_query_decomposition=use_query_decomposition,
+            use_adaptive_alpha=use_adaptive_alpha
         )
 
         # Create user message

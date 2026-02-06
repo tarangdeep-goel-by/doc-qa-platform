@@ -1,11 +1,14 @@
 """Question-answering engine using RAG (Retrieval Augmented Generation)."""
 
-from typing import List, Dict, Any, Optional
+import logging
+from typing import List, Dict, Any, Optional, Tuple
 from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
 from .reranker import Reranker
 from .structure_detector import detect_structure
+
+logger = logging.getLogger(__name__)
 
 
 class QAEngine:
@@ -40,6 +43,7 @@ class QAEngine:
 
         # Initialize reranker if enabled
         self.reranker = Reranker(model_name=reranker_model) if use_reranker else None
+        self.use_reranking = use_reranker
 
     def _expand_query(self, question: str, num_variants: int) -> List[str]:
         """
@@ -183,6 +187,72 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
 
         return "general"
 
+    def _search_with_alpha_selection(
+        self,
+        question: str,
+        query_embedding: List[float],
+        doc_ids: Optional[List[str]] = None,
+        top_k: int = 12
+    ) -> Tuple[List[Dict], float]:
+        """
+        Try multiple alpha values for hybrid search and pick the best based on reranker confidence.
+
+        This addresses the issue where technical documents (with exact terms like "FX5U")
+        need BM25-heavy search (low alpha), while narrative content works better with
+        vector-heavy search (high alpha).
+
+        Args:
+            question: User question
+            query_embedding: Pre-computed query embedding
+            doc_ids: Optional document ID filter
+            top_k: Number of results to return
+
+        Returns:
+            Tuple of (best_results, selected_alpha)
+        """
+        alphas = [0.2, 0.5, 0.8]  # BM25-heavy, balanced, vector-heavy
+        candidates = {}
+
+        for alpha in alphas:
+            # Run hybrid search with this alpha
+            results = self.vector_store.hybrid_search(
+                query_vector=query_embedding,
+                query_text=question,
+                top_k=top_k,
+                doc_ids=doc_ids,
+                alpha=alpha,
+                use_rrf=True
+            )
+
+            if not results:
+                continue
+
+            # Score with reranker to determine confidence
+            if self.use_reranking and self.reranker:
+                reranked = self.reranker.rerank(question, results)
+                # Use top reranker score as confidence metric
+                top_score = reranked[0]["rerank_score"] if reranked else -999
+                candidates[alpha] = (results, reranked, top_score)
+            else:
+                # Fallback: use retrieval score
+                top_score = results[0]["score"] if results else -999
+                candidates[alpha] = (results, None, top_score)
+
+        if not candidates:
+            return [], 0.5
+
+        # Pick alpha with highest reranker confidence
+        best_alpha = max(candidates, key=lambda a: candidates[a][2])
+        best_results, best_reranked, best_score = candidates[best_alpha]
+
+        logger.info(
+            f"Alpha selection: tried {list(candidates.keys())}, "
+            f"picked alpha={best_alpha} (score={best_score:.3f})"
+        )
+
+        # Return reranked results if available, otherwise original
+        return best_reranked or best_results, best_alpha
+
     def _boost_by_structure(
         self, chunks: List[Dict], query_type: str, boost_factor: float = 0.15
     ) -> List[Dict]:
@@ -242,7 +312,8 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         query_expansion_variants: int = 2,
         use_rrf: bool = True,
         rerank_blending: str = "position_aware",
-        use_query_decomposition: bool = False
+        use_query_decomposition: bool = False,
+        use_adaptive_alpha: bool = True
     ) -> Dict[str, Any]:
         """
         Answer a question using RAG pipeline.
@@ -260,8 +331,8 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             query_expansion_variants: Number of alternative phrasings to generate
             use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
             rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
-
             use_query_decomposition: Whether to decompose complex questions into sub-questions
+            use_adaptive_alpha: Whether to try multiple alpha values and pick best (improves technical doc retrieval)
 
         Returns:
             Dictionary with answer and sources
@@ -290,6 +361,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                         use_rrf=use_rrf,
                         rerank_blending=rerank_blending,
                         use_query_decomposition=False,  # prevent recursion
+                        use_adaptive_alpha=use_adaptive_alpha,
                     )
                     sub_results.append(sr)
                     all_sources.extend(sr.get("sources", []))
@@ -315,7 +387,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 }
 
         # Pipeline config logging
-        print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}")
+        print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
 
         # Step 1: Query expansion (if enabled)
         if use_query_expansion:
@@ -332,7 +404,19 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
 
-        if use_query_expansion and len(query_variants) > 1:
+        # Use adaptive alpha selection for single-query hybrid search (most impactful case)
+        alpha_selected = None
+        if use_adaptive_alpha and use_hybrid and not use_query_expansion and self.reranker:
+            # Adaptive alpha: try multiple alphas, pick best based on reranker confidence
+            search_results, alpha_selected = self._search_with_alpha_selection(
+                question=question,
+                query_embedding=query_embeddings[0],
+                doc_ids=doc_ids,
+                top_k=retrieval_k
+            )
+            print(f"Pipeline: {len(search_results)} chunks retrieved via adaptive alpha={alpha_selected}")
+            # Results are already reranked by _search_with_alpha_selection
+        elif use_query_expansion and len(query_variants) > 1:
             # Multi-query search with fusion
             search_results = self.vector_store.multi_query_hybrid_search(
                 query_variants=query_variants,
@@ -361,10 +445,11 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 doc_ids=doc_ids
             )
 
-        print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
+        if alpha_selected is None:
+            print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
 
-        # Step 2.5: Rerank if enabled (returns ALL scored candidates)
-        if use_reranking and self.reranker and search_results:
+        # Step 2.5: Rerank if enabled (skip if already reranked by adaptive alpha)
+        if use_reranking and self.reranker and search_results and alpha_selected is None:
             pre_rerank_count = len(search_results)
             search_results = self.reranker.rerank_with_position_blending(
                 query=question,
@@ -570,30 +655,65 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         }
         suffix = type_hints.get(query_type, "")
 
-        return f"""You are an expert technical writer producing a detailed reference answer. Use ONLY the provided sources.
+        return f"""You are an expert technical writer producing a clear, well-structured reference answer. Use ONLY the provided sources.
 
 INSTRUCTIONS:
 1. Read every source. Extract specific details — numbers, dates, names, conditions, definitions, amounts.
 2. For each major point, describe it fully using information from the sources. Do not merely name a concept; explain what it is, why it matters, and include any qualifications or exceptions found in the sources.
 3. If multiple sources cover the same topic, merge their details into one comprehensive description.
-4. Cite sources inline as [Source N]. Every factual claim must have a citation.
+4. Cite sources inline as [Source N]. Place one citation at the end of a sentence or paragraph that covers that source — do NOT repeat the same citation on every line within the same section.
 5. NEVER say information is "not provided" if it appears in any source.
-6. Use structured formatting (headings, bullets, tables) when covering multiple items.
+6. Use structured formatting: **headings** (##) to separate major topics, **bold labels** for key terms, bullets for lists, numbered steps for procedures, and tables for comparisons or specifications.
 7. Never claim that information is absent or a feature does not exist unless sources explicitly state so.
+8. Be concise. One clear sentence is better than three that repeat the same idea. Avoid filler introductions like "Here's how X works:" — go straight to the content.
+
+CITATION DETAILS:
+- NEVER put the same [Source N] on consecutive lines. If steps 1-5 all come from Source 3, cite [Source 3] once after step 5 or in a note below the list.
+- When multiple sources contribute to one section, list them together: [Source 3][Source 4].
+
+FORMATTING DETAILS:
+- Use ## headings to separate major topics, ### for subtopics.
+- Use numbered lists for step-by-step procedures.
+- Use bullet lists for feature lists or descriptions.
+- Use markdown tables (with | pipes and header separators) for comparisons, settings, or specs.
+- Use **bold** for UI elements, menu paths, and key terms.
+- When the same detail (e.g. "30-second timeout") applies to multiple items, state it once or put it in a summary table. Do NOT repeat it per section.
+- NEVER copy large blocks of raw source text into your answer. Summarize and restructure the information. Keep table cells short (under 80 characters).
 
 EXAMPLE:
 Sources:
-  Source 1: "The XR-7 has a 48V DC motor rated at 750W continuous, 1200W peak. Weight is 12.3 kg."
-  Source 2: "XR-7 uses regenerative braking with 15% energy recovery. Battery is 48V 20Ah lithium-ion."
+  Source 1: "Connect PC to CPU via Ethernet cable. Select Online > Connection Destination. Choose Ethernet. Specify adapter. Click Communication Test. Timeout: 30s, retries: 0."
+  Source 2: "Connect PC to CPU via USB cable. Select Online > Connection Destination. Choose USB. Click Communication Test. Timeout: 30s, retries: 0."
+  Source 3: "XR-7 motor: 48V DC, 750W continuous. Weight: 12.3 kg."
+  Source 4: "XR-7 battery: 48V 20Ah lithium-ion. Regenerative braking with 15% energy recovery."
 
-Q: What are the XR-7 specifications?
+Q: How do I connect to the CPU, and what are the XR-7 specs?
 
-A: The XR-7 is an electric system with the following specifications:
+A: ## Connecting to the CPU Module
 
-- **Motor**: 48V DC, rated at 750W continuous and 1200W peak power [Source 1].
-- **Battery**: 48V 20Ah lithium-ion pack [Source 2].
-- **Braking**: Regenerative braking system that recovers approximately 15% of kinetic energy [Source 2].
-- **Weight**: 12.3 kg [Source 1].
+### Direct Ethernet
+
+1. Connect the PC to the CPU module with an Ethernet cable.
+2. Select **Online > Current Connection Destination**.
+3. Choose **Ethernet** and specify the PC-side adapter.
+4. Click **Communication Test** to verify [Source 1].
+
+### USB
+
+1. Connect the PC to the CPU module with a USB cable.
+2. Select **Online > Current Connection Destination**.
+3. Choose **USB** and click **Communication Test** [Source 2].
+
+Both methods default to a 30-second timeout with 0 retries.
+
+## XR-7 Specifications
+
+| Spec | Value |
+|------|-------|
+| Motor | 48V DC, 750W continuous [Source 3] |
+| Battery | 48V 20Ah lithium-ion [Source 4] |
+| Braking | Regenerative, ~15% recovery [Source 4] |
+| Weight | 12.3 kg [Source 3] |
 
 ---
 
@@ -627,7 +747,12 @@ Answer:"""
             # Clean source header — no scores or stars to avoid LLM bias
             source_info = f"Source {i}: \"{payload['doc_title']}\"{page_info}"
 
-            context_parts.append(f"{source_info}\n{payload['text']}")
+            # Truncate excessively long chunks to prevent LLM from dumping raw text
+            text = payload['text']
+            if len(text) > 2000:
+                text = text[:2000] + "\n[...truncated]"
+
+            context_parts.append(f"{source_info}\n{text}")
 
         return "\n\n" + "="*80 + "\n\n".join(context_parts)
 

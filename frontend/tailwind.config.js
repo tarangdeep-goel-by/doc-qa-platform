@@ -8,17 +8,22 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: '#1a1a2e',
-          light: '#2d2d44',
+          DEFAULT: '#E4E4E4',
+          light: '#C0C0C0',
         },
         cream: {
-          DEFAULT: '#faf9f7',
-          dark: '#f5f4f1',
+          DEFAULT: '#2C2C2C',
+          dark: '#363636',
         },
         burgundy: {
-          DEFAULT: '#8b4049',
-          light: '#a55560',
-          dark: '#6b3238',
+          DEFAULT: '#B39CD0',
+          light: '#C4B3DD',
+          dark: '#9A82B8',
+        },
+        cyan: {
+          DEFAULT: '#A8DADC',
+          light: '#BDE4E6',
+          dark: '#8ECACD',
         },
       },
       fontFamily: {
