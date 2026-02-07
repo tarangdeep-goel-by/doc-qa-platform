@@ -36,30 +36,28 @@ class TestHealth:
         assert data["gemini_configured"] is True, "Gemini API key not configured"
 
 
+@pytest.fixture
+def uploaded_doc_id():
+    """Fixture that uploads a document and returns its ID, cleans up after test."""
+    pdf_path = Path(TEST_PDF_PATH)
+    if not pdf_path.exists():
+        pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
+
+    with open(pdf_path, 'rb') as f:
+        files = {'file': (pdf_path.name, f, 'application/pdf')}
+        response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
+
+    assert response.status_code == 200
+    doc_id = response.json()["doc_id"]
+
+    yield doc_id
+
+    # Cleanup: delete document
+    requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
+
+
 class TestDocuments:
     """Test document management endpoints."""
-
-    @pytest.fixture
-    def uploaded_doc_id(self):
-        """Fixture that uploads a document and returns its ID, cleans up after test."""
-        # Create a simple test PDF if it doesn't exist
-        pdf_path = Path(TEST_PDF_PATH)
-        if not pdf_path.exists():
-            pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
-
-        # Upload document
-        with open(pdf_path, 'rb') as f:
-            files = {'file': (pdf_path.name, f, 'application/pdf')}
-            response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
-
-        assert response.status_code == 200
-        data = response.json()
-        doc_id = data["doc_id"]
-
-        yield doc_id
-
-        # Cleanup: delete document
-        requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
 
     def test_upload_document(self):
         """Test POST /api/admin/upload uploads a document successfully."""
@@ -337,21 +335,6 @@ class TestChatQueries:
 class TestLegacyQuery:
     """Test legacy query endpoint (still supported)."""
 
-    @pytest.fixture
-    def uploaded_doc_id(self):
-        """Upload a test document."""
-        pdf_path = Path(TEST_PDF_PATH)
-        if not pdf_path.exists():
-            pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
-
-        with open(pdf_path, 'rb') as f:
-            files = {'file': (pdf_path.name, f, 'application/pdf')}
-            response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
-
-        doc_id = response.json()["doc_id"]
-        yield doc_id
-        requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
-
     def test_legacy_ask_endpoint(self, uploaded_doc_id):
         """Test POST /api/query/ask (legacy endpoint)."""
         payload = {
@@ -375,25 +358,6 @@ class TestLegacyQuery:
 
 class TestQueryDocuments:
     """Test /api/query/documents endpoint with chat usage information."""
-
-    @pytest.fixture
-    def uploaded_doc_id(self):
-        """Fixture that uploads a document and returns its ID."""
-        pdf_path = Path(TEST_PDF_PATH)
-        if not pdf_path.exists():
-            pytest.skip(f"Test PDF not found at {TEST_PDF_PATH}")
-
-        with open(pdf_path, 'rb') as f:
-            files = {'file': (pdf_path.name, f, 'application/pdf')}
-            response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
-
-        assert response.status_code == 200
-        doc_id = response.json()["doc_id"]
-
-        yield doc_id
-
-        # Cleanup
-        requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
 
     def test_query_documents_basic(self, uploaded_doc_id):
         """Test GET /api/query/documents returns correct structure."""

@@ -4,35 +4,12 @@ import pytest
 import os
 import numpy as np
 from src.vector_store import VectorStore
-from src.embedder import Embedder
 
 
 @pytest.fixture
-def embedder():
-    """Embedder instance for testing."""
-    return Embedder(
-        model_name=os.environ["EMBEDDING_MODEL"],
-        gemini_api_key=os.environ["GEMINI_API_KEY"],
-        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
-    )
-
-
-@pytest.fixture
-def vector_store():
+def vector_store(vector_store_factory):
     """VectorStore instance for testing."""
-    store = VectorStore(
-        host=os.environ["QDRANT_HOST"],
-        port=int(os.environ["QDRANT_PORT"]),
-        collection_name="test_hybrid_search",
-        vector_size=int(os.environ["EMBEDDING_DIM"]),
-        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
-    )
-    yield store
-    # Cleanup - delete test collection
-    try:
-        store.client.delete_collection("test_hybrid_search")
-    except:
-        pass
+    return vector_store_factory("test_hybrid_search")
 
 
 @pytest.fixture
@@ -283,13 +260,14 @@ class TestHybridSearch:
         assert scores == sorted(scores, reverse=True)
 
     def test_hybrid_search_empty_query(self, vector_store, embedder, sample_documents):
-        """Test hybrid search with empty query."""
-        query = ""
-        query_vector = embedder.embed_text(query)
+        """Test hybrid search with empty query returns empty list gracefully."""
+        # Gemini embedding API rejects empty text, so use a zero vector
+        dim = int(os.environ["EMBEDDING_DIM"])
+        query_vector = np.zeros(dim)
 
         results = vector_store.hybrid_search(
             query_vector=query_vector,
-            query_text=query,
+            query_text="",
             top_k=3,
             alpha=0.5
         )

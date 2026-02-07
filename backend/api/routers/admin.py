@@ -1,8 +1,11 @@
 """Admin endpoints for document management."""
 
+import logging
 import os
 import time
 import uuid
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
@@ -11,14 +14,13 @@ from fastapi.responses import FileResponse
 from api.schemas import (
     UploadResponse,
     DocumentListResponse,
-    DocumentInfo,
-    ChatUsageInfo,
     DocumentDetailResponse,
     DeleteResponse,
     BulkDeleteRequest,
     BulkDeleteResponse,
     DocumentDeleteResult
 )
+from api.helpers import build_document_list
 from src.models import DocumentMetadata, DocumentChunk
 from src.document_processor import DocumentProcessor
 from src.chunker import TextChunker
@@ -73,18 +75,18 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 
     try:
         # Save uploaded file
-        print(f"Saving file: {file.filename}")
+        logger.info(f"Saving file: {file.filename}")
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
 
         # Process document
-        print(f"Processing document: {file.filename}")
+        logger.info(f"Processing document: {file.filename}")
         use_pdfplumber = os.environ.get("USE_PDFPLUMBER", "false").lower() == "true"
         processor = DocumentProcessor()
         page_data, metadata = processor.process_document(file_path, file_extension, use_pdfplumber=use_pdfplumber)
         if use_pdfplumber:
-            print("Using pdfplumber for table-aware extraction")
+            logger.info("Using pdfplumber for table-aware extraction")
 
         # Get file size
         file_size_mb = processor.get_file_size_mb(file_path)
@@ -92,14 +94,14 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         # Chunk text with page tracking
         use_semantic = getattr(request.app.state, "use_semantic_chunking", False)
         if use_semantic:
-            print("Chunking text (semantic)...")
+            logger.info("Chunking text (semantic)...")
             chunker = SemanticChunker(embedder=embedder)
             chunk_data = chunker.chunk_with_page_tracking(page_data)
         else:
-            print("Chunking text (fixed-size)...")
+            logger.info("Chunking text (fixed-size)...")
             chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             chunk_data = chunker.chunk_with_page_tracking(page_data)
-        print(f"Created {len(chunk_data)} chunks")
+        logger.info(f"Created {len(chunk_data)} chunks")
 
         if not chunk_data:
             raise ValueError("No text chunks created from document")
@@ -119,13 +121,13 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         ]
 
         # Generate embeddings
-        print("Generating embeddings...")
+        logger.info("Generating embeddings...")
         chunk_texts = [c.text for c in chunks]
         embeddings = embedder.embed_texts(chunk_texts)
-        print(f"Generated {len(embeddings)} embeddings")
+        logger.info(f"Generated {len(embeddings)} embeddings")
 
         # Detect structure in each chunk and enrich payload
-        print("Detecting chunk structures...")
+        logger.info("Detecting chunk structures...")
         chunk_payloads = []
         structure_counts = {"table": 0, "list": 0, "specification": 0, "prose": 0, "mixed": 0}
         for c in chunks:
@@ -134,12 +136,12 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
             payload["structure"] = structure
             chunk_payloads.append(payload)
             structure_counts[structure["structure_type"]] = structure_counts.get(structure["structure_type"], 0) + 1
-        print(f"Structure types: {structure_counts}")
+        logger.info(f"Structure types: {structure_counts}")
 
         # Store in Qdrant
-        print("Storing in Qdrant...")
+        logger.info("Storing in Qdrant...")
         chunks_added = vector_store.add_document_chunks(chunk_payloads, embeddings)
-        print(f"Stored {chunks_added} chunks in Qdrant")
+        logger.info(f"Stored {chunks_added} chunks in Qdrant")
 
         # Save document metadata
         doc_metadata = DocumentMetadata(
@@ -157,7 +159,7 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         document_store.save_document(doc_metadata)
 
         processing_time = time.time() - start_time
-        print(f"Document processed successfully in {processing_time:.2f}s")
+        logger.info(f"Document processed successfully in {processing_time:.2f}s")
 
         return UploadResponse(
             doc_id=doc_id,
@@ -171,42 +173,17 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         # Cleanup on error
         if os.path.exists(file_path):
             os.remove(file_path)
-        import traceback
-        traceback.print_exc()
+        logger.exception("Failed to process document")
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
 
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_documents(request: Request):
     """List all uploaded documents with chat usage information."""
-    document_store = request.app.state.document_store
-    chat_manager = request.app.state.chat_manager
-
-    docs = document_store.list_documents()
-    all_chats = chat_manager.list_chats()
-
-    document_infos = []
-    for doc in docs:
-        # Find chats that use this document
-        doc_chats = [
-            ChatUsageInfo(id=chat.id, name=chat.name)
-            for chat in all_chats
-            if doc.doc_id in chat.doc_ids
-        ]
-
-        document_infos.append(
-            DocumentInfo(
-                doc_id=doc.doc_id,
-                title=doc.title,
-                upload_date=doc.upload_date,
-                file_size_mb=doc.file_size_mb,
-                chunk_count=doc.chunk_count,
-                format=doc.format,
-                chat_count=len(doc_chats),
-                chats=doc_chats
-            )
-        )
-
+    document_infos = build_document_list(
+        request.app.state.document_store,
+        request.app.state.chat_manager
+    )
     return DocumentListResponse(documents=document_infos)
 
 
@@ -248,17 +225,17 @@ async def delete_document(request: Request, doc_id: str):
 
     try:
         # Delete from Qdrant
-        print(f"Deleting chunks from Qdrant for doc_id: {doc_id}")
+        logger.info(f"Deleting chunks from Qdrant for doc_id: {doc_id}")
         vector_store.delete_document(doc_id)
 
         # Delete file from disk
         if os.path.exists(doc.file_path):
             os.remove(doc.file_path)
-            print(f"Deleted file: {doc.file_path}")
+            logger.info(f"Deleted file: {doc.file_path}")
 
         # Delete metadata
         document_store.delete_document(doc_id)
-        print(f"Deleted document metadata: {doc_id}")
+        logger.info(f"Deleted document metadata: {doc_id}")
 
         # Count affected chats (but don't remove doc_ids - we want to show them as missing)
         all_chats = chat_manager.list_chats()

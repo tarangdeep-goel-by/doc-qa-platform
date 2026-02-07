@@ -1,6 +1,5 @@
 """User query endpoints for Q&A."""
 
-import os
 from fastapi import APIRouter, HTTPException, Request
 
 from api.schemas import (
@@ -8,15 +7,10 @@ from api.schemas import (
     QueryResponse,
     SourceInfo,
     DocumentListResponse,
-    DocumentInfo
 )
+from api.helpers import build_document_list
 
 router = APIRouter()
-
-
-def _str_to_bool(value: str) -> bool:
-    """Convert string to boolean."""
-    return value.lower() in ("true", "1", "yes")
 
 
 @router.post("/ask", response_model=QueryResponse)
@@ -28,6 +22,7 @@ async def ask_question(http_request: Request, query: QueryRequest):
     """
     qa_engine = http_request.app.state.qa_engine
     document_store = http_request.app.state.document_store
+    rag_config = http_request.app.state.rag_config
 
     try:
         # Validate doc_ids if provided
@@ -48,30 +43,10 @@ async def ask_question(http_request: Request, query: QueryRequest):
 
             doc_ids = valid_doc_ids
 
-        # Get configuration from environment variables
-        top_k = int(os.environ["TOP_K_RESULTS"])
-        use_hybrid = _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
-        hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
-        use_reranking = _str_to_bool(os.environ["USE_RERANKING"])
-        use_query_expansion = _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
-        use_rrf = _str_to_bool(os.environ["USE_RRF"])
-        rerank_blending = os.environ["RERANKER_BLENDING"]
-        use_query_decomposition = _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
-        use_adaptive_alpha = _str_to_bool(os.environ.get("USE_ADAPTIVE_ALPHA", "true"))
-
         # Run RAG pipeline with validated doc_ids and configuration
         result = qa_engine.answer_question(
             question=query.question,
-            top_k=top_k,
-            doc_ids=doc_ids,
-            use_hybrid=use_hybrid,
-            hybrid_alpha=hybrid_alpha,
-            use_reranking=use_reranking,
-            use_query_expansion=use_query_expansion,
-            use_rrf=use_rrf,
-            rerank_blending=rerank_blending,
-            use_query_decomposition=use_query_decomposition,
-            use_adaptive_alpha=use_adaptive_alpha
+            **rag_config.to_answer_kwargs(doc_ids=doc_ids)
         )
 
         # Convert sources to schema format
@@ -100,33 +75,8 @@ async def ask_question(http_request: Request, query: QueryRequest):
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_available_documents(request: Request):
     """List documents available for querying with chat usage information."""
-    document_store = request.app.state.document_store
-    chat_manager = request.app.state.chat_manager
-
-    docs = document_store.list_documents()
-    all_chats = chat_manager.list_chats()
-
-    document_infos = []
-    for doc in docs:
-        # Find chats that use this document
-        from api.schemas import ChatUsageInfo
-        doc_chats = [
-            ChatUsageInfo(id=chat.id, name=chat.name)
-            for chat in all_chats
-            if doc.doc_id in chat.doc_ids
-        ]
-
-        document_infos.append(
-            DocumentInfo(
-                doc_id=doc.doc_id,
-                title=doc.title,
-                upload_date=doc.upload_date,
-                file_size_mb=doc.file_size_mb,
-                chunk_count=doc.chunk_count,
-                format=doc.format,
-                chat_count=len(doc_chats),
-                chats=doc_chats
-            )
-        )
-
+    document_infos = build_document_list(
+        request.app.state.document_store,
+        request.app.state.chat_manager
+    )
     return DocumentListResponse(documents=document_infos)

@@ -23,7 +23,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -46,7 +45,8 @@ from evaluation.metrics.answer_quality import (
 )
 from evaluation.metrics.performance import PerformanceTracker, Timer, LatencyRecord
 from evaluation.reporters import console_reporter, html_reporter
-
+from src.rag_config import RAGConfig
+from evaluation.history import build_metrics_entry
 
 
 def init_components():
@@ -90,24 +90,22 @@ def init_components():
 
 
 def get_rag_config() -> dict:
-    """Read current RAG config from environment (typed values, fast-fail)."""
-    return {
+    """Read current RAG config from environment (typed values, fast-fail).
+
+    Merges RAGConfig pipeline params with static env vars (embedding, chunk, model)
+    that aren't part of the per-query pipeline config.
+    """
+    rag = RAGConfig.from_env()
+    config = rag.to_dict()
+    # Add static params that live in env but aren't per-query pipeline knobs
+    config.update({
         "embedding_model": os.environ["EMBEDDING_MODEL"],
         "embedding_dim": int(os.environ["EMBEDDING_DIM"]),
         "chunk_size": int(os.environ["CHUNK_SIZE"]),
         "chunk_overlap": int(os.environ["CHUNK_OVERLAP"]),
-        "top_k": int(os.environ["TOP_K_RESULTS"]),
-        "use_hybrid": os.environ["USE_HYBRID_SEARCH"].lower() == "true",
-        "hybrid_alpha": float(os.environ["HYBRID_ALPHA"]),
-        "use_reranking": os.environ["USE_RERANKING"].lower() == "true",
-        "use_query_expansion": os.environ["USE_QUERY_EXPANSION"].lower() == "true",
-        "query_expansion_variants": int(os.environ["QUERY_EXPANSION_VARIANTS"]),
-        "use_rrf": os.environ["USE_RRF"].lower() == "true",
-        "reranker_blending": os.environ["RERANKER_BLENDING"],
-        "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true",
-        "use_adaptive_alpha": os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true",
         "fast_model": os.environ.get("GEMINI_FAST_MODEL", os.environ["GEMINI_MODEL"]),
-    }
+    })
+    return config
 
 
 def run_evaluation(
@@ -138,21 +136,10 @@ def run_evaluation(
     from google import genai
 
     client = genai.Client(api_key=gemini_api_key) if use_judge else None
+    rag_config = RAGConfig.from_env()
     config = get_rag_config()
     perf = PerformanceTracker()
     perf.start_suite()
-
-    # Read RAG params from env
-    top_k = int(os.environ["TOP_K_RESULTS"])
-    use_hybrid = os.environ["USE_HYBRID_SEARCH"].lower() == "true"
-    hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
-    use_reranking = os.environ["USE_RERANKING"].lower() == "true"
-    use_query_expansion = os.environ["USE_QUERY_EXPANSION"].lower() == "true"
-    query_expansion_variants = int(os.environ["QUERY_EXPANSION_VARIANTS"])
-    use_rrf = os.environ["USE_RRF"].lower() == "true"
-    rerank_blending = os.environ["RERANKER_BLENDING"]
-    use_adaptive_alpha = os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true"
-    use_query_decomposition = os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true"
 
     per_query_results = []
     all_retrieval_metrics = []
@@ -169,17 +156,7 @@ def run_evaluation(
         with Timer() as total_timer:
             result = qa_engine.answer_question(
                 question=bq.question,
-                top_k=top_k,
-                doc_ids=doc_ids,
-                use_hybrid=use_hybrid,
-                hybrid_alpha=hybrid_alpha,
-                use_reranking=use_reranking,
-                use_query_expansion=use_query_expansion,
-                query_expansion_variants=query_expansion_variants,
-                use_rrf=use_rrf,
-                rerank_blending=rerank_blending,
-                use_adaptive_alpha=use_adaptive_alpha,
-                use_query_decomposition=use_query_decomposition,
+                **rag_config.to_answer_kwargs(doc_ids=doc_ids)
             )
 
         our_answer = result.get("answer", "")
@@ -243,7 +220,7 @@ def run_evaluation(
     ablation_results = {}
     if feature_ablation:
         ablation_results = _run_ablation(
-            dataset, qa_engine, embedder, doc_ids, top_k
+            dataset, qa_engine, embedder, doc_ids
         )
 
     results = {
@@ -266,11 +243,12 @@ def run_evaluation(
     return results
 
 
-def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
+def _run_ablation(dataset, qa_engine, embedder, doc_ids) -> dict:
     """Run A/B tests with features toggled on/off.
 
-    Tests: query expansion, reranking, RRF.
+    Uses current RAGConfig as baseline — overrides one feature at a time.
     """
+    rag_config = RAGConfig.from_env()
     print("\n\nRunning feature ablation...")
     ablation = {}
 
@@ -287,19 +265,10 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
         metrics_list = []
 
         for bq in dataset.questions:
-            params = {
-                "question": bq.question,
-                "top_k": top_k,
-                "doc_ids": doc_ids,
-                "use_hybrid": True,
-                "use_reranking": True,
-                "use_query_expansion": True,
-                "use_rrf": True,
-                "use_adaptive_alpha": True,
-            }
-            params.update(overrides)
-
-            result = qa_engine.answer_question(**params)
+            result = qa_engine.answer_question(
+                question=bq.question,
+                **rag_config.to_answer_kwargs(doc_ids=doc_ids, **overrides)
+            )
             sources = result.get("sources", [])
 
             metrics = compute_retrieval_metrics(sources, bq.expected_sources)
@@ -317,11 +286,6 @@ def append_to_history(results: dict, output_path: str, label: str = ""):
     history_path = Path(__file__).parent / "results" / "history.jsonl"
     history_path.parent.mkdir(parents=True, exist_ok=True)
 
-    summary = results.get("summary", {})
-    aq = summary.get("answer_quality", {})
-    perf = summary.get("performance", {})
-
-    latency = perf.get("latency_ms", {})
     entry = {
         "run_id": f"{datetime.now().strftime('%Y%m%d_%H%M')}_{Path(output_path).stem[:30]}",
         "timestamp": results.get("timestamp", datetime.now().isoformat()),
@@ -329,20 +293,7 @@ def append_to_history(results: dict, output_path: str, label: str = ""):
         "document": results.get("document", ""),
         "query_count": results.get("query_count", 0),
         "config": results.get("config", {}),
-        "metrics": {
-            "overall": aq.get("avg_judge_overall"),
-            "accuracy": aq.get("avg_judge_accuracy"),
-            "completeness": aq.get("avg_judge_completeness"),
-            "organization": aq.get("avg_judge_organization"),
-            "relevance": aq.get("avg_judge_relevance"),
-            "semantic_similarity": round(aq.get("avg_semantic_similarity", 0), 4),
-            "rouge_l": round(aq.get("avg_rouge_l", 0), 4),
-            "avg_ndcg5": round(summary.get("retrieval", {}).get("avg_ndcg@5", 0), 4),
-            "latency_p50_ms": round(latency.get("p50", 0), 1),
-            "latency_p95_ms": round(latency.get("p95", 0), 1),
-            "latency_mean_ms": round(latency.get("mean", 0), 1),
-            "latency_max_ms": round(latency.get("max", 0), 1),
-        },
+        "metrics": build_metrics_entry(results.get("summary", {})),
         "label": label,
         "result_file": str(Path(output_path).name),
     }

@@ -1,8 +1,11 @@
 """Cross-encoder reranker for improving retrieval quality."""
 
+import logging
 import threading
 from sentence_transformers import CrossEncoder
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class Reranker:
@@ -16,10 +19,10 @@ class Reranker:
             model_name: HuggingFace model name for cross-encoder
         """
         self.model_name = model_name
-        print(f"Loading reranker model: {model_name}")
+        logger.info(f"Loading reranker model: {model_name}")
         self.model = CrossEncoder(model_name)
         self._lock = threading.Lock()
-        print(f"Reranker model loaded successfully")
+        logger.info("Reranker model loaded successfully")
 
     def rerank(
         self,

@@ -7,7 +7,6 @@ from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
 from .reranker import Reranker
-from .structure_detector import detect_structure
 
 logger = logging.getLogger(__name__)
 
@@ -49,67 +48,6 @@ class QAEngine:
         self.reranker = Reranker(model_name=reranker_model) if use_reranker else None
         self.use_reranking = use_reranker
 
-    def _expand_query(self, question: str, num_variants: int) -> List[str]:
-        """
-        Generate alternative phrasings of the question to improve recall.
-
-        Args:
-            question: Original user question
-            num_variants: Number of alternative phrasings to generate
-
-        Returns:
-            List of query variants [original, variant1, variant2, ...]
-        """
-        try:
-            prompt = f"""Generate {num_variants} alternative ways to phrase this question.
-Keep the core intent but use different words, synonyms, or perspectives.
-Each variant should be concise and clear.
-
-Question: {question}
-
-Return ONLY the {num_variants} variants, one per line, without numbering or additional text."""
-
-            response = self.client.models.generate_content(
-                model=self.fast_model_name,
-                contents=prompt
-            )
-            variants_text = response.text.strip()
-
-            # Parse variants (one per line)
-            variants = [v.strip() for v in variants_text.split('\n') if v.strip()]
-
-            # Limit to requested number
-            variants = variants[:num_variants]
-
-            # Return original + variants
-            return [question] + variants
-
-        except Exception as e:
-            # If expansion fails, fall back to original query only
-            print(f"Warning: Query expansion failed: {e}")
-            return [question]
-
-    def _is_complex_question(self, question: str) -> bool:
-        """Classify whether a question needs decomposition into sub-questions."""
-        try:
-            prompt = (
-                "Classify this question as SIMPLE or COMPLEX.\n"
-                "COMPLEX = asks about multiple distinct topics, requires comparing/contrasting, "
-                "or needs information from different sections.\n"
-                "SIMPLE = asks about one specific thing.\n\n"
-                f"Question: {question}\n\n"
-                "Reply with ONLY the word SIMPLE or COMPLEX."
-            )
-            response = self.client.models.generate_content(
-                model=self.fast_model_name,
-                contents=prompt,
-                config={"temperature": 0.0, "maxOutputTokens": 10}
-            )
-            return "COMPLEX" in response.text.strip().upper()
-        except Exception as e:
-            print(f"Warning: Complexity classification failed: {e}")
-            return False
-
     def _decompose_query(self, question: str) -> List[str]:
         """Break a complex question into 2-4 simpler sub-questions."""
         try:
@@ -132,7 +70,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             ]
             return subs[:4] if subs else [question]
         except Exception as e:
-            print(f"Warning: Query decomposition failed: {e}")
+            logger.warning(f"Query decomposition failed: {e}")
             return [question]
 
     def _classify_and_expand(self, question: str, num_variants: int = 2) -> Dict[str, Any]:
@@ -204,7 +142,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 "sub_questions": sub_questions[:4] if is_complex else [],
             }
         except Exception as e:
-            print(f"Warning: classify_and_expand failed: {e}")
+            logger.warning(f"classify_and_expand failed: {e}")
             return {"is_complex": False, "variants": [question], "sub_questions": []}
 
     def _synthesize_answers(
@@ -377,7 +315,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         boosted.sort(key=lambda x: x["score"], reverse=True)
 
         if boost_count > 0:
-            print(f"Structure boost: {boost_count}/{len(chunks)} chunks boosted for query_type={query_type}")
+            logger.info(f"Structure boost: {boost_count}/{len(chunks)} chunks boosted for query_type={query_type}")
 
         return boosted
 
@@ -420,6 +358,16 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         Returns:
             Dictionary with answer and sources
         """
+        # Guard: empty question
+        if not question or not question.strip():
+            return {
+                "question": question,
+                "answer": "I don't have enough information to answer an empty question. Please provide a specific question about your documents.",
+                "sources": [],
+                "low_confidence": True,
+                "retrieved_count": 0,
+            }
+
         # Step 0+1: Combined classification + expansion (single Gemini call)
         query_variants = [question]
         query_weights = [1.0]
@@ -436,7 +384,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             # Handle complex question decomposition
             if use_query_decomposition and ce_result["is_complex"]:
                 sub_questions = ce_result["sub_questions"]
-                print(f"Query decomposition: COMPLEX, {len(sub_questions)} sub-questions: {sub_questions}")
+                logger.info(f"Query decomposition: COMPLEX, {len(sub_questions)} sub-questions: {sub_questions}")
 
                 if len(sub_questions) > 1:
                     def _run_sub_question(sq):
@@ -497,7 +445,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
             query_embeddings = [self.embedder.embed_text(question)]
 
         # Pipeline config logging
-        print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
+        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
 
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
@@ -512,7 +460,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 doc_ids=doc_ids,
                 top_k=retrieval_k
             )
-            print(f"Pipeline: adaptive alpha selected={alpha_selected}")
+            logger.info(f"Pipeline: adaptive alpha selected={alpha_selected}")
 
         # Phase B: Main retrieval using best alpha (or default)
         effective_alpha = alpha_selected if alpha_selected is not None else hybrid_alpha
@@ -548,7 +496,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 doc_ids=doc_ids
             )
 
-        print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
+        logger.info(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
 
         # Step 2.5: Rerank if enabled (skip if reusing adaptive results — already reranked)
         already_reranked = adaptive_results is not None and search_results is adaptive_results
@@ -559,7 +507,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 chunks=search_results,
                 blend_strategy=rerank_blending
             )
-            print(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
+            logger.info(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
 
         # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
         search_results = self._deduplicate_chunks(search_results)
@@ -592,18 +540,6 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         # different scale (can be negative) so the 0-1 threshold doesn't apply.
         top_score = search_results[0]["score"] if search_results else 0
         if not reranking_applied and top_score < min_score:
-            # Format sources consistently even for low confidence responses
-            formatted_sources = [
-                {
-                    "doc_id": result["payload"]["doc_id"],
-                    "doc_title": result["payload"]["doc_title"],
-                    "chunk_text": result["payload"]["text"][:200] + "..." if len(result["payload"]["text"]) > 200 else result["payload"]["text"],
-                    "score": round(result["score"], 3),
-                    "page_num": result["payload"].get("page_num")
-                }
-                for result in search_results
-            ]
-
             return {
                 "question": question,
                 "answer": (
@@ -613,30 +549,17 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                     "- The question needs to be more specific\n"
                     "- Try rephrasing or check if the right documents are uploaded"
                 ),
-                "sources": formatted_sources,
+                "sources": self._format_sources(search_results),
                 "retrieved_count": len(search_results),
                 "low_confidence": True,
                 "top_score": top_score
             }
 
-        print(f"Pipeline: {len(search_results)} chunks sent to LLM")
+        logger.info(f"Pipeline: {len(search_results)} chunks sent to LLM")
 
         # Step 3: Build context from retrieved chunks with enhanced formatting
         context = self._format_context_with_sources(search_results)
-
-        # Build sources list for response
-        sources = []
-        for result in search_results:
-            payload = result["payload"]
-            score = result["score"]
-
-            sources.append({
-                "doc_id": payload["doc_id"],
-                "doc_title": payload["doc_title"],
-                "chunk_text": payload["text"][:200] + "..." if len(payload["text"]) > 200 else payload["text"],
-                "score": round(score, 3),
-                "page_num": payload.get("page_num")
-            })
+        sources = self._format_sources(search_results)
 
         # Step 4: Generate answer with Gemini
         prompt = self._build_prompt(question, context, query_type)
@@ -673,14 +596,14 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
                 unique.append(chunk)
 
         if len(unique) < len(chunks):
-            print(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
+            logger.debug(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
         return unique
 
     def _filter_noise_chunks(self, chunks: List[Dict], min_length: int = 50) -> List[Dict]:
         """Remove very short or noise-only chunks that add no substance."""
         filtered = [c for c in chunks if len(c["payload"]["text"].strip()) >= min_length]
         if len(filtered) < len(chunks):
-            print(f"Noise filter: {len(chunks)} → {len(filtered)} chunks (removed {len(chunks) - len(filtered)} short chunks)")
+            logger.debug(f"Noise filter: {len(chunks)} → {len(filtered)} chunks (removed {len(chunks) - len(filtered)} short chunks)")
         return filtered if filtered else chunks  # fallback: keep originals if all filtered
 
     def _dynamic_score_cutoff(self, chunks, max_chunks=15, drop_ratio=0.6):
@@ -717,7 +640,7 @@ Return ONLY the {num_variants} variants, one per line, without numbering or addi
         elif len(kept) > max_chunks:
             kept = kept[:max_chunks]
 
-        print(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
+        logger.debug(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
         return kept
 
     def _reorder_top_and_tail(self, chunks):
@@ -827,6 +750,19 @@ Question: {question}
 {suffix}
 Answer:"""
 
+    def _format_sources(self, search_results: List[Dict]) -> List[Dict]:
+        """Build sources list for API response from search results."""
+        return [
+            {
+                "doc_id": r["payload"]["doc_id"],
+                "doc_title": r["payload"]["doc_title"],
+                "chunk_text": r["payload"]["text"][:200] + "..." if len(r["payload"]["text"]) > 200 else r["payload"]["text"],
+                "score": round(r["score"], 3),
+                "page_num": r["payload"].get("page_num"),
+            }
+            for r in search_results
+        ]
+
     def _format_context_with_sources(self, search_results: List[Dict]) -> str:
         """
         Format context from search results with relevance indicators.
@@ -874,35 +810,6 @@ Answer:"""
             return response.text.strip()
         except Exception as e:
             return f"Error generating answer: {str(e)}"
-
-    def _check_source_metadata(self, sources: List[Dict]) -> str:
-        """
-        Generate warnings based on source metadata.
-
-        Args:
-            sources: List of source dictionaries with metadata
-
-        Returns:
-            Warning string to append to answer (empty if no warnings)
-        """
-        warnings = []
-
-        if not sources:
-            return ""
-
-        # Check for low scores
-        if sources[0]["score"] < 0.5:
-            warnings.append(
-                "⚠️ Note: The retrieved information may not be directly related to your question. "
-                "Consider rephrasing or checking if the relevant documents are uploaded."
-            )
-
-        # Could add more checks:
-        # - Conflicting information from different documents
-        # - Outdated documents (if date metadata available)
-        # - Missing page numbers
-
-        return "\n\n" + "\n".join(warnings) if warnings else ""
 
     def check_gemini_connection(self) -> bool:
         """Check if Gemini API is accessible."""

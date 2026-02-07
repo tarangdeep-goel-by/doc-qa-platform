@@ -1,8 +1,11 @@
 """Embedding utilities supporting sentence-transformers (local) and Gemini API."""
 
+import logging
 import os
 from typing import List
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class Embedder:
@@ -40,15 +43,15 @@ class Embedder:
             self.output_dimensionality = output_dimensionality
             self.embedding_dim = output_dimensionality
             self.model = None
-            print(f"Using Gemini embeddings: {model_name} (dim={output_dimensionality})")
+            logger.info(f"Using Gemini embeddings: {model_name} (dim={output_dimensionality})")
         else:
             from sentence_transformers import SentenceTransformer
 
-            print(f"Loading embedding model: {model_name}...")
+            logger.info(f"Loading embedding model: {model_name}...")
             self.client = None
             self.model = SentenceTransformer(model_name)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
-            print(f"Model loaded. Embedding dimension: {self.embedding_dim}")
+            logger.info(f"Model loaded. Embedding dimension: {self.embedding_dim}")
 
     def embed_texts(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
         """
@@ -107,8 +110,8 @@ class Embedder:
             batch = texts[i : i + gemini_batch_size]
 
             if len(texts) > gemini_batch_size:
-                print(
-                    f"  Embedding batch {i // gemini_batch_size + 1}/"
+                logger.info(
+                    f"Embedding batch {i // gemini_batch_size + 1}/"
                     f"{(len(texts) - 1) // gemini_batch_size + 1} "
                     f"({len(batch)} texts)..."
                 )

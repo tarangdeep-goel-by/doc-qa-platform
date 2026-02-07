@@ -12,6 +12,7 @@ from src.vector_store import VectorStore
 from src.qa_engine import QAEngine
 from src.models import DocumentStore
 from src.chat_manager import ChatManager
+from src.rag_config import RAGConfig
 
 # Load environment variables
 load_dotenv()
@@ -87,6 +88,7 @@ async def lifespan(app: FastAPI):
     app.state.chunk_size = chunk_size
     app.state.chunk_overlap = chunk_overlap
     app.state.use_semantic_chunking = os.environ["USE_SEMANTIC_CHUNKING"].lower() == "true"
+    app.state.rag_config = RAGConfig.from_env()
 
     print("Application initialized successfully!")
 

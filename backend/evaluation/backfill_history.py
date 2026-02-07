@@ -12,6 +12,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from evaluation.history import build_metrics_entry
+
 RESULTS_DIR = Path(__file__).parent / "results"
 HISTORY_PATH = RESULTS_DIR / "history.jsonl"
 
@@ -30,9 +32,6 @@ def build_entry(result_file: Path) -> dict | None:
         print(f"  SKIP {result_file.name}: no summary")
         return None
 
-    aq = summary.get("answer_quality", {})
-    perf = summary.get("performance", {})
-
     timestamp = data.get("timestamp", "")
     # Build run_id from timestamp + filename stem
     try:
@@ -48,17 +47,7 @@ def build_entry(result_file: Path) -> dict | None:
         "document": data.get("document", ""),
         "query_count": data.get("query_count", 0),
         "config": data.get("config", {}),
-        "metrics": {
-            "overall": aq.get("avg_judge_overall"),
-            "accuracy": aq.get("avg_judge_accuracy"),
-            "completeness": aq.get("avg_judge_completeness"),
-            "organization": aq.get("avg_judge_organization"),
-            "relevance": aq.get("avg_judge_relevance"),
-            "semantic_similarity": round(aq.get("avg_semantic_similarity", 0), 4),
-            "rouge_l": round(aq.get("avg_rouge_l", 0), 4),
-            "avg_ndcg5": round(summary.get("retrieval", {}).get("avg_ndcg@5", 0), 4),
-            "latency_p50_ms": round(perf.get("latency_ms", {}).get("p50", 0), 1),
-        },
+        "metrics": build_metrics_entry(summary),
         "label": "(backfill)",
         "result_file": result_file.name,
     }

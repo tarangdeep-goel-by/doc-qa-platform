@@ -1,7 +1,11 @@
 """Answer quality metrics: LLM-as-judge, semantic similarity, ROUGE-L."""
 
+import json
+import logging
 from typing import List, Dict, Any, Optional
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 
 
 def _tokenize(text: str) -> List[str]:
@@ -128,26 +132,25 @@ SYSTEM ANSWER (to evaluate):
 
 Rate the SYSTEM ANSWER on these dimensions (1-5 scale):
 
-1. **Relevance** (1-5): Does the answer address the question directly?
-2. **Completeness** (1-5): Does it cover all information present in the reference?
-3. **Accuracy** (1-5): Is the information factually correct compared to reference?
-4. **Organization** (1-5): Is the answer well-structured and easy to read?
+1. relevance (1-5): Does the answer address the question directly?
+2. completeness (1-5): Does it cover all information present in the reference?
+3. accuracy (1-5): Is the information factually correct compared to reference?
+4. organization (1-5): Is the answer well-structured and easy to read?
 
-Respond in EXACTLY this format (one line per score, then explanation):
-relevance: <score>
-completeness: <score>
-accuracy: <score>
-organization: <score>
-explanation: <one paragraph explaining your ratings>"""
+Respond as JSON with integer scores and a short explanation string:
+{{"relevance": 4, "completeness": 3, "accuracy": 5, "organization": 4, "explanation": "..."}}"""
 
     try:
         response = client.models.generate_content(
             model=model_name,
             contents=prompt,
-            config={"temperature": 0.1},
+            config={
+                "temperature": 0.1,
+                "response_mime_type": "application/json",
+            },
         )
         text = response.text.strip()
-        return _parse_judge_response(text)
+        return _parse_judge_json(text)
     except Exception as e:
         return {
             "relevance": 0,
@@ -160,8 +163,32 @@ explanation: <one paragraph explaining your ratings>"""
         }
 
 
-def _parse_judge_response(text: str) -> Dict[str, Any]:
-    """Parse the structured LLM judge response."""
+def _parse_judge_json(text: str) -> Dict[str, Any]:
+    """Parse JSON judge response, fall back to regex if JSON parse fails."""
+    try:
+        data = json.loads(text)
+        scores = {}
+        for dim in ["relevance", "completeness", "accuracy", "organization"]:
+            val = data.get(dim, 0)
+            scores[dim] = max(1, min(5, int(val))) if val else 0
+        explanation = data.get("explanation", "")
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("LLM judge JSON parse failed, falling back to regex parser")
+        return _parse_judge_regex(text)
+
+    valid_scores = [v for v in scores.values() if v > 0]
+    overall = sum(valid_scores) / len(valid_scores) if valid_scores else 0.0
+
+    return {
+        **scores,
+        "overall": round(overall, 2),
+        "explanation": explanation,
+        "error": False,
+    }
+
+
+def _parse_judge_regex(text: str) -> Dict[str, Any]:
+    """Fallback regex parser for non-JSON judge responses."""
     scores = {}
     explanation = ""
 
@@ -174,7 +201,6 @@ def _parse_judge_response(text: str) -> Dict[str, Any]:
             if line.lower().startswith(f"{dim}:"):
                 try:
                     val = line.split(":", 1)[1].strip()
-                    # Handle "4/5" or "4" formats
                     scores[dim] = int(val.split("/")[0].strip())
                 except (ValueError, IndexError):
                     scores[dim] = 0
@@ -182,11 +208,9 @@ def _parse_judge_response(text: str) -> Dict[str, Any]:
         if line.lower().startswith("explanation:"):
             explanation = line.split(":", 1)[1].strip()
 
-    # Default missing scores to 0
     for dim in ["relevance", "completeness", "accuracy", "organization"]:
         scores.setdefault(dim, 0)
 
-    # Overall is average of all dimensions
     valid_scores = [v for v in scores.values() if v > 0]
     overall = sum(valid_scores) / len(valid_scores) if valid_scores else 0.0
 

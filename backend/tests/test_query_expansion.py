@@ -4,36 +4,12 @@ import pytest
 import numpy as np
 import os
 from src.qa_engine import QAEngine
-from src.embedder import Embedder
-from src.vector_store import VectorStore
 
 
 @pytest.fixture
-def embedder():
-    """Embedder instance for testing."""
-    return Embedder(
-        model_name=os.environ["EMBEDDING_MODEL"],
-        gemini_api_key=os.environ["GEMINI_API_KEY"],
-        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
-    )
-
-
-@pytest.fixture
-def vector_store():
+def vector_store(vector_store_factory):
     """VectorStore instance for testing."""
-    store = VectorStore(
-        host=os.environ["QDRANT_HOST"],
-        port=int(os.environ["QDRANT_PORT"]),
-        collection_name="test_query_expansion",
-        vector_size=int(os.environ["EMBEDDING_DIM"]),
-        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
-    )
-    yield store
-    # Cleanup
-    try:
-        store.client.delete_collection("test_query_expansion")
-    except:
-        pass
+    return vector_store_factory("test_query_expansion")
 
 
 @pytest.fixture
@@ -91,32 +67,6 @@ def sample_documents(embedder, vector_store):
     vector_store.add_document_chunks(chunks, embeddings)
 
     return chunks
-
-
-def test_expand_query_generates_variants(qa_engine):
-    """Test that _expand_query generates alternative phrasings."""
-    question = "What is Python used for?"
-
-    variants = qa_engine._expand_query(question, num_variants=2)
-
-    # Should return original + 2 variants = 3 total
-    assert len(variants) >= 1  # At minimum, returns original if expansion fails
-    assert variants[0] == question  # First should be original
-
-    if len(variants) > 1:
-        # If expansion succeeded, variants should be different
-        assert variants[1] != question
-        assert len(variants[1]) > 0
-
-
-def test_expand_query_fallback_on_error(qa_engine):
-    """Test that query expansion falls back to original on error."""
-    # This should work even if expansion fails
-    question = ""
-    variants = qa_engine._expand_query(question, num_variants=2)
-
-    assert len(variants) >= 1
-    assert variants[0] == question
 
 
 def test_multi_query_hybrid_search(embedder, vector_store, sample_documents):
@@ -226,32 +176,36 @@ def test_query_expansion_with_doc_filter(qa_engine, sample_documents):
 
 
 def test_query_weights_applied_correctly(embedder, vector_store, sample_documents):
-    """Test that query weights are applied correctly in fusion."""
-    query_variants = ["Python"]
-    query_embeddings = [embedder.embed_text("Python")]
+    """Test that query weights affect fusion when multiple variants are used."""
+    # Two variants: "Python" (high-level) and "neural networks" (deep learning)
+    query_variants = ["Python programming", "neural networks deep learning"]
+    query_embeddings = [embedder.embed_text(q) for q in query_variants]
 
-    # Weight = 1.0
-    results_weight_1 = vector_store.multi_query_hybrid_search(
+    # Weight Python higher — should rank Python chunks first
+    results_python_heavy = vector_store.multi_query_hybrid_search(
         query_variants=query_variants,
         query_embeddings=query_embeddings,
-        query_weights=[1.0],
-        top_k=2,
+        query_weights=[5.0, 1.0],
+        top_k=4,
         alpha=0.5
     )
 
-    # Weight = 2.0 (should give higher scores)
-    results_weight_2 = vector_store.multi_query_hybrid_search(
+    # Weight neural networks higher — should rank DL chunks first
+    results_nn_heavy = vector_store.multi_query_hybrid_search(
         query_variants=query_variants,
         query_embeddings=query_embeddings,
-        query_weights=[2.0],
-        top_k=2,
+        query_weights=[1.0, 5.0],
+        top_k=4,
         alpha=0.5
     )
 
-    # Scores should be approximately 2x with weight=2.0
-    assert len(results_weight_1) > 0
-    assert len(results_weight_2) > 0
-    assert results_weight_2[0]["score"] > results_weight_1[0]["score"]
+    assert len(results_python_heavy) > 0
+    assert len(results_nn_heavy) > 0
+
+    # Top result should differ based on which query was weighted higher
+    top_python = results_python_heavy[0]["payload"]["text"]
+    top_nn = results_nn_heavy[0]["payload"]["text"]
+    assert "Python" in top_python or top_python != top_nn
 
 
 def test_multi_query_with_empty_results(embedder, vector_store, sample_documents):

@@ -3,47 +3,24 @@
 import pytest
 import os
 from src.qa_engine import QAEngine
-from src.embedder import Embedder
-from src.vector_store import VectorStore
 
 
 @pytest.fixture
-def embedder():
-    """Embedder instance."""
-    return Embedder(
-        model_name=os.environ["EMBEDDING_MODEL"],
-        gemini_api_key=os.environ["GEMINI_API_KEY"],
-        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
-    )
-
-
-@pytest.fixture
-def vector_store():
+def vector_store(vector_store_factory):
     """VectorStore instance."""
-    store = VectorStore(
-        host=os.environ["QDRANT_HOST"],
-        port=int(os.environ["QDRANT_PORT"]),
-        collection_name="test_qa_guardrails",
-        vector_size=int(os.environ["EMBEDDING_DIM"]),
-        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
-    )
-    yield store
-    # Cleanup
-    try:
-        store.client.delete_collection("test_qa_guardrails")
-    except:
-        pass
+    return vector_store_factory("test_qa_guardrails")
 
 
 @pytest.fixture
-def qa_engine(embedder, vector_store):
+def qa_engine(embedder, vector_store, reranker_available):
     """QA engine instance."""
+    use_reranker = os.environ["USE_RERANKING"].lower() == "true" and reranker_available
     return QAEngine(
         embedder=embedder,
         vector_store=vector_store,
         gemini_api_key=os.environ["GEMINI_API_KEY"],
         model_name=os.environ["GEMINI_MODEL"],
-        use_reranker=os.environ["USE_RERANKING"].lower() == "true",
+        use_reranker=use_reranker,
         reranker_model=os.environ["RERANKER_MODEL"],
     )
 
@@ -194,25 +171,6 @@ class TestQAGuardrails:
         # Should return answer
         assert "answer" in result
         assert len(result["answer"]) > 0
-
-    def test_source_metadata_warnings(self, qa_engine, sample_documents):
-        """Test source metadata warning helper."""
-        # Create sources with low scores
-        sources = [
-            {"score": 0.3, "doc_id": "doc1"},
-            {"score": 0.25, "doc_id": "doc2"}
-        ]
-
-        warning = qa_engine._check_source_metadata(sources)
-
-        # Should generate warning for low scores
-        assert "⚠️" in warning or len(warning) == 0  # Might not warn if threshold not met
-
-    def test_source_metadata_warnings_empty(self, qa_engine):
-        """Test metadata warnings with empty sources."""
-        warning = qa_engine._check_source_metadata([])
-
-        assert warning == ""
 
     def test_answer_with_min_score_variations(self, qa_engine, sample_documents):
         """Test different min_score thresholds."""

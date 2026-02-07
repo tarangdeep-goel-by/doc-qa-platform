@@ -2,50 +2,25 @@
 
 import pytest
 import os
-from src.embedder import Embedder
-from src.vector_store import VectorStore
 from src.qa_engine import QAEngine
-from src.bm25_index import BM25Index
-from src.reranker import Reranker
 
 
 @pytest.fixture
-def embedder():
-    """Embedder instance."""
-    return Embedder(
-        model_name=os.environ["EMBEDDING_MODEL"],
-        gemini_api_key=os.environ["GEMINI_API_KEY"],
-        output_dimensionality=int(os.environ["EMBEDDING_DIM"]),
-    )
-
-
-@pytest.fixture
-def vector_store():
+def vector_store(vector_store_factory):
     """VectorStore instance."""
-    store = VectorStore(
-        host=os.environ["QDRANT_HOST"],
-        port=int(os.environ["QDRANT_PORT"]),
-        collection_name="test_rag_pipeline",
-        vector_size=int(os.environ["EMBEDDING_DIM"]),
-        bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
-    )
-    yield store
-    # Cleanup
-    try:
-        store.client.delete_collection("test_rag_pipeline")
-    except:
-        pass
+    return vector_store_factory("test_rag_pipeline")
 
 
 @pytest.fixture
-def qa_engine(embedder, vector_store):
+def qa_engine(embedder, vector_store, reranker_available):
     """QA engine with all features enabled."""
+    use_reranker = os.environ["USE_RERANKING"].lower() == "true" and reranker_available
     return QAEngine(
         embedder=embedder,
         vector_store=vector_store,
         gemini_api_key=os.environ["GEMINI_API_KEY"],
         model_name=os.environ["GEMINI_MODEL"],
-        use_reranker=os.environ["USE_RERANKING"].lower() == "true",
+        use_reranker=use_reranker,
         reranker_model=os.environ["RERANKER_MODEL"],
     )
 

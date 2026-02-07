@@ -1,3 +1,24 @@
+x-env-common: &env-common
+  GEMINI_API_KEY: ${GEMINI_API_KEY}
+  GEMINI_MODEL: gemini-2.5-flash
+  GEMINI_FAST_MODEL: gemini-2.5-flash-lite
+  QDRANT_HOST: qdrant
+  QDRANT_PORT: "6333"
+  EMBEDDING_MODEL: gemini-embedding-001
+  EMBEDDING_DIM: "768"
+  BM25_CACHE_DIR: data/bm25
+  RERANKER_MODEL: cross-encoder/ms-marco-MiniLM-L-6-v2
+  USE_RERANKING: "true"
+  USE_HYBRID_SEARCH: "true"
+  HYBRID_ALPHA: "0.5"
+  USE_QUERY_EXPANSION: "true"
+  QUERY_EXPANSION_VARIANTS: "2"
+  USE_RRF: "true"
+  RERANKER_BLENDING: position_aware
+  USE_QUERY_DECOMPOSITION: "true"
+  USE_ADAPTIVE_ALPHA: "true"
+  TOP_K_RESULTS: "12"
+
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -21,35 +42,15 @@ services:
     volumes:
       - ./backend/data:/app/data
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash
-      - GEMINI_FAST_MODEL=gemini-2.5-flash-lite
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - DATA_DIR=data
-      - UPLOAD_DIR=data/uploads
-      - EMBEDDING_MODEL=gemini-embedding-001
-      - EMBEDDING_DIM=768
-      - CHUNK_SIZE=2500
-      - CHUNK_OVERLAP=500
-      - USE_SEMANTIC_CHUNKING=false
-      - TOP_K_RESULTS=12
-      # RAG Improvements
-      - USE_HYBRID_SEARCH=true
-      - HYBRID_ALPHA=0.5
-      - USE_RERANKING=true
-      - USE_QUERY_EXPANSION=true
-      - QUERY_EXPANSION_VARIANTS=2
-      - USE_RRF=true
-      - BM25_CACHE_DIR=data/bm25
-      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
-      - RERANKER_BLENDING=position_aware
-      - USE_QUERY_DECOMPOSITION=true
-      # Technical document retrieval improvements
-      - USE_ADAPTIVE_ALPHA=true
-      - USE_PDFPLUMBER=true
+      <<: *env-common
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      DATA_DIR: data
+      UPLOAD_DIR: data/uploads
+      CHUNK_SIZE: "2500"
+      CHUNK_OVERLAP: "500"
+      USE_SEMANTIC_CHUNKING: "false"
+      USE_PDFPLUMBER: "true"
     depends_on:
       - qdrant
     restart: unless-stopped
@@ -63,34 +64,16 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - TEST_BASE_URL=http://backend:8000
-      - TEST_PDF_PATH=tests/fixtures/test.pdf
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash
-      - GEMINI_FAST_MODEL=gemini-2.5-flash-lite
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - DATA_DIR=data
-      - UPLOAD_DIR=data/uploads
-      - EMBEDDING_MODEL=gemini-embedding-001
-      - EMBEDDING_DIM=768
-      - CHUNK_SIZE=2500
-      - CHUNK_OVERLAP=500
-      - USE_SEMANTIC_CHUNKING=false
-      - TOP_K_RESULTS=12
-      - USE_HYBRID_SEARCH=true
-      - HYBRID_ALPHA=0.5
-      - USE_RERANKING=true
-      - USE_QUERY_EXPANSION=true
-      - USE_RRF=true
-      - USE_QUERY_DECOMPOSITION=true
-      - QUERY_EXPANSION_VARIANTS=2
-      - BM25_CACHE_DIR=data/bm25
-      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
-      - RERANKER_BLENDING=position_aware
-      - USE_ADAPTIVE_ALPHA=true
+      <<: *env-common
+      TEST_BASE_URL: http://backend:8000
+      TEST_PDF_PATH: tests/fixtures/test.pdf
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      DATA_DIR: data
+      UPLOAD_DIR: data/uploads
+      CHUNK_SIZE: "2500"
+      CHUNK_OVERLAP: "500"
+      USE_SEMANTIC_CHUNKING: "false"
     depends_on:
       - backend
       - qdrant
@@ -107,15 +90,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - EMBEDDING_MODEL=gemini-embedding-001
-      - EMBEDDING_DIM=768
-      - BM25_CACHE_DIR=data/bm25
-      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
-      - USE_RERANKING=true
+      <<: *env-common
     command: pytest tests/test_bm25_index.py tests/test_reranker.py -v --tb=short
     profiles:
       - test
@@ -129,25 +104,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash
-      - GEMINI_FAST_MODEL=gemini-2.5-flash-lite
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - EMBEDDING_MODEL=gemini-embedding-001
-      - EMBEDDING_DIM=768
-      - BM25_CACHE_DIR=data/bm25
-      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
-      - USE_RERANKING=true
-      - USE_HYBRID_SEARCH=true
-      - HYBRID_ALPHA=0.5
-      - USE_QUERY_EXPANSION=true
-      - QUERY_EXPANSION_VARIANTS=2
-      - USE_RRF=true
-      - RERANKER_BLENDING=position_aware
-      - USE_QUERY_DECOMPOSITION=true
-      - USE_ADAPTIVE_ALPHA=true
-      - TOP_K_RESULTS=12
+      <<: *env-common
     depends_on:
       - qdrant
     command: pytest tests/test_hybrid_search.py tests/test_qa_guardrails.py tests/test_rag_pipeline_integration.py -v --tb=short
@@ -163,17 +120,9 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - TEST_BASE_URL=http://backend:8000
-      - TEST_PDF_PATH=tests/fixtures/test.pdf
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - EMBEDDING_MODEL=gemini-embedding-001
-      - EMBEDDING_DIM=768
-      - BM25_CACHE_DIR=data/bm25
-      - RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
-      - USE_RERANKING=true
+      <<: *env-common
+      TEST_BASE_URL: http://backend:8000
+      TEST_PDF_PATH: tests/fixtures/test.pdf
     depends_on:
       - backend
       - qdrant
