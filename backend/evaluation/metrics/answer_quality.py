@@ -141,14 +141,16 @@ Respond as JSON with integer scores and a short explanation string:
 {{"relevance": 4, "completeness": 3, "accuracy": 5, "organization": 4, "explanation": "..."}}"""
 
     try:
-        response = client.models.generate_content(
+        from src.gemini_retry import gemini_retry
+
+        response = gemini_retry(lambda: client.models.generate_content(
             model=model_name,
             contents=prompt,
             config={
                 "temperature": 0.1,
                 "response_mime_type": "application/json",
             },
-        )
+        ))
         text = response.text.strip()
         return _parse_judge_json(text)
     except Exception as e:

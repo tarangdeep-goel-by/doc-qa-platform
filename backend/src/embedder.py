@@ -5,6 +5,8 @@ import os
 from typing import List
 import numpy as np
 
+from .gemini_retry import gemini_retry
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,11 +118,11 @@ class Embedder:
                     f"({len(batch)} texts)..."
                 )
 
-            response = self.client.models.embed_content(
+            response = gemini_retry(lambda batch=batch: self.client.models.embed_content(
                 model=self.model_name,
                 contents=batch,
                 config={"output_dimensionality": self.output_dimensionality},
-            )
+            ))
 
             for embedding in response.embeddings:
                 all_embeddings.append(embedding.values)

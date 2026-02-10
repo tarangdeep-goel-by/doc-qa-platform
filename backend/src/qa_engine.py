@@ -366,6 +366,7 @@ class QAEngine:
                 "sources": [],
                 "low_confidence": True,
                 "retrieved_count": 0,
+                "_chunks": [],
             }
 
         # Step 0+1: Combined classification + expansion (single Gemini call)
@@ -427,6 +428,7 @@ class QAEngine:
                         "retrieved_count": len(unique_sources),
                         "decomposed": True,
                         "sub_questions": [sr["question"] for sr in sub_results],
+                        "_chunks": [],
                     }
 
             # Use query variants for expansion (simple questions or decomp disabled)
@@ -532,7 +534,8 @@ class QAEngine:
                 "answer": "I couldn't find any relevant information in the documents to answer this question.",
                 "sources": [],
                 "retrieved_count": 0,
-                "low_confidence": True
+                "low_confidence": True,
+                "_chunks": [],
             }
 
         # Check top score against threshold
@@ -552,7 +555,8 @@ class QAEngine:
                 "sources": self._format_sources(search_results),
                 "retrieved_count": len(search_results),
                 "low_confidence": True,
-                "top_score": top_score
+                "top_score": top_score,
+                "_chunks": search_results,
             }
 
         logger.info(f"Pipeline: {len(search_results)} chunks sent to LLM")
@@ -569,7 +573,8 @@ class QAEngine:
             "question": question,
             "answer": answer,
             "sources": sources,
-            "retrieved_count": len(search_results)
+            "retrieved_count": len(search_results),
+            "_chunks": search_results,
         }
 
     def _deduplicate_chunks(
@@ -796,20 +801,19 @@ Answer:"""
         return "\n\n" + "="*80 + "\n\n".join(context_parts)
 
     def _generate_answer(self, prompt: str) -> str:
-        """Generate answer using Gemini."""
-        try:
-            response = self.client.models.generate_content(
-                model=self.fast_model_name,
-                contents=prompt,
-                config={
-                    "temperature": 0.4,        # Balanced: factual but not overly terse
-                    "topP": 0.9,              # Reasonable diversity (camelCase!)
-                    "maxOutputTokens": 8192   # Allow thorough answers (camelCase!)
-                }
-            )
-            return response.text.strip()
-        except Exception as e:
-            return f"Error generating answer: {str(e)}"
+        """Generate answer using Gemini with retry on transient errors."""
+        from .gemini_retry import gemini_retry
+
+        response = gemini_retry(lambda: self.client.models.generate_content(
+            model=self.fast_model_name,
+            contents=prompt,
+            config={
+                "temperature": 0.4,
+                "topP": 0.9,
+                "maxOutputTokens": 8192,
+            }
+        ))
+        return response.text.strip()
 
     def check_gemini_connection(self) -> bool:
         """Check if Gemini API is accessible."""
