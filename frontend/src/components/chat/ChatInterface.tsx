@@ -80,9 +80,11 @@ export function ChatInterface() {
               </p>
             </div>
           ) : (
-            messages.map(msg => (
-              <ChatMessageItem key={msg.id} message={msg} />
-            ))
+            messages
+              .filter(msg => !(msg.id.startsWith('stream-') && !msg.content))
+              .map(msg => (
+                <ChatMessageItem key={msg.id} message={msg} />
+              ))
           )}
 
           {/* Typing indicator: show only while loading AND last assistant message has no content yet */}

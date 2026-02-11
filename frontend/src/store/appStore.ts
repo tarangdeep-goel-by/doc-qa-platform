@@ -238,6 +238,14 @@ export const useAppStore = create<AppState>((set, get) => ({
               ),
               loading: false
             }))
+
+            // Auto-rename chat from first question if still default name
+            if (activeChat.name === 'New Chat') {
+              const autoName = question.length > 60
+                ? question.slice(0, 57) + '...'
+                : question
+              get().renameChat(activeChat.id, autoName)
+            }
             break
 
           case 'error':

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 interface Props {
@@ -8,21 +8,24 @@ interface Props {
 }
 
 export function NewChatModal({ onClose, onChatCreated }: Props) {
-  const { documents, createChat } = useAppStore()
+  const { documents, createChat, uploadDocument, loadDocuments } = useAppStore()
   const [name, setName] = useState('')
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
 
+  // Inline upload state
+  const [isDragging, setIsDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name.trim()) {
-      alert('Please enter a chat name')
-      return
-    }
-
     setLoading(true)
-    const chat = await createChat(name.trim(), selectedDocs)
+    const chatName = name.trim() || 'New Chat'
+    const chat = await createChat(chatName, selectedDocs)
     setLoading(false)
 
     if (chat) {
@@ -46,6 +49,43 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
     setSelectedDocs([])
   }
 
+  const handleInlineUpload = async (file: File) => {
+    const allowedExtensions = ['.pdf', '.docx', '.html', '.htm', '.txt']
+    const hasValidExt = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+    if (!hasValidExt) {
+      setUploadError(`Unsupported file type. Allowed: ${allowedExtensions.join(', ')}`)
+      return
+    }
+    if (file.size / (1024 * 1024) > 50) {
+      setUploadError('File too large. Maximum 50MB.')
+      return
+    }
+
+    setUploading(true)
+    setUploadError(null)
+    setUploadSuccess(null)
+
+    try {
+      await uploadDocument(file)
+      await loadDocuments()
+
+      // Auto-select the newly uploaded doc
+      const updated = useAppStore.getState().documents
+      const newDoc = updated.find(d => d.title === file.name)
+      if (newDoc && !selectedDocs.includes(newDoc.doc_id)) {
+        setSelectedDocs(prev => [...prev, newDoc.doc_id])
+      }
+
+      setUploadSuccess(file.name)
+      setTimeout(() => setUploadSuccess(null), 3000)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-cream rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
@@ -66,7 +106,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
             {/* Chat name */}
             <div>
               <label className="block font-sans text-fluid-sm text-ink/70 mb-2">
-                Chat Name
+                Chat Name <span className="text-ink/40">(optional — auto-named from first question)</span>
               </label>
               <input
                 type="text"
@@ -104,7 +144,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
 
               {documents.length === 0 ? (
                 <p className="font-sans text-fluid-sm text-ink/50 p-fluid-md border border-ink/10 rounded-lg">
-                  No documents available. Please upload documents first.
+                  No documents available. Upload one below to get started.
                 </p>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto border border-ink/10 rounded-lg p-fluid-sm">
@@ -139,6 +179,85 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                 }
               </p>
             </div>
+
+            {/* Upload document tile */}
+            <div>
+              <label className="block font-sans text-fluid-sm text-ink/70 mb-2">
+                Upload New Document
+              </label>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  const file = e.dataTransfer.files[0]
+                  if (file) handleInlineUpload(file)
+                }}
+                onClick={() => !uploading && fileInputRef.current?.click()}
+                className={`
+                  w-full border-2 border-dashed rounded-lg p-fluid-lg flex items-center gap-4 cursor-pointer transition-all
+                  ${isDragging
+                    ? 'border-burgundy bg-burgundy/5'
+                    : 'border-ink/15 hover:border-burgundy/40 hover:bg-ink/[0.02]'
+                  }
+                  ${uploading ? 'pointer-events-none opacity-60' : ''}
+                `}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.html,.htm,.txt"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleInlineUpload(file)
+                  }}
+                  className="hidden"
+                  disabled={uploading}
+                />
+
+                <div className="flex-shrink-0">
+                  {uploading ? (
+                    <Loader2 className="w-8 h-8 text-burgundy animate-spin" />
+                  ) : (
+                    <Upload className={`w-8 h-8 ${isDragging ? 'text-burgundy' : 'text-ink/30'}`} />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {uploading ? (
+                    <p className="font-sans text-fluid-sm text-ink/70">Uploading and processing...</p>
+                  ) : (
+                    <>
+                      <p className="font-sans text-fluid-sm text-ink font-medium">
+                        Drop a file here or click to browse
+                      </p>
+                      <p className="font-sans text-fluid-xs text-ink/50">
+                        PDF, DOCX, HTML, TXT
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {uploadSuccess && (
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <p className="font-sans text-fluid-xs text-emerald-700">
+                    Uploaded &amp; selected: {uploadSuccess}
+                  </p>
+                </div>
+              )}
+
+              {uploadError && (
+                <div className="flex items-center gap-2 mt-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <p className="font-sans text-fluid-xs text-red-600 whitespace-pre-line">
+                    {uploadError}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -152,7 +271,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim()}
+              disabled={loading}
               className="px-fluid-lg py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating...' : 'Create Chat'}

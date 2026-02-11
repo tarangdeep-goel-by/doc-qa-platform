@@ -255,11 +255,14 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    # Filter to only existing documents
-    available_doc_ids = [
-        doc_id for doc_id in chat.doc_ids
-        if document_store.get_document(doc_id) is not None
-    ] if chat.doc_ids else []
+    # Filter to only existing documents; empty doc_ids means "search all"
+    if chat.doc_ids:
+        available_doc_ids = [
+            doc_id for doc_id in chat.doc_ids
+            if document_store.get_document(doc_id) is not None
+        ]
+    else:
+        available_doc_ids = [doc.doc_id for doc in document_store.list_documents()]
 
     def _sse_event(data: dict) -> str:
         return f"data: {json.dumps(data)}\n\n"
