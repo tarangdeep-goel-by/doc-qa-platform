@@ -31,10 +31,6 @@ export function ChatInterface() {
     )
   }
 
-  const handleSend = async (question: string) => {
-    await sendMessage(question)
-  }
-
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -47,16 +43,16 @@ export function ChatInterface() {
             <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-sans text-fluid-sm text-yellow-300 font-medium">
-                {activeChat.missing_documents.length} document(s) from this chat have been deleted
+                {activeChat.missing_documents.length} {activeChat.missing_documents.length === 1 ? 'document has' : 'documents have'} been deleted from this chat
               </p>
               {activeChat.available_documents && activeChat.available_documents.length > 0 ? (
                 <p className="font-sans text-fluid-sm text-yellow-300 mt-fluid-xs">
-                  Questions will use the {activeChat.available_documents.length} remaining document(s): {' '}
+                  Questions will use the {activeChat.available_documents.length} remaining document{activeChat.available_documents.length === 1 ? '' : 's'}: {' '}
                   {activeChat.available_documents.map(d => d.title).join(', ')}
                 </p>
               ) : (
                 <p className="font-sans text-fluid-sm text-yellow-300 mt-fluid-xs">
-                  This chat has no documents available. Consider adding new documents or archiving this chat.
+                  This chat has no documents available. Add new documents to continue using this chat.
                 </p>
               )}
             </div>
@@ -113,7 +109,7 @@ export function ChatInterface() {
       <div className="border-t border-ink/10 bg-cream/80 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-fluid-lg py-fluid-md">
           <MessageInput
-            onSubmit={handleSend}
+            onSubmit={sendMessage}
             disabled={loading}
           />
         </div>

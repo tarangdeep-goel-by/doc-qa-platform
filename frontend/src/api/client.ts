@@ -1,4 +1,4 @@
-import type { Document, QueryResponse, Chat, ChatMessage, Source } from '../types'
+import type { Document, Chat, ChatMessage, Source } from '../types'
 
 const API_BASE = '/api'
 
@@ -9,28 +9,6 @@ export async function fetchDocuments(): Promise<Document[]> {
   }
   const data = await response.json()
   return data.documents
-}
-
-export async function askQuestion(
-  question: string,
-  docIds?: string[]
-): Promise<QueryResponse> {
-  const response = await fetch(`${API_BASE}/query/ask`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      question,
-      doc_ids: docIds,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to get answer')
-  }
-
-  return response.json()
 }
 
 // Chat API functions

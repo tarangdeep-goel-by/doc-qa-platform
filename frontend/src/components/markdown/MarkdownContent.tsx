@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function MarkdownContent({ content, sources = [], onCitationClick }: Props) {
-  const { cleanedContent } = parseCitations(content, sources)
+  const cleanedContent = parseCitations(content, sources)
 
   // Helper to extract text from React children recursively
   const getTextContent = (children: React.ReactNode): string => {

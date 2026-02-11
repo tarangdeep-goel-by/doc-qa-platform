@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
+import { X, Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 interface Props {
@@ -10,7 +10,6 @@ export function UploadModal({ onClose }: Props) {
   const { uploadDocument } = useAppStore()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -79,19 +78,10 @@ export function UploadModal({ onClose }: Props) {
     if (!selectedFile) return
 
     setUploading(true)
-    setProgress(0)
     setError(null)
 
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90))
-      }, 200)
-
       await uploadDocument(selectedFile)
-
-      clearInterval(progressInterval)
-      setProgress(100)
       setSuccess(true)
 
       // Close modal after short delay
@@ -100,7 +90,6 @@ export function UploadModal({ onClose }: Props) {
       }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document')
-      setProgress(0)
     } finally {
       setUploading(false)
     }
@@ -192,19 +181,11 @@ export function UploadModal({ onClose }: Props) {
             </div>
           )}
 
-          {/* Progress Bar */}
+          {/* Uploading Spinner */}
           {uploading && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-fluid-sm text-ink/70">Uploading and processing...</span>
-                <span className="font-sans text-fluid-sm text-ink/70 font-medium">{progress}%</span>
-              </div>
-              <div className="h-2 bg-ink/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-burgundy transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-burgundy animate-spin" />
+              <span className="font-sans text-fluid-sm text-ink/70">Uploading and processing...</span>
             </div>
           )}
 
@@ -213,7 +194,7 @@ export function UploadModal({ onClose }: Props) {
             <div className="flex items-center gap-2 p-fluid-md bg-green-900/20 border border-green-700 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
               <p className="font-sans text-fluid-sm text-green-300">
-                Document uploaded successfully!
+                Document uploaded successfully
               </p>
             </div>
           )}

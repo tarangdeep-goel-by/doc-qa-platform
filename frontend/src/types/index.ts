@@ -22,22 +22,6 @@ export interface Source {
   page_num?: number
 }
 
-export interface QueryResponse {
-  question: string
-  answer: string
-  sources: Source[]
-  retrieved_count: number
-}
-
-export interface Message {
-  id: string
-  type: 'question' | 'answer'
-  content: string
-  sources?: Source[]
-  timestamp: Date
-  filteredDocs?: string[]
-}
-
 export interface Chat {
   id: string
   name: string
@@ -57,6 +41,5 @@ export interface ChatMessage {
   content: string
   timestamp: string
   sources?: Source[]
-  filtered_docs?: string[]
   feedback?: 'up' | 'down'
 }

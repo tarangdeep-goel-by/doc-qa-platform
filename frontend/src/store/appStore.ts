@@ -170,7 +170,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeChat } = get()
 
     if (!activeChat) {
-      set({ error: 'No active chat' })
+      set({ error: 'Select a chat to send messages' })
       return
     }
 
@@ -183,8 +183,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         chat_id: activeChat.id,
         role: 'user',
         content: question,
-        timestamp: new Date().toISOString(),
-        filtered_docs: activeChat.doc_ids
+        timestamp: new Date().toISOString()
       }
 
       // Create assistant placeholder (empty content, will be filled by stream)
@@ -268,7 +267,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             set(state => ({
               messages: state.messages.map(msg =>
                 msg.id === assistantPlaceholderId
-                  ? { ...msg, content: `Error: ${event.detail}` }
+                  ? { ...msg, content: event.detail }
                   : msg
               ),
               loading: false
