@@ -28,6 +28,7 @@ interface AppState {
   sendMessage: (question: string) => Promise<void>
   uploadDocument: (file: File) => Promise<void>
   deleteDocument: (docId: string) => Promise<void>
+  submitFeedback: (chatId: string, messageId: string, feedback: 'up' | 'down') => Promise<void>
   clearError: () => void
 }
 
@@ -163,7 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Send message in active chat
+  // Send message in active chat (streaming)
   sendMessage: async (question: string) => {
     const { activeChat } = get()
 
@@ -175,7 +176,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ loading: true, error: null })
 
-      // Create user message immediately
+      // Create user message immediately (optimistic)
       const userMessage: ChatMessage = {
         id: `temp-${Date.now()}`,
         chat_id: activeChat.id,
@@ -185,19 +186,72 @@ export const useAppStore = create<AppState>((set, get) => ({
         filtered_docs: activeChat.doc_ids
       }
 
-      // Add user message to UI
+      // Create assistant placeholder (empty content, will be filled by stream)
+      const assistantPlaceholderId = `stream-${Date.now()}`
+      const assistantPlaceholder: ChatMessage = {
+        id: assistantPlaceholderId,
+        chat_id: activeChat.id,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+      }
+
+      // Add both messages to UI
       set(state => ({
-        messages: [...state.messages, userMessage]
+        messages: [...state.messages, userMessage, assistantPlaceholder]
       }))
 
-      // Call API
-      const assistantMessage = await api.askInChat(activeChat.id, question)
+      let accumulatedContent = ''
 
-      // Add assistant response
-      set(state => ({
-        messages: [...state.messages, assistantMessage],
-        loading: false
-      }))
+      await api.askInChatStream(activeChat.id, question, (event) => {
+        switch (event.type) {
+          case 'retrieval_done':
+            // Attach sources to the assistant placeholder
+            set(state => ({
+              messages: state.messages.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? { ...msg, sources: event.sources }
+                  : msg
+              )
+            }))
+            break
+
+          case 'chunk':
+            accumulatedContent += event.content
+            // Update assistant message content
+            set(state => ({
+              messages: state.messages.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              )
+            }))
+            break
+
+          case 'done':
+            // Update with server's message_id, set loading false
+            set(state => ({
+              messages: state.messages.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? { ...msg, id: event.message_id }
+                  : msg
+              ),
+              loading: false
+            }))
+            break
+
+          case 'error':
+            set(state => ({
+              messages: state.messages.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? { ...msg, content: `Error: ${event.detail}` }
+                  : msg
+              ),
+              loading: false
+            }))
+            break
+        }
+      })
 
       // Update chat in list (message_count increased)
       get().loadChats()
@@ -272,6 +326,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete document'
       throw new Error(message)
+    }
+  },
+
+  // Submit feedback on assistant message
+  submitFeedback: async (chatId: string, messageId: string, feedback: 'up' | 'down') => {
+    try {
+      // Optimistic update
+      set(state => ({
+        messages: state.messages.map(msg =>
+          msg.id === messageId ? { ...msg, feedback } : msg
+        )
+      }))
+      await api.submitFeedback(chatId, messageId, feedback)
+    } catch (error) {
+      // Revert on failure
+      set(state => ({
+        messages: state.messages.map(msg =>
+          msg.id === messageId ? { ...msg, feedback: undefined } : msg
+        )
+      }))
+      toast.error('Failed to submit feedback')
     }
   },
 

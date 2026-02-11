@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -194,3 +194,14 @@ class BulkDeleteChatsResponse(BaseModel):
     total: int
     successful: int
     failed: int
+
+
+# Feedback Schemas
+class FeedbackRequest(BaseModel):
+    """Request to submit feedback on an answer."""
+    feedback: Literal["up", "down"]
+
+
+class FeedbackResponse(BaseModel):
+    """Response after submitting feedback."""
+    success: bool

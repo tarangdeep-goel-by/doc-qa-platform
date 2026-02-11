@@ -1,5 +1,6 @@
 """Tests for deleted documents edge case handling."""
 
+import json
 import pytest
 import os
 import time
@@ -229,16 +230,28 @@ class TestDeletedDocuments:
         # Delete document
         client.delete(f"/api/admin/documents/{uploaded_doc}")
 
-        # Try to ask question
+        # Try to ask question (SSE stream)
         response = client.post(
             f"/api/chats/{chat_id}/ask",
-            json={"question": "What is this document about?"}
+            json={"question": "What is this document about?"},
+            stream=True
         )
 
         # Should return clear message about deleted documents
         assert response.status_code == 200
-        answer = response.json()["message"]["content"]
 
+        # Parse SSE events
+        chunks = []
+        for line in response.iter_lines(decode_unicode=True):
+            if line and line.startswith("data: "):
+                try:
+                    event = json.loads(line[6:])
+                    if event["type"] == "chunk":
+                        chunks.append(event["content"])
+                except json.JSONDecodeError:
+                    pass
+
+        answer = "".join(chunks)
         # Should indicate all documents deleted
         assert "deleted" in answer.lower() or "not available" in answer.lower()
 

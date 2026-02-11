@@ -63,6 +63,10 @@ htmlcov/
 *.seed
 *.pid.lock
 
+# Interaction/feedback data
+backend/data/interactions.jsonl
+backend/data/feedback.jsonl
+
 # Misc
 .cache/
 *.bak

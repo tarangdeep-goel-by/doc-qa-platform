@@ -17,9 +17,12 @@ export function UploadModal({ onClose }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = (file: File): string | null => {
-    // Check file type
-    if (file.type !== 'application/pdf') {
-      return 'Only PDF files are supported'
+    // Check file type by extension
+    const allowedExtensions = ['.pdf', '.docx', '.html', '.htm', '.txt']
+    const fileName = file.name.toLowerCase()
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
+    if (!hasValidExtension) {
+      return `Unsupported file type. Allowed: ${allowedExtensions.join(', ')}`
     }
 
     // Check file size (max 50MB)
@@ -146,7 +149,7 @@ export function UploadModal({ onClose }: Props) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.docx,.html,.htm,.txt"
               onChange={handleFileInputChange}
               className="hidden"
               disabled={uploading}
@@ -155,10 +158,10 @@ export function UploadModal({ onClose }: Props) {
             <Upload className={`w-12 h-12 mx-auto mb-fluid-md ${isDragging ? 'text-burgundy' : 'text-ink/40'}`} />
 
             <p className="font-sans text-fluid-base text-ink font-medium mb-fluid-xs">
-              {isDragging ? 'Drop your PDF here' : 'Drag & drop your PDF here'}
+              {isDragging ? 'Drop your document here' : 'Drag & drop your document here'}
             </p>
             <p className="font-sans text-fluid-sm text-ink/60">
-              or click to browse • Maximum 50MB
+              PDF, DOCX, HTML, TXT • Maximum 50MB
             </p>
           </div>
 

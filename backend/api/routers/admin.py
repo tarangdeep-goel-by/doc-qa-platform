@@ -7,8 +7,8 @@ import uuid
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from typing import List, Optional
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query
 from fastapi.responses import FileResponse
 
 from api.schemas import (
@@ -35,14 +35,19 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
     """
     Upload and process a document.
 
-    Accepts: PDF files
+    Accepts: PDF, DOCX, HTML, TXT files
     Returns: Document ID and processing stats
     """
     start_time = time.time()
 
     # Validate file type
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.html', '.htm', '.txt'}
+    _, ext = os.path.splitext(file.filename)
+    if ext.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        )
 
     # Get app state
     embedder = request.app.state.embedder
@@ -341,8 +346,42 @@ async def download_document(request: Request, doc_id: str):
     if not os.path.exists(doc.file_path):
         raise HTTPException(status_code=404, detail="Document file not found on disk")
 
+    MEDIA_TYPES = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'html': 'text/html',
+        'htm': 'text/html',
+        'txt': 'text/plain',
+    }
+    media_type = MEDIA_TYPES.get(doc.format, 'application/octet-stream')
+
     return FileResponse(
         doc.file_path,
-        media_type='application/pdf',
+        media_type=media_type,
         filename=doc.filename
+    )
+
+
+@router.get("/interactions")
+async def get_interactions(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=1000),
+    chat_id: Optional[str] = Query(default=None),
+):
+    """Get recent Q&A interactions."""
+    interaction_logger = request.app.state.interaction_logger
+    return interaction_logger.get_interactions(limit=limit, chat_id=chat_id)
+
+
+@router.get("/feedback")
+async def get_feedback(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=1000),
+    chat_id: Optional[str] = Query(default=None),
+    feedback: Optional[str] = Query(default=None, pattern="^(up|down)$"),
+):
+    """Get feedback entries."""
+    feedback_store = request.app.state.feedback_store
+    return feedback_store.get_feedback(
+        limit=limit, chat_id=chat_id, feedback_filter=feedback
     )

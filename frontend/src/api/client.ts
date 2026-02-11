@@ -1,4 +1,4 @@
-import type { Document, QueryResponse, Chat, ChatMessage } from '../types'
+import type { Document, QueryResponse, Chat, ChatMessage, Source } from '../types'
 
 const API_BASE = '/api'
 
@@ -126,10 +126,17 @@ export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChat
   return response.json()
 }
 
-export async function askInChat(
+export type StreamEvent =
+  | { type: 'retrieval_done'; sources: Source[] }
+  | { type: 'chunk'; content: string }
+  | { type: 'done'; message_id: string }
+  | { type: 'error'; detail: string }
+
+export async function askInChatStream(
   chatId: string,
   question: string,
-): Promise<ChatMessage> {
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
   const response = await fetch(`${API_BASE}/chats/${chatId}/ask`, {
     method: 'POST',
     headers: {
@@ -144,8 +151,61 @@ export async function askInChat(
     throw new Error('Failed to ask question in chat')
   }
 
-  const data = await response.json()
-  return data.message
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('No response body')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    // Parse SSE lines
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(trimmed.slice(6))
+          onEvent(data as StreamEvent)
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    }
+  }
+
+  // Process any remaining buffer
+  if (buffer.trim().startsWith('data: ')) {
+    try {
+      const data = JSON.parse(buffer.trim().slice(6))
+      onEvent(data as StreamEvent)
+    } catch {
+      // Skip
+    }
+  }
+}
+
+// Feedback
+export async function submitFeedback(
+  chatId: string,
+  messageId: string,
+  feedback: 'up' | 'down'
+): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_BASE}/chats/${chatId}/messages/${messageId}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedback }),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to submit feedback')
+  }
+  return response.json()
 }
 
 // Document management functions

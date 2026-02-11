@@ -85,8 +85,8 @@ export function ChatInterface() {
             ))
           )}
 
-          {/* Typing indicator while waiting for response */}
-          {loading && (
+          {/* Typing indicator: show only while loading AND last assistant message has no content yet */}
+          {loading && (!messages.length || messages[messages.length - 1].role !== 'assistant' || !messages[messages.length - 1].content) && (
             <div className="flex gap-fluid-md justify-start">
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan/10 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-cyan" />

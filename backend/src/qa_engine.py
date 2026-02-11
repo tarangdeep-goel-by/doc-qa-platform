@@ -319,7 +319,7 @@ class QAEngine:
 
         return boosted
 
-    def answer_question(
+    def _retrieve(
         self,
         question: str,
         top_k: int,
@@ -337,36 +337,28 @@ class QAEngine:
         use_adaptive_alpha: bool = True
     ) -> Dict[str, Any]:
         """
-        Answer a question using RAG pipeline.
+        Run retrieval pipeline: classify, search, rerank, filter.
 
-        Args:
-            question: User question
-            top_k: Number of chunks to retrieve
-            doc_ids: Optional list of document IDs to filter search
-            chat_history: Optional chat history for context (Gemini format)
-            use_hybrid: Whether to use hybrid search (vector + BM25) or pure vector
-            hybrid_alpha: Weight for hybrid search (0=all BM25, 1=all vector, 0.5=balanced)
-            use_reranking: Whether to rerank results with cross-encoder
-            min_score: Minimum confidence score threshold (0-1)
-            use_query_expansion: Whether to generate alternative query phrasings (improves recall)
-            query_expansion_variants: Number of alternative phrasings to generate
-            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
-            rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
-            use_query_decomposition: Whether to decompose complex questions into sub-questions
-            use_adaptive_alpha: Whether to try multiple alpha values and pick best (improves technical doc retrieval)
-
-        Returns:
-            Dictionary with answer and sources
+        Returns dict with keys:
+            - search_results: filtered chunks
+            - sources: formatted sources list
+            - context: formatted context string
+            - prompt: final LLM prompt
+            - query_type: classified query type
+            - early_return: None or a complete response dict (for empty/low-confidence/decomposed)
+            - decomposed_result: full response dict if query was decomposed, else None
         """
         # Guard: empty question
         if not question or not question.strip():
             return {
-                "question": question,
-                "answer": "I don't have enough information to answer an empty question. Please provide a specific question about your documents.",
-                "sources": [],
-                "low_confidence": True,
-                "retrieved_count": 0,
-                "_chunks": [],
+                "early_return": {
+                    "question": question,
+                    "answer": "I don't have enough information to answer an empty question. Please provide a specific question about your documents.",
+                    "sources": [],
+                    "low_confidence": True,
+                    "retrieved_count": 0,
+                    "_chunks": [],
+                }
             }
 
         # Step 0+1: Combined classification + expansion (single Gemini call)
@@ -420,15 +412,15 @@ class QAEngine:
                             seen_texts.add(key)
                             unique_sources.append(s)
 
-                    answer = self._synthesize_answers(question, sub_results)
                     return {
-                        "question": question,
-                        "answer": answer,
-                        "sources": unique_sources[:top_k],
-                        "retrieved_count": len(unique_sources),
-                        "decomposed": True,
-                        "sub_questions": [sr["question"] for sr in sub_results],
-                        "_chunks": [],
+                        "early_return": None,
+                        "decomposed_result": {
+                            "question": question,
+                            "sub_results": sub_results,
+                            "sources": unique_sources[:top_k],
+                            "retrieved_count": len(unique_sources),
+                            "sub_questions": [sr["question"] for sr in sub_results],
+                        }
                     }
 
             # Use query variants for expansion (simple questions or decomp disabled)
@@ -468,7 +460,6 @@ class QAEngine:
         effective_alpha = alpha_selected if alpha_selected is not None else hybrid_alpha
 
         if use_query_expansion and len(query_variants) > 1:
-            # Multi-query search with all variants + best alpha
             search_results = self.vector_store.multi_query_hybrid_search(
                 query_variants=query_variants,
                 query_embeddings=query_embeddings,
@@ -478,10 +469,10 @@ class QAEngine:
                 alpha=effective_alpha,
                 use_rrf=use_rrf
             )
-            adaptive_results = None  # Can't reuse — need broader retrieval from all variants
+            adaptive_results = None
         elif use_hybrid:
             if adaptive_results is not None:
-                search_results = adaptive_results  # Reuse (already reranked by alpha selection)
+                search_results = adaptive_results
             else:
                 search_results = self.vector_store.hybrid_search(
                     query_vector=query_embeddings[0],
@@ -500,7 +491,7 @@ class QAEngine:
 
         logger.info(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
 
-        # Step 2.5: Rerank if enabled (skip if reusing adaptive results — already reranked)
+        # Step 2.5: Rerank
         already_reranked = adaptive_results is not None and search_results is adaptive_results
         if use_reranking and self.reranker and search_results and not already_reranked:
             pre_rerank_count = len(search_results)
@@ -511,71 +502,241 @@ class QAEngine:
             )
             logger.info(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
 
-        # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
+        # Step 2.6-2.9: Post-processing
         search_results = self._deduplicate_chunks(search_results)
-
-        # Step 2.7: Filter noise chunks (very short/substance-free)
         search_results = self._filter_noise_chunks(search_results)
-
-        # Step 2.8: Dynamic score cutoff (replaces hardcoded top_k from reranker)
         search_results = self._dynamic_score_cutoff(search_results)
 
-        # Step 2.9: Structure-aware boosting
         query_type = self._classify_query_type(question)
         if query_type != "general":
             search_results = self._boost_by_structure(search_results, query_type)
 
-        # Step 2.10: Check if we have confident results
+        # Check confidence
         reranking_applied = use_reranking and self.reranker and len(search_results) > 0
 
         if not search_results:
             return {
-                "question": question,
-                "answer": "I couldn't find any relevant information in the documents to answer this question.",
-                "sources": [],
-                "retrieved_count": 0,
-                "low_confidence": True,
-                "_chunks": [],
+                "early_return": {
+                    "question": question,
+                    "answer": "I couldn't find any relevant information in the documents to answer this question.",
+                    "sources": [],
+                    "retrieved_count": 0,
+                    "low_confidence": True,
+                    "_chunks": [],
+                }
             }
 
-        # Check top score against threshold
-        # Skip when reranking is active — cross-encoder blended scores use a
-        # different scale (can be negative) so the 0-1 threshold doesn't apply.
         top_score = search_results[0]["score"] if search_results else 0
         if not reranking_applied and top_score < min_score:
             return {
-                "question": question,
-                "answer": (
-                    "I don't have enough information to answer that question confidently. "
-                    "This could mean:\n"
-                    "- The information isn't in the uploaded documents\n"
-                    "- The question needs to be more specific\n"
-                    "- Try rephrasing or check if the right documents are uploaded"
-                ),
-                "sources": self._format_sources(search_results),
-                "retrieved_count": len(search_results),
-                "low_confidence": True,
-                "top_score": top_score,
-                "_chunks": search_results,
+                "early_return": {
+                    "question": question,
+                    "answer": (
+                        "I don't have enough information to answer that question confidently. "
+                        "This could mean:\n"
+                        "- The information isn't in the uploaded documents\n"
+                        "- The question needs to be more specific\n"
+                        "- Try rephrasing or check if the right documents are uploaded"
+                    ),
+                    "sources": self._format_sources(search_results),
+                    "retrieved_count": len(search_results),
+                    "low_confidence": True,
+                    "top_score": top_score,
+                    "_chunks": search_results,
+                }
             }
 
         logger.info(f"Pipeline: {len(search_results)} chunks sent to LLM")
 
-        # Step 3: Build context from retrieved chunks with enhanced formatting
         context = self._format_context_with_sources(search_results)
         sources = self._format_sources(search_results)
-
-        # Step 4: Generate answer with Gemini
         prompt = self._build_prompt(question, context, query_type)
-        answer = self._generate_answer(prompt)
 
+        return {
+            "early_return": None,
+            "decomposed_result": None,
+            "search_results": search_results,
+            "sources": sources,
+            "context": context,
+            "prompt": prompt,
+            "query_type": query_type,
+        }
+
+    def answer_question(
+        self,
+        question: str,
+        top_k: int,
+        doc_ids: Optional[List[str]] = None,
+        chat_history: Optional[List[Dict]] = None,
+        use_hybrid: bool = True,
+        hybrid_alpha: float = 0.5,
+        use_reranking: bool = True,
+        min_score: float = 0.3,
+        use_query_expansion: bool = False,
+        query_expansion_variants: int = 2,
+        use_rrf: bool = True,
+        rerank_blending: str = "position_aware",
+        use_query_decomposition: bool = False,
+        use_adaptive_alpha: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Answer a question using RAG pipeline (non-streaming).
+
+        Args:
+            question: User question
+            top_k: Number of chunks to retrieve
+            doc_ids: Optional list of document IDs to filter search
+            chat_history: Optional chat history for context (Gemini format)
+            use_hybrid: Whether to use hybrid search (vector + BM25) or pure vector
+            hybrid_alpha: Weight for hybrid search (0=all BM25, 1=all vector, 0.5=balanced)
+            use_reranking: Whether to rerank results with cross-encoder
+            min_score: Minimum confidence score threshold (0-1)
+            use_query_expansion: Whether to generate alternative query phrasings (improves recall)
+            query_expansion_variants: Number of alternative phrasings to generate
+            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
+            rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
+            use_query_decomposition: Whether to decompose complex questions into sub-questions
+            use_adaptive_alpha: Whether to try multiple alpha values and pick best (improves technical doc retrieval)
+
+        Returns:
+            Dictionary with answer and sources
+        """
+        retrieval = self._retrieve(
+            question=question,
+            top_k=top_k,
+            doc_ids=doc_ids,
+            chat_history=chat_history,
+            use_hybrid=use_hybrid,
+            hybrid_alpha=hybrid_alpha,
+            use_reranking=use_reranking,
+            min_score=min_score,
+            use_query_expansion=use_query_expansion,
+            query_expansion_variants=query_expansion_variants,
+            use_rrf=use_rrf,
+            rerank_blending=rerank_blending,
+            use_query_decomposition=use_query_decomposition,
+            use_adaptive_alpha=use_adaptive_alpha,
+        )
+
+        # Handle early returns (empty, low-confidence)
+        if retrieval.get("early_return"):
+            return retrieval["early_return"]
+
+        # Handle decomposed queries
+        if retrieval.get("decomposed_result"):
+            dr = retrieval["decomposed_result"]
+            answer = self._synthesize_answers(question, dr["sub_results"])
+            return {
+                "question": question,
+                "answer": answer,
+                "sources": dr["sources"],
+                "retrieved_count": dr["retrieved_count"],
+                "decomposed": True,
+                "sub_questions": dr["sub_questions"],
+                "_chunks": [],
+            }
+
+        # Normal path: generate answer
+        answer = self._generate_answer(retrieval["prompt"])
         return {
             "question": question,
             "answer": answer,
-            "sources": sources,
-            "retrieved_count": len(search_results),
-            "_chunks": search_results,
+            "sources": retrieval["sources"],
+            "retrieved_count": len(retrieval["search_results"]),
+            "_chunks": retrieval["search_results"],
         }
+
+    def _generate_answer_stream(self, prompt: str):
+        """Yield text chunks from Gemini streaming API."""
+        from .gemini_retry import gemini_retry
+
+        response = gemini_retry(lambda: self.client.models.generate_content_stream(
+            model=self.fast_model_name,
+            contents=prompt,
+            config={
+                "temperature": 0.4,
+                "topP": 0.9,
+                "maxOutputTokens": 8192,
+            },
+        ))
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+
+    def answer_question_stream(
+        self,
+        question: str,
+        top_k: int,
+        doc_ids: Optional[List[str]] = None,
+        chat_history: Optional[List[Dict]] = None,
+        use_hybrid: bool = True,
+        hybrid_alpha: float = 0.5,
+        use_reranking: bool = True,
+        min_score: float = 0.3,
+        use_query_expansion: bool = False,
+        query_expansion_variants: int = 2,
+        use_rrf: bool = True,
+        rerank_blending: str = "position_aware",
+        use_query_decomposition: bool = False,
+        use_adaptive_alpha: bool = True
+    ):
+        """
+        Stream an answer using RAG pipeline. Yields SSE event dicts.
+
+        Event types:
+            retrieval_done: {"type": "retrieval_done", "sources": [...]}
+            chunk: {"type": "chunk", "content": "partial text..."}
+            done: {"type": "done", "full_content": "complete answer"}
+            error: {"type": "error", "detail": "..."}
+        """
+        try:
+            retrieval = self._retrieve(
+                question=question,
+                top_k=top_k,
+                doc_ids=doc_ids,
+                chat_history=chat_history,
+                use_hybrid=use_hybrid,
+                hybrid_alpha=hybrid_alpha,
+                use_reranking=use_reranking,
+                min_score=min_score,
+                use_query_expansion=use_query_expansion,
+                query_expansion_variants=query_expansion_variants,
+                use_rrf=use_rrf,
+                rerank_blending=rerank_blending,
+                use_query_decomposition=use_query_decomposition,
+                use_adaptive_alpha=use_adaptive_alpha,
+            )
+
+            # Handle early returns (no streaming needed)
+            if retrieval.get("early_return"):
+                er = retrieval["early_return"]
+                yield {"type": "retrieval_done", "sources": er.get("sources", [])}
+                yield {"type": "chunk", "content": er["answer"]}
+                yield {"type": "done", "full_content": er["answer"]}
+                return
+
+            # Handle decomposed queries (sub-questions answered non-streaming, synthesis non-streaming)
+            if retrieval.get("decomposed_result"):
+                dr = retrieval["decomposed_result"]
+                yield {"type": "retrieval_done", "sources": dr["sources"]}
+                answer = self._synthesize_answers(question, dr["sub_results"])
+                yield {"type": "chunk", "content": answer}
+                yield {"type": "done", "full_content": answer}
+                return
+
+            # Normal path: emit sources, then stream LLM generation
+            yield {"type": "retrieval_done", "sources": retrieval["sources"]}
+
+            full_content = []
+            for text_chunk in self._generate_answer_stream(retrieval["prompt"]):
+                full_content.append(text_chunk)
+                yield {"type": "chunk", "content": text_chunk}
+
+            yield {"type": "done", "full_content": "".join(full_content)}
+
+        except Exception as e:
+            logger.exception("Streaming answer failed")
+            yield {"type": "error", "detail": str(e)}
 
     def _deduplicate_chunks(
         self, chunks: List[Dict], threshold: float = 0.85

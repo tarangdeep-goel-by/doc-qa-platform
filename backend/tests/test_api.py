@@ -7,11 +7,24 @@ Run with:
     pytest tests/test_api.py::TestDocuments -v  # specific test class
 """
 
+import json
 import pytest
 import requests
 import os
 import time
 from pathlib import Path
+
+
+def parse_sse_events(response) -> list[dict]:
+    """Parse SSE events from a streaming response."""
+    events = []
+    for line in response.iter_lines(decode_unicode=True):
+        if line and line.startswith("data: "):
+            try:
+                events.append(json.loads(line[6:]))
+            except json.JSONDecodeError:
+                pass
+    return events
 
 # Configuration
 BASE_URL = os.getenv("TEST_BASE_URL", "http://localhost:8000")
@@ -272,47 +285,52 @@ class TestChatQueries:
         requests.delete(f"{BASE_URL}/api/admin/documents/{doc_id}")
 
     def test_ask_in_chat(self, test_chat_with_doc):
-        """Test POST /api/chats/{chat_id}/ask sends question and gets answer."""
+        """Test POST /api/chats/{chat_id}/ask sends SSE stream with answer."""
         chat_id = test_chat_with_doc["chat_id"]
 
         payload = {
             "question": "What is this document about?",
             "top_k": 5
         }
-        response = requests.post(f"{BASE_URL}/api/chats/{chat_id}/ask", json=payload)
+        response = requests.post(f"{BASE_URL}/api/chats/{chat_id}/ask", json=payload, stream=True)
         assert response.status_code == 200
 
-        data = response.json()
-        assert "message" in data
+        events = parse_sse_events(response)
+        event_types = [e["type"] for e in events]
 
-        message = data["message"]
-        assert "id" in message
-        assert message["chat_id"] == chat_id
-        assert message["role"] == "assistant"
-        assert "content" in message
-        assert len(message["content"]) > 0
-        assert "timestamp" in message
+        # Must have retrieval_done, at least one chunk, and done
+        assert "retrieval_done" in event_types
+        assert "chunk" in event_types
+        assert "done" in event_types
 
-        # Check sources
-        if message.get("sources"):
-            assert isinstance(message["sources"], list)
-            for source in message["sources"]:
+        # Check sources in retrieval_done
+        retrieval_event = next(e for e in events if e["type"] == "retrieval_done")
+        if retrieval_event.get("sources"):
+            for source in retrieval_event["sources"]:
                 assert "doc_id" in source
                 assert "doc_title" in source
                 assert "score" in source
-                # Page number should be present for new uploads
-                assert "page_num" in source
+
+        # Check done event has message_id
+        done_event = next(e for e in events if e["type"] == "done")
+        assert "message_id" in done_event
+
+        # Verify content was streamed
+        chunks = [e["content"] for e in events if e["type"] == "chunk"]
+        full_content = "".join(chunks)
+        assert len(full_content) > 0
 
     def test_chat_message_persistence(self, test_chat_with_doc):
         """Test that messages persist in chat."""
         chat_id = test_chat_with_doc["chat_id"]
 
-        # Ask a question
+        # Ask a question (must consume full SSE stream before messages are saved)
         payload = {"question": "Test question", "top_k": 5}
-        requests.post(f"{BASE_URL}/api/chats/{chat_id}/ask", json=payload)
+        response = requests.post(f"{BASE_URL}/api/chats/{chat_id}/ask", json=payload, stream=True)
+        events = parse_sse_events(response)
 
-        # Wait a bit for processing
-        time.sleep(0.5)
+        # Ensure stream completed
+        assert any(e["type"] == "done" for e in events)
 
         # Get chat and verify messages
         response = requests.get(f"{BASE_URL}/api/chats/{chat_id}")
@@ -570,17 +588,16 @@ class TestErrorCases:
         response = requests.post(f"{BASE_URL}/api/chats/nonexistent-id/ask", json=payload)
         assert response.status_code == 404
 
-    def test_upload_non_pdf_file(self):
-        """Test uploading non-PDF file returns 400."""
-        # Create a simple text file
+    def test_upload_unsupported_file(self):
+        """Test uploading unsupported file type returns 400."""
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("This is not a PDF")
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.xyz', delete=False) as f:
+            f.write("This is an unsupported format")
             temp_path = f.name
 
         try:
             with open(temp_path, 'rb') as f:
-                files = {'file': ('test.txt', f, 'text/plain')}
+                files = {'file': ('test.xyz', f, 'application/octet-stream')}
                 response = requests.post(f"{BASE_URL}/api/admin/upload", files=files)
 
             assert response.status_code == 400

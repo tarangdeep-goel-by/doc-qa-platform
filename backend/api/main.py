@@ -13,6 +13,8 @@ from src.qa_engine import QAEngine
 from src.models import DocumentStore
 from src.chat_manager import ChatManager
 from src.rag_config import RAGConfig
+from src.interaction_logger import InteractionLogger
+from src.feedback_store import FeedbackStore
 
 # Load environment variables
 load_dotenv()
@@ -89,6 +91,8 @@ async def lifespan(app: FastAPI):
     app.state.chunk_overlap = chunk_overlap
     app.state.use_semantic_chunking = os.environ["USE_SEMANTIC_CHUNKING"].lower() == "true"
     app.state.rag_config = RAGConfig.from_env()
+    app.state.interaction_logger = InteractionLogger(data_dir=data_dir)
+    app.state.feedback_store = FeedbackStore(data_dir=data_dir)
 
     print("Application initialized successfully!")
 

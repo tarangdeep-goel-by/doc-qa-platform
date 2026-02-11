@@ -1,9 +1,10 @@
 import { useRef } from 'react'
-import { User, Bot } from 'lucide-react'
+import { User, Bot, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ChatMessage } from '../../types'
 import { SourcesBadge, type SourcesBadgeRef } from '../SourcesBadge'
 import { MarkdownContent } from '../markdown/MarkdownContent'
+import { useAppStore } from '../../store/appStore'
 
 interface Props {
   message: ChatMessage
@@ -11,6 +12,7 @@ interface Props {
 
 export function ChatMessageItem({ message }: Props) {
   const isUser = message.role === 'user'
+  const submitFeedback = useAppStore(s => s.submitFeedback)
   // Backend sends UTC timestamps without Z suffix — append Z so JS parses as UTC
   const utcTimestamp = message.timestamp.endsWith('Z') ? message.timestamp : message.timestamp + 'Z'
   const timeAgo = formatDistanceToNow(new Date(utcTimestamp), { addSuffix: true })
@@ -21,6 +23,16 @@ export function ChatMessageItem({ message }: Props) {
   const handleCitationClick = (index: number) => {
     // Call scrollToSource on SourcesBadge (0-indexed)
     sourcesBadgeRef.current?.scrollToSource(index - 1)
+  }
+
+  // Don't show feedback for streaming placeholder messages
+  const isStreaming = message.id.startsWith('stream-')
+  const showFeedback = !isUser && !isStreaming && message.content.length > 0
+
+  const handleFeedback = (fb: 'up' | 'down') => {
+    // Toggle off if already selected
+    if (message.feedback === fb) return
+    submitFeedback(message.chat_id, message.id, fb)
   }
 
   return (
@@ -59,10 +71,38 @@ export function ChatMessageItem({ message }: Props) {
           <SourcesBadge ref={sourcesBadgeRef} sources={message.sources} />
         )}
 
-        {/* Timestamp */}
-        <p className="font-sans text-fluid-xs text-ink/40 mt-2">
-          {timeAgo}
-        </p>
+        {/* Feedback + Timestamp row */}
+        <div className={`flex items-center gap-3 mt-2 ${isUser ? 'justify-end' : ''}`}>
+          {showFeedback && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleFeedback('up')}
+                className={`p-1 rounded transition-colors ${
+                  message.feedback === 'up'
+                    ? 'text-emerald-600'
+                    : 'text-ink/30 hover:text-ink/60'
+                }`}
+                title="Helpful"
+              >
+                <ThumbsUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => handleFeedback('down')}
+                className={`p-1 rounded transition-colors ${
+                  message.feedback === 'down'
+                    ? 'text-red-500'
+                    : 'text-ink/30 hover:text-ink/60'
+                }`}
+                title="Not helpful"
+              >
+                <ThumbsDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          <p className="font-sans text-fluid-xs text-ink/40">
+            {timeAgo}
+          </p>
+        </div>
       </div>
 
       {/* Avatar for user */}

@@ -57,4 +57,5 @@ export interface ChatMessage {
   timestamp: string
   sources?: Source[]
   filtered_docs?: string[]
+  feedback?: 'up' | 'down'
 }
