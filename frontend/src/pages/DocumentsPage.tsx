@@ -22,10 +22,10 @@ export function DocumentsPage() {
 
   const handleDelete = async (doc: Document) => {
     const chatWarning = doc.chat_count > 0
-      ? `\n\nWarning: This document is used in ${doc.chat_count} chat(s).`
+      ? `\n\nWarning: This document is used in ${doc.chat_count} chat${doc.chat_count === 1 ? '' : 's'}.`
       : ''
 
-    if (!confirm(`Delete "${doc.title}"?${chatWarning}\n\nThis will remove the document and all its chunks.`)) {
+    if (!confirm(`Delete "${doc.title}"?${chatWarning}\n\nThis permanently removes the document.`)) {
       return
     }
 
@@ -48,10 +48,10 @@ export function DocumentsPage() {
       .reduce((sum, doc) => sum + doc.chat_count, 0)
 
     const chatWarning = totalChats > 0
-      ? `\n\nWarning: ${totalChats} chat(s) will be affected.`
+      ? `\n\nWarning: ${totalChats} chat${totalChats === 1 ? '' : 's'} will be affected.`
       : ''
 
-    if (!confirm(`Delete ${selectedDocs.size} document(s)?${chatWarning}\n\nThis action cannot be undone.`)) {
+    if (!confirm(`Delete ${selectedDocs.size} document${selectedDocs.size === 1 ? '' : 's'}?${chatWarning}\n\nThis action cannot be undone.`)) {
       return
     }
 
@@ -60,11 +60,11 @@ export function DocumentsPage() {
       const response = await api.bulkDeleteDocuments(Array.from(selectedDocs))
 
       if (response.successful > 0) {
-        toast.success(`${response.successful} document(s) deleted successfully`)
+        toast.success(`${response.successful} document${response.successful === 1 ? '' : 's'} deleted`)
       }
 
       if (response.failed > 0) {
-        toast.error(`${response.failed} document(s) failed to delete`)
+        toast.error(`${response.failed} document${response.failed === 1 ? '' : 's'} failed to delete`)
       }
 
       // Reload documents
@@ -169,7 +169,7 @@ export function DocumentsPage() {
               No documents yet
             </h2>
             <p className="font-sans text-fluid-sm text-ink/60 text-center max-w-md mb-fluid-lg">
-              Upload your first document to start asking questions. Supported formats: PDF
+              Upload your first document to start asking questions. Supported: PDF, DOCX, HTML, TXT
             </p>
             <button
               onClick={() => setShowUploadModal(true)}
@@ -218,7 +218,7 @@ export function DocumentsPage() {
                       <div className="flex items-center gap-fluid-md text-fluid-sm text-ink/60 mb-fluid-xs">
                         <span>{formatFileSize(doc.file_size_mb)}</span>
                         <span>•</span>
-                        <span>{doc.chunk_count} chunks</span>
+                        <span>{doc.chunk_count} sections</span>
                         <span>•</span>
                         <span>{uploadDate}</span>
                       </div>

@@ -166,7 +166,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                           {doc.title}
                         </p>
                         <p className="font-sans text-fluid-xs text-ink/50">
-                          {doc.chunk_count} chunks • {doc.file_size_mb} MB
+                          {doc.chunk_count} sections • {doc.file_size_mb} MB
                         </p>
                       </div>
                     </label>

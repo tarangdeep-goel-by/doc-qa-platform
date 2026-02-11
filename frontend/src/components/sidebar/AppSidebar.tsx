@@ -52,7 +52,7 @@ export function AppSidebar() {
   const handleBulkDelete = async () => {
     if (selectedChats.size === 0) return
 
-    if (!confirm(`Delete ${selectedChats.size} chat(s)?\n\nThis action cannot be undone.`)) {
+    if (!confirm(`Delete ${selectedChats.size} chat${selectedChats.size === 1 ? '' : 's'}?\n\nThis action cannot be undone.`)) {
       return
     }
 
@@ -61,11 +61,11 @@ export function AppSidebar() {
       const response = await api.bulkDeleteChats(Array.from(selectedChats))
 
       if (response.successful > 0) {
-        toast.success(`${response.successful} chat(s) deleted successfully`)
+        toast.success(`${response.successful} chat${response.successful === 1 ? '' : 's'} deleted`)
       }
 
       if (response.failed > 0) {
-        toast.error(`${response.failed} chat(s) failed to delete`)
+        toast.error(`${response.failed} chat${response.failed === 1 ? '' : 's'} failed to delete`)
       }
 
       // Reload chats
@@ -177,7 +177,7 @@ export function AppSidebar() {
         {/* Footer */}
         <div className="p-fluid-md border-t border-ink/10">
           <p className="font-sans text-fluid-xs text-ink/40 text-center">
-            Powered by RAG
+            Powered by AI
           </p>
         </div>
       </aside>
