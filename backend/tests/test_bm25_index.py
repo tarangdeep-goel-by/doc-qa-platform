@@ -194,18 +194,6 @@ class TestBM25Index:
         assert loaded is False
         assert bm25_index.index is None
 
-    def test_clear_cache(self, bm25_index, sample_chunks):
-        """Test clearing BM25 cache."""
-        # Build and save
-        bm25_index.build_index(sample_chunks)
-
-        # Clear cache
-        bm25_index.clear_cache()
-
-        # Cache file should not exist
-        cache_file = os.path.join(bm25_index.cache_dir, "bm25_index.pkl")
-        assert not os.path.exists(cache_file)
-
     def test_case_insensitivity(self, bm25_index, sample_chunks):
         """Test that search is case-insensitive."""
         bm25_index.build_index(sample_chunks)

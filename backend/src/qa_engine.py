@@ -24,21 +24,8 @@ class QAEngine:
         reranker_model: str,
         fast_model_name: str = None
     ):
-        """
-        Initialize QA engine.
-
-        Args:
-            embedder: Embedder instance
-            vector_store: VectorStore instance
-            gemini_api_key: Google Gemini API key
-            model_name: Gemini model name (quality tier, kept for future use)
-            use_reranker: Whether to initialize reranker (slower startup, better quality)
-            reranker_model: Cross-encoder model name for reranking
-            fast_model_name: Fast Gemini model for all LLM calls (default: model_name)
-        """
         self.embedder = embedder
         self.vector_store = vector_store
-        self.model_name = model_name
         self.fast_model_name = fast_model_name or model_name
 
         # Create Gemini client (new SDK)
@@ -47,31 +34,6 @@ class QAEngine:
         # Initialize reranker if enabled
         self.reranker = Reranker(model_name=reranker_model) if use_reranker else None
         self.use_reranking = use_reranker
-
-    def _decompose_query(self, question: str) -> List[str]:
-        """Break a complex question into 2-4 simpler sub-questions."""
-        try:
-            prompt = (
-                "Break this complex question into 2-4 simpler sub-questions.\n"
-                "Each sub-question should be independently answerable from a document.\n"
-                "Keep sub-questions concise and specific.\n\n"
-                f"Question: {question}\n\n"
-                "Return ONLY the sub-questions, one per line, no numbering or bullets."
-            )
-            response = self.client.models.generate_content(
-                model=self.fast_model_name,
-                contents=prompt,
-                config={"temperature": 0.2, "maxOutputTokens": 256}
-            )
-            subs = [
-                line.strip().lstrip("0123456789.-) ")
-                for line in response.text.strip().split("\n")
-                if line.strip() and len(line.strip()) > 10
-            ]
-            return subs[:4] if subs else [question]
-        except Exception as e:
-            logger.warning(f"Query decomposition failed: {e}")
-            return [question]
 
     def _classify_and_expand(self, question: str, num_variants: int = 2) -> Dict[str, Any]:
         """Classify question complexity and generate expansion variants in a single Gemini call.
@@ -988,14 +950,3 @@ Answer:"""
         ))
         return response.text.strip()
 
-    def check_gemini_connection(self) -> bool:
-        """Check if Gemini API is accessible."""
-        try:
-            # Try a simple generation
-            response = self.client.models.generate_content(
-                model=self.fast_model_name,
-                contents="Test"
-            )
-            return True
-        except Exception:
-            return False

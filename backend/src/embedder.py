@@ -1,7 +1,6 @@
 """Embedding utilities supporting sentence-transformers (local) and Gemini API."""
 
 import logging
-import os
 from typing import List
 import numpy as np
 

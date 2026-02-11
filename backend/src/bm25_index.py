@@ -175,9 +175,3 @@ class BM25Index:
             logger.warning(f"Failed to load BM25 cache: {e}")
             return False
 
-    def clear_cache(self):
-        """Clear BM25 index cache from disk."""
-        cache_file = os.path.join(self.cache_dir, "bm25_index.pkl")
-        if os.path.exists(cache_file):
-            os.remove(cache_file)
-            logger.info(f"Cleared BM25 cache: {cache_file}")
