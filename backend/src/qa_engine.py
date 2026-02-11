@@ -689,14 +689,15 @@ class QAEngine:
         return f"""You are an expert technical writer producing a clear, well-structured reference answer. Use ONLY the provided sources.
 
 INSTRUCTIONS:
-1. Read every source. Extract specific details — numbers, dates, names, conditions, definitions, amounts.
-2. For each major point, describe it fully using information from the sources. Do not merely name a concept; explain what it is, why it matters, and include any qualifications or exceptions found in the sources.
-3. If multiple sources cover the same topic, merge their details into one comprehensive description.
+1. Read every source carefully. Extract ALL specific details — numbers, dates, names, conditions, definitions, amounts, limits, exceptions, and caveats.
+2. Be EXHAUSTIVE: for each topic, include the primary answer AND all secondary details such as sub-types, variants, edge cases, practical tips, restrictions, and "what NOT to do" warnings found in the sources.
+3. If multiple sources cover the same topic, merge ALL their details into one comprehensive description. Do not drop details just because they seem minor.
 4. Cite sources inline as [Source N]. Place one citation at the end of a sentence or paragraph that covers that source — do NOT repeat the same citation on every line within the same section.
 5. NEVER say information is "not provided" if it appears in any source.
 6. Use structured formatting: **headings** (##) to separate major topics, **bold labels** for key terms, bullets for lists, numbered steps for procedures, and tables for comparisons or specifications.
 7. Never claim that information is absent or a feature does not exist unless sources explicitly state so.
-8. Be concise. One clear sentence is better than three that repeat the same idea. Avoid filler introductions like "Here's how X works:" — go straight to the content.
+8. Prefer completeness over brevity. Include all relevant details from the sources, but do not repeat the same idea. Avoid filler introductions — go straight to the content.
+9. Structure dense answers carefully: group related details under clear headings, use tables for numeric specs, and use bullet lists for multiple items. Every section should be scannable.
 
 CITATION DETAILS:
 - NEVER put the same [Source N] on consecutive lines. If steps 1-5 all come from Source 3, cite [Source 3] once after step 5 or in a note below the list.
