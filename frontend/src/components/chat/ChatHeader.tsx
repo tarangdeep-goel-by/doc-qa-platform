@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { FileText, X } from 'lucide-react'
 import type { Chat } from '../../types'
 import { useAppStore } from '../../store/appStore'
 
@@ -7,10 +7,11 @@ interface Props {
 }
 
 export function ChatHeader({ chat }: Props) {
-  const { documents } = useAppStore()
+  const { documents, removeChatDocument } = useAppStore()
 
   // Get selected document titles
   const selectedDocs = documents.filter(d => chat.doc_ids.includes(d.doc_id))
+  const canRemove = selectedDocs.length > 1
 
   return (
     <header className="border-b border-ink/10 bg-cream/80 backdrop-blur-sm">
@@ -28,10 +29,19 @@ export function ChatHeader({ chat }: Props) {
             </span>
             <div className="flex items-center gap-2 flex-wrap">
               {selectedDocs.map((doc, idx) => (
-                <span key={doc.doc_id}>
+                <span key={doc.doc_id} className="inline-flex items-center">
                   <span className="font-sans text-fluid-sm text-burgundy">
                     {doc.title}
                   </span>
+                  {canRemove && (
+                    <button
+                      onClick={() => removeChatDocument(chat.id, doc.doc_id)}
+                      className="ml-1 p-0.5 rounded hover:bg-ink/10 text-ink/40 hover:text-ink/70 transition-colors"
+                      title={`Remove ${doc.title}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                   {idx < selectedDocs.length - 1 && (
                     <span className="text-ink/40 mx-1">•</span>
                   )}

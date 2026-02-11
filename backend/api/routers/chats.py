@@ -29,6 +29,7 @@ from api.schemas import (
     FeedbackResponse,
 )
 from src.models import ChatMessage
+from src.doc_router import route_query
 
 router = APIRouter()
 
@@ -45,7 +46,8 @@ async def create_chat(request: Request, body: CreateChatRequest):
     # Create chat
     chat = chat_manager.create_chat(
         name=body.name,
-        doc_ids=body.doc_ids
+        doc_ids=body.doc_ids,
+        auto_route=body.auto_route
     )
 
     return ChatResponse(
@@ -54,7 +56,8 @@ async def create_chat(request: Request, body: CreateChatRequest):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
 
@@ -72,7 +75,8 @@ async def list_chats(request: Request):
             doc_ids=chat.doc_ids,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
-            message_count=chat.message_count
+            message_count=chat.message_count,
+            auto_route=chat.auto_route
         )
         for chat in chats
     ]
@@ -111,7 +115,8 @@ async def get_chat(request: Request, chat_id: str):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
     message_responses = [
@@ -154,7 +159,8 @@ async def rename_chat(request: Request, chat_id: str, body: RenameChatRequest):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
 
@@ -235,6 +241,32 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
     )
 
 
+@router.delete("/{chat_id}/documents/{doc_id}", response_model=ChatResponse)
+async def remove_chat_document(request: Request, chat_id: str, doc_id: str):
+    """Remove a document from a chat's doc_ids."""
+    chat_manager = request.app.state.chat_manager
+
+    chat, _ = chat_manager.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if doc_id not in chat.doc_ids:
+        raise HTTPException(status_code=404, detail="Document not in this chat")
+
+    chat.doc_ids = [d for d in chat.doc_ids if d != doc_id]
+    chat_manager.save_chat(chat)
+
+    return ChatResponse(
+        id=chat.id,
+        name=chat.name,
+        doc_ids=chat.doc_ids,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
+    )
+
+
 @router.post("/{chat_id}/ask")
 async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     """
@@ -255,6 +287,16 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
+    # Auto-route: on first question, detect relevant docs via BM25
+    routed_doc_ids = None
+    if chat.auto_route and not chat.doc_ids and not messages:
+        vector_store = request.app.state.vector_store
+        routed_doc_ids = route_query(body.question, vector_store.bm25_index)
+        if routed_doc_ids:
+            chat.doc_ids = routed_doc_ids
+        chat.auto_route = False
+        chat_manager.save_chat(chat)
+
     # Filter to only existing documents; empty doc_ids means "search all"
     if chat.doc_ids:
         available_doc_ids = [
@@ -273,6 +315,18 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     def event_generator():
         start_time = time.time()
         try:
+            # Emit docs_routed event if auto-routing happened
+            if routed_doc_ids is not None:
+                doc_names = []
+                for did in (routed_doc_ids or []):
+                    doc = document_store.get_document(did)
+                    doc_names.append(doc.title if doc else did)
+                yield _sse_event({
+                    "type": "docs_routed",
+                    "doc_ids": routed_doc_ids or [],
+                    "doc_names": doc_names,
+                })
+
             # Save user message
             user_message = ChatMessage(
                 id=str(uuid.uuid4()),
@@ -340,6 +394,16 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
                     )
                     chat_manager.add_message(chat_id, assistant_message)
                     yield _sse_event({"type": "done", "message_id": assistant_message.id})
+
+                    # Update chat history for follow-ups (truncate answer to 300 chars)
+                    try:
+                        answer_summary = event["full_content"][:300]
+                        history = list(chat.gemini_chat_history or [])
+                        history.append({"question": body.question, "answer": answer_summary})
+                        # Keep last 5 turns
+                        chat_manager.update_gemini_history(chat_id, history[-5:])
+                    except Exception:
+                        logger.exception("Failed to update chat history")
 
                     # Log interaction
                     try:

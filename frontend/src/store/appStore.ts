@@ -22,12 +22,13 @@ interface AppState {
   loadChats: () => Promise<void>
   loadDocuments: () => Promise<void>
   setActiveChat: (chatId: string) => Promise<void>
-  createChat: (name: string, docIds: string[]) => Promise<Chat | null>
+  createChat: (name: string, docIds: string[], autoRoute?: boolean) => Promise<Chat | null>
   deleteChat: (chatId: string) => Promise<void>
   renameChat: (chatId: string, name: string) => Promise<void>
   sendMessage: (question: string) => Promise<void>
   uploadDocument: (file: File) => Promise<void>
   deleteDocument: (docId: string) => Promise<void>
+  removeChatDocument: (chatId: string, docId: string) => Promise<void>
   submitFeedback: (chatId: string, messageId: string, feedback: 'up' | 'down') => Promise<void>
   clearError: () => void
 }
@@ -84,10 +85,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Create new chat
-  createChat: async (name: string, docIds: string[]) => {
+  createChat: async (name: string, docIds: string[], autoRoute: boolean = false) => {
     try {
       set({ loading: true, error: null })
-      const newChat = await api.createChat(name, docIds)
+      const newChat = await api.createChat(name, docIds, autoRoute)
 
       // Add to chat list
       set(state => ({
@@ -205,6 +206,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       await api.askInChatStream(activeChat.id, question, (event) => {
         switch (event.type) {
+          case 'docs_routed':
+            // Auto-routing resolved — update active chat with routed doc_ids
+            set(state => {
+              const updated = {
+                ...state.activeChat!,
+                doc_ids: event.doc_ids,
+                auto_route: false,
+              }
+              return {
+                activeChat: updated,
+                chats: state.chats.map(c => c.id === updated.id ? { ...c, doc_ids: event.doc_ids, auto_route: false } : c),
+              }
+            })
+            break
+
           case 'retrieval_done':
             // Attach sources to the assistant placeholder
             set(state => ({
@@ -334,6 +350,34 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete document'
       throw new Error(message)
+    }
+  },
+
+  // Remove document from chat
+  removeChatDocument: async (chatId: string, docId: string) => {
+    // Save previous state for rollback
+    const prevActiveChat = get().activeChat
+    const prevChats = get().chats
+
+    // Optimistic update
+    set(state => {
+      const updatedDocIds = (state.activeChat?.doc_ids || []).filter(id => id !== docId)
+      return {
+        activeChat: state.activeChat?.id === chatId
+          ? { ...state.activeChat, doc_ids: updatedDocIds }
+          : state.activeChat,
+        chats: state.chats.map(c =>
+          c.id === chatId ? { ...c, doc_ids: c.doc_ids.filter(id => id !== docId) } : c
+        ),
+      }
+    })
+
+    try {
+      await api.removeChatDocument(chatId, docId)
+    } catch (error) {
+      // Revert on failure
+      set({ activeChat: prevActiveChat, chats: prevChats })
+      toast.error('Failed to remove document from chat')
     }
   },
 

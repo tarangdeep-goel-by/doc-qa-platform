@@ -35,7 +35,7 @@ export async function askQuestion(
 
 // Chat API functions
 
-export async function createChat(name: string, docIds: string[]): Promise<Chat> {
+export async function createChat(name: string, docIds: string[], autoRoute: boolean = false): Promise<Chat> {
   const response = await fetch(`${API_BASE}/chats`, {
     method: 'POST',
     headers: {
@@ -44,6 +44,7 @@ export async function createChat(name: string, docIds: string[]): Promise<Chat> 
     body: JSON.stringify({
       name,
       doc_ids: docIds,
+      auto_route: autoRoute,
     }),
   })
 
@@ -126,7 +127,20 @@ export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChat
   return response.json()
 }
 
+export async function removeChatDocument(chatId: string, docId: string): Promise<Chat> {
+  const response = await fetch(`${API_BASE}/chats/${chatId}/documents/${docId}`, {
+    method: 'DELETE',
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to remove document from chat')
+  }
+
+  return response.json()
+}
+
 export type StreamEvent =
+  | { type: 'docs_routed'; doc_ids: string[]; doc_names: string[] }
   | { type: 'retrieval_done'; sources: Source[] }
   | { type: 'chunk'; content: string }
   | { type: 'done'; message_id: string }
