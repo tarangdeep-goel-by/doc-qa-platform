@@ -73,9 +73,11 @@ export function ChatInterface() {
                 Start a conversation
               </h2>
               <p className="font-sans text-fluid-base text-ink/60">
-                {activeChat.doc_ids.length > 0
-                  ? `Ask questions about ${activeChat.doc_ids.length} selected document${activeChat.doc_ids.length === 1 ? '' : 's'}`
-                  : 'Ask questions about all available documents'
+                {activeChat.auto_route
+                  ? 'Ask a question and relevant documents will be automatically selected'
+                  : activeChat.doc_ids.length > 0
+                    ? `Ask questions about ${activeChat.doc_ids.length} selected document${activeChat.doc_ids.length === 1 ? '' : 's'}`
+                    : 'Ask questions about all available documents'
                 }
               </p>
             </div>

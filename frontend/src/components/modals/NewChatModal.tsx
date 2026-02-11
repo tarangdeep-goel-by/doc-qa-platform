@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 interface Props {
@@ -11,6 +11,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
   const { documents, createChat, uploadDocument, loadDocuments } = useAppStore()
   const [name, setName] = useState('')
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
+  const [autoRoute, setAutoRoute] = useState(true)
   const [loading, setLoading] = useState(false)
 
   // Inline upload state
@@ -25,7 +26,8 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
 
     setLoading(true)
     const chatName = name.trim() || 'New Chat'
-    const chat = await createChat(chatName, selectedDocs)
+    const useAutoRoute = selectedDocs.length === 0 && autoRoute && documents.length > 0
+    const chat = await createChat(chatName, selectedDocs, useAutoRoute)
     setLoading(false)
 
     if (chat) {
@@ -178,6 +180,20 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                   : `${selectedDocs.length} document${selectedDocs.length === 1 ? '' : 's'} selected`
                 }
               </p>
+
+              {/* Auto-route option — shown when no docs manually selected */}
+              {selectedDocs.length === 0 && documents.length > 0 && (
+                <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoRoute}
+                    onChange={(e) => setAutoRoute(e.target.checked)}
+                  />
+                  <span className="font-sans text-fluid-xs text-ink/70">
+                    Auto-detect relevant documents from your first question
+                  </span>
+                </label>
+              )}
             </div>
 
             {/* Upload document tile */}

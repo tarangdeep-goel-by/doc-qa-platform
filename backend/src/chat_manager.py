@@ -23,13 +23,14 @@ class ChatManager:
         self.chats_dir = self.base_dir / "chats"
         self.chats_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_chat(self, name: str, doc_ids: List[str]) -> Chat:
+    def create_chat(self, name: str, doc_ids: List[str], auto_route: bool = False) -> Chat:
         """
         Create a new chat session.
 
         Args:
             name: Chat name (or preview from first question)
             doc_ids: Document IDs associated with this chat
+            auto_route: Whether to auto-detect docs from first question
 
         Returns:
             Created Chat object
@@ -44,7 +45,8 @@ class ChatManager:
             created_at=now,
             updated_at=now,
             message_count=0,
-            gemini_chat_history=[]
+            gemini_chat_history=[],
+            auto_route=auto_route
         )
 
         # Create chat directory

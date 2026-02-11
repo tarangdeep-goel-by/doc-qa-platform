@@ -1,0 +1,187 @@
+{
+  "dataset_name": "Conversational Multi-Document Q&A",
+  "version": "1.0",
+  "description": "Multi-turn conversations testing chat history handling, pronoun resolution, follow-ups, and cross-document context. Each conversation builds on prior turns.",
+  "conversations": [
+    {
+      "id": "conv_1",
+      "doc_ids_hint": "atomic_habits",
+      "turns": [
+        {
+          "id": "conv_1_t1",
+          "question": "What are the 4 laws of behavior change described in Atomic Habits?",
+          "claude_answer": "The 4 laws of behavior change from Atomic Habits are: 1) Make it obvious (cue), 2) Make it attractive (craving), 3) Make it easy (response), 4) Make it satisfying (reward). Each law corresponds to a stage of the habit loop. To break a bad habit, you invert them: make it invisible, unattractive, difficult, and unsatisfying.",
+          "difficulty": "medium",
+          "category": "concept",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_1_t2",
+          "question": "Can you explain the first one in more detail?",
+          "claude_answer": "The first law, 'Make it obvious,' focuses on awareness and visibility of cues. James Clear recommends strategies like implementation intentions ('I will [BEHAVIOR] at [TIME] in [LOCATION]'), habit stacking (linking a new habit to an existing one), and designing your environment so cues for good habits are visible. The Habits Scorecard is a tool for becoming aware of your current habits by listing daily behaviors and marking them as positive, negative, or neutral.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        },
+        {
+          "id": "conv_1_t3",
+          "question": "What's the opposite approach for breaking bad habits using that same law?",
+          "claude_answer": "The inversion of the first law is 'Make it invisible.' To break a bad habit, you reduce exposure to the cue that triggers it. For example, if you want to stop checking your phone constantly, put it in another room. If you want to eat less junk food, don't keep it in visible places. The key insight is that self-control is a short-term strategy — redesigning your environment to eliminate cues is more effective long-term.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    },
+    {
+      "id": "conv_2",
+      "doc_ids_hint": "atomic_habits",
+      "turns": [
+        {
+          "id": "conv_2_t1",
+          "question": "What does James Clear say about identity-based habits?",
+          "claude_answer": "James Clear argues there are three levels of behavior change: outcomes (what you get), processes (what you do), and identity (what you believe). Most people focus on outcomes, but the most effective approach is identity-based — changing your beliefs about who you are. Instead of 'I want to run a marathon,' you say 'I am a runner.' Every action becomes a vote for the type of person you want to become.",
+          "difficulty": "medium",
+          "category": "concept",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_2_t2",
+          "question": "How does he suggest actually changing your identity?",
+          "claude_answer": "Clear suggests a two-step process for identity change: 1) Decide the type of person you want to be, and 2) Prove it to yourself with small wins. Each time you perform a habit, you cast a vote for your new identity. No single instance transforms your beliefs, but as the votes accumulate, the evidence builds and your self-image starts to shift. The focus is on becoming, not achieving.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        },
+        {
+          "id": "conv_2_t3",
+          "question": "Give me a practical example of that",
+          "claude_answer": "A practical example: instead of setting the goal 'I want to lose 20 pounds' (outcome-based), you adopt the identity 'I am a healthy person.' Then each decision becomes identity reinforcement — choosing a salad over fast food is a vote for being healthy. Going for a walk is another vote. Over time, these small actions compound and your self-image shifts from 'someone trying to lose weight' to 'a healthy person.' The behavior change follows naturally from the identity shift.",
+          "difficulty": "hard",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    },
+    {
+      "id": "conv_3",
+      "doc_ids_hint": "separation_agreement",
+      "turns": [
+        {
+          "id": "conv_3_t1",
+          "question": "Who are the parties in the separation agreement?",
+          "claude_answer": "The separation agreement is between HDFC Life Insurance Company Limited (the Company) and the employee. HDFC Life is an insurance company incorporated under the Companies Act, having its registered office in Mumbai, India.",
+          "difficulty": "easy",
+          "category": "factual",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_3_t2",
+          "question": "What compensation does the employee receive under it?",
+          "claude_answer": "Under the separation agreement, the employee receives: notice pay in lieu of the notice period, garden leave payment, and any pending salary/reimbursements. The specific amounts depend on the employee's compensation structure and notice period terms. The agreement also addresses the treatment of any outstanding loans, stock options, or other benefits.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        },
+        {
+          "id": "conv_3_t3",
+          "question": "Are there any non-compete or confidentiality obligations?",
+          "claude_answer": "Yes, the separation agreement includes confidentiality obligations. The employee must maintain the confidentiality of proprietary and trade secret information even after separation. The agreement typically includes clauses about non-solicitation of clients and employees, and restrictions on sharing company information with competitors or third parties.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    },
+    {
+      "id": "conv_4",
+      "doc_ids_hint": "fx5u_manual",
+      "turns": [
+        {
+          "id": "conv_4_t1",
+          "question": "What communication ports does the FX5U have?",
+          "claude_answer": "The FX5U CPU module has three built-in communication ports: 1) USB port (Mini-B type) for connection to programming software like GX Works3, 2) RS-422/485 port for serial communication including MODBUS RTU and connection to HMI/GOT panels, 3) Ethernet port (RJ45) supporting SLMP, MODBUS TCP, and FTP functionality for network communication and remote monitoring.",
+          "difficulty": "medium",
+          "category": "specifications",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_4_t2",
+          "question": "Which one should I use for connecting to a SCADA system?",
+          "claude_answer": "For connecting to a SCADA system, the Ethernet port (RJ45) is the recommended choice. It supports SLMP (Seamless Message Protocol) which is Mitsubishi's protocol for MC Protocol communication, as well as MODBUS TCP. Ethernet provides higher speed, longer cable distances, and the ability to connect multiple devices on the same network. The RS-485 port could also work via MODBUS RTU for simpler point-to-point SCADA connections.",
+          "difficulty": "hard",
+          "category": "follow_up",
+          "depends_on_context": true
+        },
+        {
+          "id": "conv_4_t3",
+          "question": "What safety precautions should I keep in mind when setting this up?",
+          "claude_answer": "Key safety precautions from the FX5U manual include: emergency stop circuits, protection circuits, and protective interlock circuits must be configured externally to the PLC (not inside the programmable controller). For communication specifically, ensure proper grounding, use shielded cables for RS-485 connections, and follow the manual's guidelines on cable routing to avoid electromagnetic interference. The manual emphasizes that backup or failsafe functions should be systematically provided outside the device.",
+          "difficulty": "hard",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    },
+    {
+      "id": "conv_5",
+      "doc_ids_hint": "cross_doc",
+      "turns": [
+        {
+          "id": "conv_5_t1",
+          "question": "What does Atomic Habits say about making habits easy?",
+          "claude_answer": "The third law of behavior change is 'Make it easy.' James Clear emphasizes reducing friction for good habits and increasing friction for bad ones. Key strategies include the Two-Minute Rule (scale any habit down to a two-minute version to get started), environment design (prepare your environment in advance), and reducing the number of steps between you and your good habits. The idea is that the most effective form of learning is practice, not planning.",
+          "difficulty": "medium",
+          "category": "concept",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_5_t2",
+          "question": "Interesting. Now switching topics — what are the termination conditions in the separation agreement?",
+          "claude_answer": "The separation agreement outlines conditions under which the employment relationship is terminated. This includes the effective date of separation, the notice period requirements, and circumstances under which the agreement can be invoked. The termination may be initiated by either party subject to the terms specified, including any garden leave provisions and the settlement of outstanding dues.",
+          "difficulty": "medium",
+          "category": "topic_switch",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_5_t3",
+          "question": "How does that compare to notice period requirements?",
+          "claude_answer": "The notice period is a specific component within the termination conditions. While termination conditions cover the broader circumstances and process for ending employment, the notice period specifically defines the required advance notice duration that either party must provide. The separation agreement may include notice pay in lieu of serving the full notice period, and garden leave where the employee remains on payroll but is not required to report to work during the notice period.",
+          "difficulty": "hard",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    },
+    {
+      "id": "conv_6",
+      "doc_ids_hint": "clarification",
+      "turns": [
+        {
+          "id": "conv_6_t1",
+          "question": "What are the different models available?",
+          "claude_answer": "The FX5U CPU module comes in multiple models. They are categorized by I/O count (32, 64, or 80 points), output type (relay MR or transistor MT), power supply (AC with /ES suffix or DC with /DS suffix), and transistor output polarity (sink or source, with source models having an extra S — /ESS or /DSS). This gives 18 total FX5U model variants.",
+          "difficulty": "easy",
+          "category": "factual",
+          "depends_on_context": false
+        },
+        {
+          "id": "conv_6_t2",
+          "question": "Sorry, I meant the habit models, not the PLC models",
+          "claude_answer": "No problem! In Atomic Habits, James Clear presents two models of behavior change: 1) Outcome-based habits — where you focus on what you want to achieve (e.g., 'I want to lose weight'), and 2) Identity-based habits — where you focus on who you want to become (e.g., 'I am a healthy person'). Clear argues that identity-based habits are far more effective because they address the root cause of behavior rather than just the symptoms.",
+          "difficulty": "medium",
+          "category": "clarification",
+          "depends_on_context": true
+        },
+        {
+          "id": "conv_6_t3",
+          "question": "Which one does the author recommend and why?",
+          "claude_answer": "James Clear strongly recommends identity-based habits. His reasoning is that outcomes are about what you get, processes are about what you do, but identity is about what you believe. When your behavior is aligned with your identity, you're not pursuing change — you're acting naturally as the person you believe you are. The key insight is that every action is a vote for the type of person you wish to become, and true behavior change is identity change.",
+          "difficulty": "medium",
+          "category": "follow_up",
+          "depends_on_context": true
+        }
+      ]
+    }
+  ]
+}

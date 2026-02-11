@@ -550,7 +550,7 @@ class QAEngine:
 
         context = self._format_context_with_sources(search_results)
         sources = self._format_sources(search_results)
-        prompt = self._build_prompt(question, context, query_type)
+        prompt = self._build_prompt(question, context, query_type, chat_history=chat_history)
 
         return {
             "early_return": None,
@@ -828,7 +828,7 @@ class QAEngine:
                 right -= 1
         return reordered
 
-    def _build_prompt(self, question: str, context: str, query_type: str = "general") -> str:
+    def _build_prompt(self, question: str, context: str, query_type: str = "general", chat_history: Optional[List[Dict]] = None) -> str:
         """
         Build prompt for Gemini with per-source engagement and few-shot example.
 
@@ -913,9 +913,20 @@ Both methods default to a 30-second timeout with 0 retries.
 Context from documents:
 {context}
 
-Question: {question}
+{self._format_chat_history(chat_history)}Question: {question}
 {suffix}
 Answer:"""
+
+    def _format_chat_history(self, chat_history: Optional[List[Dict]]) -> str:
+        """Format chat history as conversation context for the prompt."""
+        if not chat_history:
+            return ""
+        lines = ["Previous conversation:"]
+        for turn in chat_history[-5:]:  # last 5 turns
+            lines.append(f"User: {turn['question']}")
+            lines.append(f"Assistant: {turn['answer']}")
+        lines.append("")
+        return "\n".join(lines) + "\n"
 
     def _format_sources(self, search_results: List[Dict]) -> List[Dict]:
         """Build sources list for API response from search results."""

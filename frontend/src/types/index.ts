@@ -45,6 +45,7 @@ export interface Chat {
   created_at: string
   updated_at: string
   message_count: number
+  auto_route?: boolean
   missing_documents?: string[]
   available_documents?: { doc_id: string; title: string }[]
 }

@@ -120,6 +120,7 @@ class Chat:
     updated_at: str
     message_count: int = 0
     gemini_chat_history: List[Dict[str, Any]] = field(default_factory=list)
+    auto_route: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -127,8 +128,11 @@ class Chat:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Chat":
-        """Create from dictionary."""
-        return cls(**data)
+        """Create from dictionary, ignoring unknown fields."""
+        import inspect
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
 
 
 @dataclass
