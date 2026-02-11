@@ -311,32 +311,15 @@ class TestHybridSearch:
         query = "Python programming"
         query_vector = embedder.embed_text(query)
 
-        # Use RRF fusion
-        rrf_results = vector_store.hybrid_search(
+        results = vector_store.hybrid_search(
             query_vector=query_vector,
             query_text=query,
             top_k=3,
             alpha=0.5,
-            use_rrf=True
         )
 
-        # Use weighted fusion
-        weighted_results = vector_store.hybrid_search(
-            query_vector=query_vector,
-            query_text=query,
-            top_k=3,
-            alpha=0.5,
-            use_rrf=False
-        )
-
-        # Both should return results
-        assert len(rrf_results) > 0
-        assert len(weighted_results) > 0
-
-        # Results might differ in ranking
-        # At minimum, verify structure
-        assert all("score" in r for r in rrf_results)
-        assert all("score" in r for r in weighted_results)
+        assert len(results) > 0
+        assert all("score" in r for r in results)
 
     def test_rrf_position_bonuses(self, vector_store, embedder, sample_documents):
         """Test that RRF applies position bonuses correctly."""
@@ -371,26 +354,20 @@ class TestHybridSearch:
         scores = [r["score"] for r in fused]
         assert scores == sorted(scores, reverse=True)
 
-    def test_rrf_vs_weighted_ranking_quality(self, vector_store, embedder, sample_documents):
-        """Compare RRF vs weighted fusion for ranking quality."""
-        # Use a query with clear keyword match
+    def test_rrf_ranking_quality(self, vector_store, embedder, sample_documents):
+        """Test RRF ranking finds keyword matches."""
         query = "scikit-learn"
         query_vector = embedder.embed_text(query)
 
-        # RRF fusion
-        rrf_results = vector_store.hybrid_search(
+        results = vector_store.hybrid_search(
             query_vector=query_vector,
             query_text=query,
             top_k=3,
             alpha=0.5,
-            use_rrf=True
         )
 
-        # Both methods should find the relevant chunk
-        assert len(rrf_results) > 0
-
-        # Check if "scikit-learn" appears in top results
-        found_keyword = any("scikit-learn" in r["payload"]["text"] for r in rrf_results[:2])
+        assert len(results) > 0
+        found_keyword = any("scikit-learn" in r["payload"]["text"] for r in results[:2])
         assert found_keyword
 
     def test_rrf_deduplication(self, vector_store, embedder, sample_documents):
@@ -403,7 +380,6 @@ class TestHybridSearch:
             query_text=query,
             top_k=3,
             alpha=0.5,
-            use_rrf=True
         )
 
         # Check no duplicate chunk IDs

@@ -23,7 +23,6 @@ class RAGConfig:
     use_reranking: bool
     use_query_expansion: bool
     query_expansion_variants: int
-    use_rrf: bool
     rerank_blending: str
     use_query_decomposition: bool
     use_adaptive_alpha: bool
@@ -38,7 +37,6 @@ class RAGConfig:
             use_reranking=str_to_bool(os.environ["USE_RERANKING"]),
             use_query_expansion=str_to_bool(os.environ["USE_QUERY_EXPANSION"]),
             query_expansion_variants=int(os.environ["QUERY_EXPANSION_VARIANTS"]),
-            use_rrf=str_to_bool(os.environ["USE_RRF"]),
             rerank_blending=os.environ["RERANKER_BLENDING"],
             use_query_decomposition=str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"]),
             use_adaptive_alpha=str_to_bool(os.environ["USE_ADAPTIVE_ALPHA"]),

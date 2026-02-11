@@ -151,7 +151,6 @@ def run_benchmark_queries(
     use_reranking = os.environ["USE_RERANKING"].lower() == "true"
     use_query_expansion = os.environ["USE_QUERY_EXPANSION"].lower() == "true"
     query_expansion_variants = int(os.environ["QUERY_EXPANSION_VARIANTS"])
-    use_rrf = os.environ["USE_RRF"].lower() == "true"
     rerank_blending = os.environ["RERANKER_BLENDING"]
 
     results = []
@@ -171,7 +170,6 @@ def run_benchmark_queries(
                 use_reranking=use_reranking,
                 use_query_expansion=use_query_expansion,
                 query_expansion_variants=query_expansion_variants,
-                use_rrf=use_rrf,
                 rerank_blending=rerank_blending,
             )
 

@@ -434,7 +434,6 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids) -> dict:
     configs = [
         ("no_query_expansion", {"use_query_expansion": False}),
         ("no_reranking", {"use_reranking": False}),
-        ("no_rrf", {"use_rrf": False}),
         ("no_adaptive_alpha", {"use_adaptive_alpha": False}),
         ("vector_only", {"use_hybrid": False, "use_query_expansion": False, "use_adaptive_alpha": False}),
     ]

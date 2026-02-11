@@ -197,7 +197,6 @@ class QAEngine:
                 top_k=top_k,
                 doc_ids=doc_ids,
                 alpha=alpha,
-                use_rrf=True
             )
 
         search_results_by_alpha = {}
@@ -293,7 +292,6 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
@@ -353,7 +351,6 @@ class QAEngine:
                             min_score=min_score,
                             use_query_expansion=use_query_expansion,
                             query_expansion_variants=query_expansion_variants,
-                            use_rrf=use_rrf,
                             rerank_blending=rerank_blending,
                             use_query_decomposition=False,
                             use_adaptive_alpha=use_adaptive_alpha,
@@ -401,7 +398,7 @@ class QAEngine:
             query_embeddings = [self.embedder.embed_text(question)]
 
         # Pipeline config logging
-        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
+        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
 
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
@@ -429,7 +426,6 @@ class QAEngine:
                 top_k=retrieval_k,
                 doc_ids=doc_ids,
                 alpha=effective_alpha,
-                use_rrf=use_rrf
             )
             adaptive_results = None
         elif use_hybrid:
@@ -442,7 +438,6 @@ class QAEngine:
                     top_k=retrieval_k,
                     doc_ids=doc_ids,
                     alpha=effective_alpha,
-                    use_rrf=use_rrf
                 )
         else:
             search_results = self.vector_store.search(
@@ -536,33 +531,11 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
     ) -> Dict[str, Any]:
-        """
-        Answer a question using RAG pipeline (non-streaming).
-
-        Args:
-            question: User question
-            top_k: Number of chunks to retrieve
-            doc_ids: Optional list of document IDs to filter search
-            chat_history: Optional chat history for context (Gemini format)
-            use_hybrid: Whether to use hybrid search (vector + BM25) or pure vector
-            hybrid_alpha: Weight for hybrid search (0=all BM25, 1=all vector, 0.5=balanced)
-            use_reranking: Whether to rerank results with cross-encoder
-            min_score: Minimum confidence score threshold (0-1)
-            use_query_expansion: Whether to generate alternative query phrasings (improves recall)
-            query_expansion_variants: Number of alternative phrasings to generate
-            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
-            rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
-            use_query_decomposition: Whether to decompose complex questions into sub-questions
-            use_adaptive_alpha: Whether to try multiple alpha values and pick best (improves technical doc retrieval)
-
-        Returns:
-            Dictionary with answer and sources
-        """
+        """Answer a question using RAG pipeline (non-streaming)."""
         retrieval = self._retrieve(
             question=question,
             top_k=top_k,
@@ -574,7 +547,6 @@ class QAEngine:
             min_score=min_score,
             use_query_expansion=use_query_expansion,
             query_expansion_variants=query_expansion_variants,
-            use_rrf=use_rrf,
             rerank_blending=rerank_blending,
             use_query_decomposition=use_query_decomposition,
             use_adaptive_alpha=use_adaptive_alpha,
@@ -637,20 +609,11 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
     ):
-        """
-        Stream an answer using RAG pipeline. Yields SSE event dicts.
-
-        Event types:
-            retrieval_done: {"type": "retrieval_done", "sources": [...]}
-            chunk: {"type": "chunk", "content": "partial text..."}
-            done: {"type": "done", "full_content": "complete answer"}
-            error: {"type": "error", "detail": "..."}
-        """
+        """Stream an answer using RAG pipeline. Yields SSE event dicts."""
         try:
             retrieval = self._retrieve(
                 question=question,
@@ -663,7 +626,6 @@ class QAEngine:
                 min_score=min_score,
                 use_query_expansion=use_query_expansion,
                 query_expansion_variants=query_expansion_variants,
-                use_rrf=use_rrf,
                 rerank_blending=rerank_blending,
                 use_query_decomposition=use_query_decomposition,
                 use_adaptive_alpha=use_adaptive_alpha,
@@ -770,25 +732,6 @@ class QAEngine:
 
         logger.debug(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
         return kept
-
-    def _reorder_top_and_tail(self, chunks):
-        """Place best chunks at start and end, weakest in middle.
-
-        LLMs attend most to the beginning and end of context (lost-in-the-middle).
-        Interleave: best→position 1, 2nd best→position N, 3rd→position 2, etc.
-        """
-        if len(chunks) <= 2:
-            return chunks
-        reordered = [None] * len(chunks)
-        left, right = 0, len(chunks) - 1
-        for i, chunk in enumerate(chunks):
-            if i % 2 == 0:
-                reordered[left] = chunk
-                left += 1
-            else:
-                reordered[right] = chunk
-                right -= 1
-        return reordered
 
     def _build_prompt(self, question: str, context: str, query_type: str = "general", chat_history: Optional[List[Dict]] = None) -> str:
         """
@@ -913,9 +856,6 @@ Answer:"""
         Returns:
             Formatted context string with visual hierarchy
         """
-        # Reorder: best chunks at start and end (lost-in-the-middle mitigation)
-        search_results = self._reorder_top_and_tail(search_results)
-
         context_parts = []
         for i, result in enumerate(search_results, 1):
             payload = result["payload"]
