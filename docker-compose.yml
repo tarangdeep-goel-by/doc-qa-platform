@@ -41,6 +41,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/data:/app/data
+      - ./backend/evaluation/results:/app/evaluation/results
     environment:
       <<: *env-common
       API_HOST: 0.0.0.0

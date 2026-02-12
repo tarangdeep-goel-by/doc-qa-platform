@@ -2,7 +2,7 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
@@ -169,13 +169,11 @@ class QAEngine:
         query_embedding: List[float],
         doc_ids: Optional[List[str]] = None,
         top_k: int = 12
-    ) -> Tuple[List[Dict], float]:
+    ) -> float:
         """
-        Try multiple alpha values for hybrid search and pick the best based on reranker confidence.
-
-        This addresses the issue where technical documents (with exact terms like "FX5U")
-        need BM25-heavy search (low alpha), while narrative content works better with
-        vector-heavy search (high alpha).
+        Try multiple alpha values for hybrid search and pick the best based on
+        top retrieval score. Returns only the selected alpha — the caller handles
+        searching and reranking with that alpha.
 
         Args:
             question: User question
@@ -184,12 +182,11 @@ class QAEngine:
             top_k: Number of results to return
 
         Returns:
-            Tuple of (best_results, selected_alpha)
+            Selected alpha value
         """
         alphas = [0.2, 0.5, 0.8]  # BM25-heavy, balanced, vector-heavy
-        candidates = {}
 
-        # Phase 1: Run all hybrid searches in parallel (stateless HTTP + read-only BM25)
+        # Run all hybrid searches in parallel (stateless HTTP + read-only BM25)
         def _search_for_alpha(alpha):
             return alpha, self.vector_store.hybrid_search(
                 query_vector=query_embedding,
@@ -210,30 +207,22 @@ class QAEngine:
                 except Exception as e:
                     logger.warning(f"Alpha search failed: {e}")
 
-        # Phase 2: Rerank each sequentially (CrossEncoder model is not thread-safe)
-        for alpha, results in search_results_by_alpha.items():
-            if self.use_reranking and self.reranker:
-                reranked = self.reranker.rerank(question, results)
-                top_score = reranked[0]["rerank_score"] if reranked else -999
-                candidates[alpha] = (results, reranked, top_score)
-            else:
-                top_score = results[0]["score"] if results else -999
-                candidates[alpha] = (results, None, top_score)
+        if not search_results_by_alpha:
+            return 0.5
 
-        if not candidates:
-            return [], 0.5
-
-        # Pick alpha with highest reranker confidence
-        best_alpha = max(candidates, key=lambda a: candidates[a][2])
-        best_results, best_reranked, best_score = candidates[best_alpha]
+        # Pick alpha with highest top retrieval score (no reranking needed)
+        best_alpha = max(
+            search_results_by_alpha,
+            key=lambda a: search_results_by_alpha[a][0]["score"]
+        )
+        best_score = search_results_by_alpha[best_alpha][0]["score"]
 
         logger.info(
-            f"Alpha selection: tried {list(candidates.keys())}, "
+            f"Alpha selection: tried {list(search_results_by_alpha.keys())}, "
             f"picked alpha={best_alpha} (score={best_score:.3f})"
         )
 
-        # Return reranked results if available, otherwise original
-        return best_reranked or best_results, best_alpha
+        return best_alpha
 
     def _boost_by_structure(
         self, chunks: List[Dict], query_type: str, boost_factor: float = 0.15
@@ -403,11 +392,10 @@ class QAEngine:
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
 
-        # Phase A: Find best alpha via parallel search + sequential rerank
+        # Phase A: Find best alpha via parallel search
         alpha_selected = None
-        adaptive_results = None
-        if use_adaptive_alpha and use_hybrid and self.reranker:
-            adaptive_results, alpha_selected = self._search_with_alpha_selection(
+        if use_adaptive_alpha and use_hybrid:
+            alpha_selected = self._search_with_alpha_selection(
                 question=question,
                 query_embedding=query_embeddings[0],
                 doc_ids=doc_ids,
@@ -427,18 +415,14 @@ class QAEngine:
                 doc_ids=doc_ids,
                 alpha=effective_alpha,
             )
-            adaptive_results = None
         elif use_hybrid:
-            if adaptive_results is not None:
-                search_results = adaptive_results
-            else:
-                search_results = self.vector_store.hybrid_search(
-                    query_vector=query_embeddings[0],
-                    query_text=query_variants[0],
-                    top_k=retrieval_k,
-                    doc_ids=doc_ids,
-                    alpha=effective_alpha,
-                )
+            search_results = self.vector_store.hybrid_search(
+                query_vector=query_embeddings[0],
+                query_text=query_variants[0],
+                top_k=retrieval_k,
+                doc_ids=doc_ids,
+                alpha=effective_alpha,
+            )
         else:
             search_results = self.vector_store.search(
                 query_vector=query_embeddings[0],
@@ -449,8 +433,7 @@ class QAEngine:
         logger.info(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
 
         # Step 2.5: Rerank
-        already_reranked = adaptive_results is not None and search_results is adaptive_results
-        if use_reranking and self.reranker and search_results and not already_reranked:
+        if use_reranking and self.reranker and search_results:
             pre_rerank_count = len(search_results)
             search_results = self.reranker.rerank_with_position_blending(
                 query=question,
