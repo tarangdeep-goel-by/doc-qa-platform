@@ -39,7 +39,20 @@ class DocumentChunk:
     doc_title: str
     chunk_index: int
     page_num: Optional[int] = None
+    section_title: str = ""
+    enriched_text: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def build_enriched_text(self) -> str:
+        """Build enriched text with context header for embedding/BM25."""
+        parts = [f"Document: {self.doc_title}"]
+        if self.page_num:
+            parts.append(f"Page: {self.page_num}")
+        if self.section_title:
+            parts.append(f"Section: {self.section_title}")
+        header = "[" + " | ".join(parts) + "]\n"
+        self.enriched_text = header + self.text
+        return self.enriched_text
 
     def to_payload(self) -> Dict[str, Any]:
         """Convert to Qdrant payload format."""
@@ -49,6 +62,8 @@ class DocumentChunk:
             "doc_title": self.doc_title,
             "chunk_index": self.chunk_index,
             "page_num": self.page_num,
+            "section_title": self.section_title,
+            "enriched_text": self.enriched_text,
             "metadata": self.metadata
         }
 
@@ -120,6 +135,7 @@ class Chat:
     updated_at: str
     message_count: int = 0
     gemini_chat_history: List[Dict[str, Any]] = field(default_factory=list)
+    auto_route: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""

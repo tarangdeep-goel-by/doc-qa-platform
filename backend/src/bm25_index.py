@@ -66,7 +66,11 @@ class BM25Index:
         self.chunks = chunks
 
         # Tokenize with stop word removal and punctuation handling
-        tokenized_chunks = [tokenize(chunk["text"]) for chunk in chunks]
+        # Prefer enriched_text (includes context headers) over raw text
+        tokenized_chunks = [
+            tokenize(chunk.get("enriched_text") or chunk["text"])
+            for chunk in chunks
+        ]
 
         # Build BM25 index
         self.index = BM25Okapi(tokenized_chunks)

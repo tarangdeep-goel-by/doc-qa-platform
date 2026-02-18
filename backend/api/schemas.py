@@ -1,8 +1,7 @@
 """Pydantic schemas for API requests and responses."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from typing import Optional, List, Dict, Any, Literal
 
 
 # Upload Response
@@ -119,6 +118,7 @@ class CreateChatRequest(BaseModel):
     """Request to create a new chat."""
     name: str = Field(..., min_length=1, max_length=200)
     doc_ids: List[str] = Field(default_factory=list)
+    auto_route: bool = Field(default=False, description="Auto-detect relevant documents from first question")
 
 
 class ChatResponse(BaseModel):
@@ -129,6 +129,7 @@ class ChatResponse(BaseModel):
     created_at: str
     updated_at: str
     message_count: int
+    auto_route: bool = False
 
 
 class ChatListResponse(BaseModel):
@@ -194,3 +195,14 @@ class BulkDeleteChatsResponse(BaseModel):
     total: int
     successful: int
     failed: int
+
+
+# Feedback Schemas
+class FeedbackRequest(BaseModel):
+    """Request to submit feedback on an answer."""
+    feedback: Literal["up", "down"]
+
+
+class FeedbackResponse(BaseModel):
+    """Response after submitting feedback."""
+    success: bool

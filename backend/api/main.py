@@ -12,6 +12,9 @@ from src.vector_store import VectorStore
 from src.qa_engine import QAEngine
 from src.models import DocumentStore
 from src.chat_manager import ChatManager
+from src.rag_config import RAGConfig
+from src.interaction_logger import InteractionLogger
+from src.feedback_store import FeedbackStore
 
 # Load environment variables
 load_dotenv()
@@ -64,6 +67,8 @@ async def lifespan(app: FastAPI):
     print("Initializing chat manager...")
     chat_manager = ChatManager(base_dir=data_dir)
 
+    fast_model = os.environ.get("GEMINI_FAST_MODEL", gemini_model)
+
     print("Initializing QA engine...")
     qa_engine = QAEngine(
         embedder=embedder,
@@ -72,7 +77,7 @@ async def lifespan(app: FastAPI):
         model_name=gemini_model,
         use_reranker=use_reranking,
         reranker_model=reranker_model,
-        fast_model_name=os.environ.get("GEMINI_FAST_MODEL"),
+        fast_model_name=fast_model
     )
 
     # Store in app state
@@ -85,6 +90,9 @@ async def lifespan(app: FastAPI):
     app.state.chunk_size = chunk_size
     app.state.chunk_overlap = chunk_overlap
     app.state.use_semantic_chunking = os.environ["USE_SEMANTIC_CHUNKING"].lower() == "true"
+    app.state.rag_config = RAGConfig.from_env()
+    app.state.interaction_logger = InteractionLogger(data_dir=data_dir)
+    app.state.feedback_store = FeedbackStore(data_dir=data_dir)
 
     print("Application initialized successfully!")
 

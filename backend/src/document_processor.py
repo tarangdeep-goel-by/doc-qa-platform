@@ -180,23 +180,172 @@ class DocumentProcessor:
         return "\n".join([header_row, sep_row] + data_rows)
 
     @staticmethod
+    def extract_text_from_docx(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Extract text from DOCX file.
+
+        Groups paragraphs into pseudo-pages (~3000 chars each).
+
+        Returns:
+            Tuple of (page_data, metadata)
+        """
+        from docx import Document
+
+        try:
+            doc = Document(file_path)
+
+            # Extract metadata
+            metadata = {}
+            props = doc.core_properties
+            if props.author:
+                metadata['author'] = props.author
+            if props.title:
+                metadata['title'] = props.title
+            if props.subject:
+                metadata['subject'] = props.subject
+
+            # Group paragraphs into pseudo-pages (~3000 chars each)
+            page_data = []
+            current_text = []
+            current_len = 0
+            page_num = 1
+            page_char_limit = 3000
+
+            for para in doc.paragraphs:
+                text = para.text.strip()
+                if not text:
+                    continue
+                current_text.append(text)
+                current_len += len(text)
+                if current_len >= page_char_limit:
+                    page_data.append({
+                        'page_num': page_num,
+                        'text': '\n'.join(current_text)
+                    })
+                    page_num += 1
+                    current_text = []
+                    current_len = 0
+
+            # Flush remaining text
+            if current_text:
+                page_data.append({
+                    'page_num': page_num,
+                    'text': '\n'.join(current_text)
+                })
+
+            metadata['total_pages'] = len(page_data)
+
+            if not page_data:
+                raise ValueError("No text could be extracted from DOCX")
+
+            return page_data, metadata
+
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Failed to process DOCX: {str(e)}")
+
+    @staticmethod
+    def extract_text_from_html(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Extract text from HTML file.
+
+        Strips tags using BeautifulSoup, returns as single page.
+
+        Returns:
+            Tuple of (page_data, metadata)
+        """
+        from bs4 import BeautifulSoup
+
+        try:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+
+            soup = BeautifulSoup(content, 'html.parser')
+
+            metadata = {}
+            title_tag = soup.find('title')
+            if title_tag and title_tag.string:
+                metadata['title'] = title_tag.string.strip()
+
+            text = soup.get_text(separator='\n')
+            text = text.strip()
+
+            if not text:
+                raise ValueError("No text could be extracted from HTML")
+
+            page_data = [{'page_num': 1, 'text': text}]
+            metadata['total_pages'] = 1
+
+            return page_data, metadata
+
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Failed to process HTML: {str(e)}")
+
+    @staticmethod
+    def extract_text_from_txt(file_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Extract text from plain text file.
+
+        Returns as single page.
+
+        Returns:
+            Tuple of (page_data, metadata)
+        """
+        try:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+
+            content = content.strip()
+
+            if not content:
+                raise ValueError("No text could be extracted from TXT file")
+
+            page_data = [{'page_num': 1, 'text': content}]
+            metadata = {'total_pages': 1}
+
+            return page_data, metadata
+
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Failed to process TXT: {str(e)}")
+
+    @staticmethod
     def process_document(file_path: str, file_format: str, use_pdfplumber: bool = False) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Process document and extract text based on format.
 
         Args:
             file_path: Path to document
-            file_format: File format (pdf, docx, html, txt)
+            file_format: File format (pdf, docx, html, htm, txt)
             use_pdfplumber: Whether to use pdfplumber for table-aware extraction
 
         Returns:
             Tuple of (page_data, metadata)
             page_data: List of dicts with {page_num: int, text: str}
         """
-        if file_format.lower() == 'pdf':
+        fmt = file_format.lower()
+        if fmt == 'pdf':
             if use_pdfplumber:
                 return DocumentProcessor.extract_text_with_tables(file_path)
             return DocumentProcessor.extract_text_from_pdf(file_path)
+        elif fmt == 'docx':
+            return DocumentProcessor.extract_text_from_docx(file_path)
+        elif fmt in ('html', 'htm'):
+            return DocumentProcessor.extract_text_from_html(file_path)
+        elif fmt == 'txt':
+            return DocumentProcessor.extract_text_from_txt(file_path)
         else:
             raise ValueError(f"Unsupported format: {file_format}")
 

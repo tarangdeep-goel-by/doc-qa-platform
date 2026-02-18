@@ -275,17 +275,17 @@ class VectorStore:
             chunk_scores[chunk_id]['score'] += rrf_score
             chunk_scores[chunk_id]['result'] = result
 
+        # Build O(1) lookup from chunk text to vector result ID
+        text_to_id = {
+            vr["payload"].get("text"): vr["id"]
+            for vr in vector_results
+            if vr["payload"].get("text")
+        }
+
         # Process BM25 results
         for rank, result in enumerate(bm25_results, start=1):
-            # BM25 results have chunk data
             chunk_text = result["chunk"]["text"]
-
-            # Find matching chunk ID from vector results
-            matching_id = None
-            for vr in vector_results:
-                if vr["payload"].get("text") == chunk_text:
-                    matching_id = vr["id"]
-                    break
+            matching_id = text_to_id.get(chunk_text)
 
             if matching_id:
                 # Add RRF score to existing chunk
@@ -313,7 +313,6 @@ class VectorStore:
         top_k: int,
         doc_ids: Optional[List[str]] = None,
         alpha: float = 0.5,
-        use_rrf: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Hybrid search combining vector similarity and BM25 keyword matching.
@@ -324,7 +323,6 @@ class VectorStore:
             top_k: Number of final results to return
             doc_ids: Optional list of document IDs to filter by
             alpha: Weight for vector vs BM25 (0=all BM25, 1=all vector, 0.5=balanced)
-            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
 
         Returns:
             List of search results with combined scores
@@ -346,82 +344,28 @@ class VectorStore:
             doc_ids=doc_ids
         )
 
-        if use_rrf:
-            # Use Reciprocal Rank Fusion (more robust)
-            fused_results = self._reciprocal_rank_fusion(
-                vector_results=vector_results,
-                bm25_results=bm25_results,
-                k=60
-            )
+        # Reciprocal Rank Fusion (RRF)
+        fused_results = self._reciprocal_rank_fusion(
+            vector_results=vector_results,
+            bm25_results=bm25_results,
+            k=60
+        )
 
-            # Normalize RRF scores to 0-1 range (for consistency with min_score thresholds)
-            if fused_results and len(fused_results) > 1:
-                scores = [r["score"] for r in fused_results]
-                min_score = min(scores)
-                max_score = max(scores)
+        # Normalize RRF scores to 0-1 range (for consistency with min_score thresholds)
+        if fused_results and len(fused_results) > 1:
+            scores = [r["score"] for r in fused_results]
+            min_score = min(scores)
+            max_score = max(scores)
 
-                if max_score > min_score:
-                    for i, result in enumerate(fused_results):
-                        result["score"] = (result["score"] - min_score) / (max_score - min_score)
-                else:
-                    # All scores are the same
-                    for result in fused_results:
-                        result["score"] = 1.0
+            if max_score > min_score:
+                for i, result in enumerate(fused_results):
+                    result["score"] = (result["score"] - min_score) / (max_score - min_score)
+            else:
+                # All scores are the same
+                for result in fused_results:
+                    result["score"] = 1.0
 
-            return fused_results[:top_k]
-
-        else:
-            # Use weighted score fusion (legacy method)
-            # Normalize scores
-            vector_scores = self._normalize_scores([r["score"] for r in vector_results])
-            bm25_scores = self._normalize_scores([r["score"] for r in bm25_results])
-
-            # Combine scores
-            combined = {}
-
-            # Add vector results
-            for i, result in enumerate(vector_results):
-                chunk_id = result["id"]
-                combined[chunk_id] = {
-                    "result": result,
-                    "score": alpha * vector_scores[i]
-                }
-
-            # Add BM25 results
-            for i, result in enumerate(bm25_results):
-                # BM25 results use chunk data directly
-                chunk_text = result["chunk"]["text"]
-
-                # Find matching vector result by text (since we don't have IDs from BM25)
-                matching_id = None
-                for vr in vector_results:
-                    if vr["payload"].get("text") == chunk_text:
-                        matching_id = vr["id"]
-                        break
-
-                if matching_id:
-                    # Add BM25 score to existing entry
-                    combined[matching_id]["score"] += (1 - alpha) * bm25_scores[i]
-                else:
-                    # New result from BM25 only
-                    # Create a pseudo-result (this shouldn't happen often if both indices are synced)
-                    pass
-
-            # Sort by combined score
-            sorted_results = sorted(
-                combined.items(),
-                key=lambda x: x[1]["score"],
-                reverse=True
-            )
-
-            # Return top k with original format
-            final_results = []
-            for chunk_id, data in sorted_results[:top_k]:
-                result = data["result"]
-                result["score"] = data["score"]  # Update with combined score
-                final_results.append(result)
-
-            return final_results
+        return fused_results[:top_k]
 
     def multi_query_hybrid_search(
         self,
@@ -431,7 +375,6 @@ class VectorStore:
         top_k: int,
         doc_ids: Optional[List[str]] = None,
         alpha: float = 0.5,
-        use_rrf: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Search with multiple query variants and fuse results.
@@ -443,7 +386,6 @@ class VectorStore:
             top_k: Number of final results to return
             doc_ids: Optional list of document IDs to filter by
             alpha: Weight for vector vs BM25 (0=all BM25, 1=all vector, 0.5=balanced)
-            use_rrf: Whether to use Reciprocal Rank Fusion in hybrid search
 
         Returns:
             List of search results with fused scores
@@ -459,7 +401,6 @@ class VectorStore:
                 top_k=top_k * 4,  # Get more candidates
                 doc_ids=doc_ids,
                 alpha=alpha,
-                use_rrf=use_rrf
             )
 
             # Add weighted scores
@@ -507,24 +448,3 @@ class VectorStore:
 
         return final_results
 
-    def _normalize_scores(self, scores: List[float]) -> List[float]:
-        """
-        Normalize scores to 0-1 range using min-max normalization.
-
-        Args:
-            scores: List of raw scores
-
-        Returns:
-            List of normalized scores
-        """
-        if not scores:
-            return []
-
-        min_score = min(scores)
-        max_score = max(scores)
-
-        if max_score == min_score:
-            # All scores are the same
-            return [1.0] * len(scores)
-
-        return [(s - min_score) / (max_score - min_score) for s in scores]

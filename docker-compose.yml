@@ -13,7 +13,6 @@ x-env-common: &env-common
   HYBRID_ALPHA: "0.5"
   USE_QUERY_EXPANSION: "true"
   QUERY_EXPANSION_VARIANTS: "2"
-  USE_RRF: "true"
   RERANKER_BLENDING: position_aware
   USE_QUERY_DECOMPOSITION: "true"
   USE_ADAPTIVE_ALPHA: "true"

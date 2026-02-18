@@ -1,7 +1,11 @@
 """Cross-encoder reranker for improving retrieval quality."""
 
+import logging
+import threading
 from sentence_transformers import CrossEncoder
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class Reranker:
@@ -15,9 +19,10 @@ class Reranker:
             model_name: HuggingFace model name for cross-encoder
         """
         self.model_name = model_name
-        print(f"Loading reranker model: {model_name}")
+        logger.info(f"Loading reranker model: {model_name}")
         self.model = CrossEncoder(model_name)
-        print(f"Reranker model loaded successfully")
+        self._lock = threading.Lock()
+        logger.info("Reranker model loaded successfully")
 
     def rerank(
         self,
@@ -41,7 +46,6 @@ class Reranker:
             return []
 
         # Extract text from chunks
-        # Chunks can have different formats (from vector search or hybrid search)
         chunk_texts = []
         for chunk in chunks:
             if "payload" in chunk and "text" in chunk["payload"]:
@@ -49,26 +53,22 @@ class Reranker:
             elif "text" in chunk:
                 chunk_texts.append(chunk["text"])
             else:
-                # Fallback - try to find text anywhere
                 chunk_texts.append(str(chunk))
 
         # Create (query, document) pairs for cross-encoder
         pairs = [(query, text) for text in chunk_texts]
 
         # Get reranking scores from cross-encoder
-        # These scores represent how well each chunk answers the query
-        scores = self.model.predict(pairs)
+        with self._lock:
+            scores = self.model.predict(pairs)
 
         # Combine chunks with their rerank scores
         reranked = []
         for chunk, score in zip(chunks, scores):
-            # Keep original chunk data and add rerank score
             reranked_chunk = chunk.copy()
             reranked_chunk["rerank_score"] = float(score)
-            # Keep original score as "retrieval_score" for comparison
             if "score" in chunk:
                 reranked_chunk["retrieval_score"] = chunk["score"]
-            # Update main score to rerank score
             reranked_chunk["score"] = float(score)
             reranked.append(reranked_chunk)
 
@@ -116,7 +116,8 @@ class Reranker:
 
         # Get reranking scores
         pairs = [(query, text) for text in chunk_texts]
-        rerank_scores = self.model.predict(pairs)
+        with self._lock:
+            rerank_scores = self.model.predict(pairs)
 
         # Apply position-aware blending
         reranked = []
@@ -128,15 +129,12 @@ class Reranker:
 
             # Determine blend weights based on position
             if rank <= 3:
-                # Top 3: Trust retrieval more (75%)
                 retrieval_weight = 0.75
                 rerank_weight = 0.25
             elif rank <= 10:
-                # Ranks 4-10: Equal weight (50/50)
                 retrieval_weight = 0.5
                 rerank_weight = 0.5
             else:
-                # Ranks 11+: Trust reranker more (75%)
                 retrieval_weight = 0.25
                 rerank_weight = 0.75
 

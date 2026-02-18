@@ -1,10 +1,15 @@
 """Chat session endpoints for multi-chat interface."""
 
-import os
+import json
+import logging
+import time
 import uuid
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from api.schemas import (
     CreateChatRequest,
@@ -19,16 +24,14 @@ from api.schemas import (
     BulkDeleteChatsRequest,
     BulkDeleteChatsResponse,
     ChatDeleteResult,
-    SourceInfo
+    SourceInfo,
+    FeedbackRequest,
+    FeedbackResponse,
 )
 from src.models import ChatMessage
+from src.doc_router import route_query
 
 router = APIRouter()
-
-
-def _str_to_bool(value: str) -> bool:
-    """Convert string to boolean."""
-    return value.lower() in ("true", "1", "yes")
 
 
 @router.post("", response_model=ChatResponse)
@@ -43,7 +46,8 @@ async def create_chat(request: Request, body: CreateChatRequest):
     # Create chat
     chat = chat_manager.create_chat(
         name=body.name,
-        doc_ids=body.doc_ids
+        doc_ids=body.doc_ids,
+        auto_route=body.auto_route
     )
 
     return ChatResponse(
@@ -52,7 +56,8 @@ async def create_chat(request: Request, body: CreateChatRequest):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
 
@@ -70,7 +75,8 @@ async def list_chats(request: Request):
             doc_ids=chat.doc_ids,
             created_at=chat.created_at,
             updated_at=chat.updated_at,
-            message_count=chat.message_count
+            message_count=chat.message_count,
+            auto_route=chat.auto_route
         )
         for chat in chats
     ]
@@ -109,7 +115,8 @@ async def get_chat(request: Request, chat_id: str):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
     message_responses = [
@@ -152,7 +159,8 @@ async def rename_chat(request: Request, chat_id: str, body: RenameChatRequest):
         doc_ids=chat.doc_ids,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
-        message_count=chat.message_count
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
     )
 
 
@@ -233,150 +241,238 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
     )
 
 
-@router.post("/{chat_id}/ask", response_model=AskInChatResponse)
+@router.delete("/{chat_id}/documents/{doc_id}", response_model=ChatResponse)
+async def remove_chat_document(request: Request, chat_id: str, doc_id: str):
+    """Remove a document from a chat's doc_ids."""
+    chat_manager = request.app.state.chat_manager
+
+    chat, _ = chat_manager.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if doc_id not in chat.doc_ids:
+        raise HTTPException(status_code=404, detail="Document not in this chat")
+
+    chat.doc_ids = [d for d in chat.doc_ids if d != doc_id]
+    chat_manager.save_chat(chat)
+
+    return ChatResponse(
+        id=chat.id,
+        name=chat.name,
+        doc_ids=chat.doc_ids,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
+    )
+
+
+@router.post("/{chat_id}/ask")
 async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
     """
-    Ask a question in a chat context.
+    Ask a question in a chat context. Returns SSE stream.
 
-    Uses chat's associated documents and maintains conversation history.
+    Event format:
+        data: {"type": "retrieval_done", "sources": [...]}\n\n
+        data: {"type": "chunk", "content": "partial text..."}\n\n
+        data: {"type": "done", "message_id": "uuid"}\n\n
+        data: {"type": "error", "detail": "..."}\n\n
     """
     chat_manager = request.app.state.chat_manager
     qa_engine = request.app.state.qa_engine
     document_store = request.app.state.document_store
 
-    # Get chat
+    # Validate chat exists (raise before streaming starts)
     chat, messages = chat_manager.get_chat(chat_id)
-
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    try:
-        # Filter to only existing documents
+    # Auto-route: on first question, detect relevant docs via BM25
+    routed_doc_ids = None
+    if chat.auto_route and not chat.doc_ids and not messages:
+        vector_store = request.app.state.vector_store
+        routed_doc_ids = route_query(body.question, vector_store.bm25_index)
+        if routed_doc_ids:
+            chat.doc_ids = routed_doc_ids
+        chat.auto_route = False
+        chat_manager.save_chat(chat)
+
+    # Filter to only existing documents; empty doc_ids means "search all"
+    if chat.doc_ids:
         available_doc_ids = [
             doc_id for doc_id in chat.doc_ids
             if document_store.get_document(doc_id) is not None
-        ] if chat.doc_ids else []
+        ]
+    else:
+        available_doc_ids = [doc.doc_id for doc in document_store.list_documents()]
 
-        # If no documents available, return early
-        if not available_doc_ids:
-            # Create user message
+    def _sse_event(data: dict) -> str:
+        return f"data: {json.dumps(data)}\n\n"
+
+    interaction_logger = request.app.state.interaction_logger
+    rag_config = request.app.state.rag_config
+
+    def event_generator():
+        start_time = time.time()
+        try:
+            # Emit docs_routed event if auto-routing happened
+            if routed_doc_ids is not None:
+                doc_names = []
+                for did in (routed_doc_ids or []):
+                    doc = document_store.get_document(did)
+                    doc_names.append(doc.title if doc else did)
+                yield _sse_event({
+                    "type": "docs_routed",
+                    "doc_ids": routed_doc_ids or [],
+                    "doc_names": doc_names,
+                })
+
+            # Save user message
             user_message = ChatMessage(
                 id=str(uuid.uuid4()),
                 chat_id=chat_id,
                 role="user",
                 content=body.question,
                 timestamp=datetime.now().isoformat(),
-                filtered_docs=[]
+                filtered_docs=available_doc_ids
             )
             chat_manager.add_message(chat_id, user_message)
 
-            # Create assistant message with helpful error
-            assistant_message = ChatMessage(
-                id=str(uuid.uuid4()),
-                chat_id=chat_id,
-                role="assistant",
-                content=(
+            # Handle no documents case
+            if not available_doc_ids:
+                no_docs_content = (
                     "I cannot answer questions for this chat because all associated "
                     "documents have been deleted. Please add new documents to continue."
-                ),
-                timestamp=datetime.now().isoformat(),
-                sources=[],
-                filtered_docs=[]
-            )
-            chat_manager.add_message(chat_id, assistant_message)
-
-            return AskInChatResponse(
-                message=MessageResponse(
-                    id=assistant_message.id,
-                    chat_id=assistant_message.chat_id,
-                    role=assistant_message.role,
-                    content=assistant_message.content,
-                    timestamp=assistant_message.timestamp,
-                    sources=[],
-                    filtered_docs=assistant_message.filtered_docs
                 )
-            )
+                yield _sse_event({"type": "retrieval_done", "sources": []})
+                yield _sse_event({"type": "chunk", "content": no_docs_content})
 
-        # Read RAG config from environment
-        top_k = int(os.environ["TOP_K_RESULTS"])
-        use_hybrid = _str_to_bool(os.environ["USE_HYBRID_SEARCH"])
-        hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
-        use_reranking = _str_to_bool(os.environ["USE_RERANKING"])
-        use_query_expansion = _str_to_bool(os.environ["USE_QUERY_EXPANSION"])
-        use_rrf = _str_to_bool(os.environ["USE_RRF"])
-        rerank_blending = os.environ["RERANKER_BLENDING"]
-        use_query_decomposition = _str_to_bool(os.environ["USE_QUERY_DECOMPOSITION"])
-        use_adaptive_alpha = _str_to_bool(os.environ.get("USE_ADAPTIVE_ALPHA", "true"))
+                assistant_message = ChatMessage(
+                    id=str(uuid.uuid4()),
+                    chat_id=chat_id,
+                    role="assistant",
+                    content=no_docs_content,
+                    timestamp=datetime.now().isoformat(),
+                    sources=[],
+                    filtered_docs=[]
+                )
+                chat_manager.add_message(chat_id, assistant_message)
+                yield _sse_event({"type": "done", "message_id": assistant_message.id})
+                return
 
-        # Run RAG pipeline with available documents only
-        result = qa_engine.answer_question(
-            question=body.question,
-            top_k=top_k,
-            doc_ids=available_doc_ids,
-            chat_history=chat.gemini_chat_history,
-            use_hybrid=use_hybrid,
-            hybrid_alpha=hybrid_alpha,
-            use_reranking=use_reranking,
-            use_query_expansion=use_query_expansion,
-            use_rrf=use_rrf,
-            rerank_blending=rerank_blending,
-            use_query_decomposition=use_query_decomposition,
-            use_adaptive_alpha=use_adaptive_alpha
-        )
+            # Stream RAG pipeline
+            sources_dicts = []
+            full_content = []
 
-        # Create user message
-        user_message = ChatMessage(
-            id=str(uuid.uuid4()),
-            chat_id=chat_id,
-            role="user",
-            content=body.question,
-            timestamp=datetime.now().isoformat(),
-            filtered_docs=available_doc_ids
-        )
-        chat_manager.add_message(chat_id, user_message)
+            for event in qa_engine.answer_question_stream(
+                question=body.question,
+                **rag_config.to_answer_kwargs(
+                    doc_ids=available_doc_ids,
+                    chat_history=chat.gemini_chat_history
+                )
+            ):
+                if event["type"] == "retrieval_done":
+                    sources_dicts = event["sources"]
+                    yield _sse_event({"type": "retrieval_done", "sources": sources_dicts})
 
-        # Convert sources to dicts
-        sources_dicts = [
-            {
-                "doc_id": s["doc_id"],
-                "doc_title": s["doc_title"],
-                "chunk_text": s["chunk_text"],
-                "score": s["score"],
-                "page_num": s.get("page_num")
-            }
-            for s in result["sources"]
-        ]
+                elif event["type"] == "chunk":
+                    full_content.append(event["content"])
+                    yield _sse_event({"type": "chunk", "content": event["content"]})
 
-        # Create assistant message
-        assistant_message = ChatMessage(
-            id=str(uuid.uuid4()),
-            chat_id=chat_id,
-            role="assistant",
-            content=result["answer"],
-            timestamp=datetime.now().isoformat(),
-            sources=sources_dicts,
-            filtered_docs=available_doc_ids
-        )
-        chat_manager.add_message(chat_id, assistant_message)
+                elif event["type"] == "done":
+                    latency_ms = int((time.time() - start_time) * 1000)
 
-        # Update Gemini chat history (if provided by QA engine)
-        if "gemini_history" in result:
-            chat_manager.update_gemini_history(chat_id, result["gemini_history"])
+                    # Save assistant message to disk
+                    assistant_message = ChatMessage(
+                        id=str(uuid.uuid4()),
+                        chat_id=chat_id,
+                        role="assistant",
+                        content=event["full_content"],
+                        timestamp=datetime.now().isoformat(),
+                        sources=sources_dicts,
+                        filtered_docs=available_doc_ids
+                    )
+                    chat_manager.add_message(chat_id, assistant_message)
+                    yield _sse_event({"type": "done", "message_id": assistant_message.id})
 
-        # Return assistant message
-        return AskInChatResponse(
-            message=MessageResponse(
-                id=assistant_message.id,
-                chat_id=assistant_message.chat_id,
-                role=assistant_message.role,
-                content=assistant_message.content,
-                timestamp=assistant_message.timestamp,
-                sources=[SourceInfo(**s) for s in sources_dicts],
-                filtered_docs=assistant_message.filtered_docs
-            )
-        )
+                    # Update chat history for follow-ups (truncate answer to 300 chars)
+                    try:
+                        answer_summary = event["full_content"][:300]
+                        history = list(chat.gemini_chat_history or [])
+                        history.append({"question": body.question, "answer": answer_summary})
+                        # Keep last 5 turns
+                        chat_manager.update_gemini_history(chat_id, history[-5:])
+                    except Exception:
+                        logger.exception("Failed to update chat history")
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(e)}")
+                    # Log interaction
+                    try:
+                        interaction_logger.log_interaction(
+                            chat_id=chat_id,
+                            question=body.question,
+                            answer=event["full_content"],
+                            sources=sources_dicts,
+                            latency_ms=latency_ms,
+                            doc_ids=available_doc_ids,
+                            config=rag_config.to_dict(),
+                            message_id=assistant_message.id,
+                        )
+                    except Exception:
+                        logger.exception("Failed to log interaction")
+
+                elif event["type"] == "error":
+                    yield _sse_event({"type": "error", "detail": event["detail"]})
+
+        except Exception as e:
+            logger.exception("Failed to stream answer in chat")
+            yield _sse_event({"type": "error", "detail": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@router.post("/{chat_id}/messages/{message_id}/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    request: Request, chat_id: str, message_id: str, body: FeedbackRequest
+):
+    """Submit thumbs up/down feedback on an assistant message."""
+    chat_manager = request.app.state.chat_manager
+    feedback_store = request.app.state.feedback_store
+
+    chat, messages = chat_manager.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # Find the assistant message
+    target_msg = None
+    question_text = ""
+    for i, msg in enumerate(messages):
+        if msg.id == message_id:
+            if msg.role != "assistant":
+                raise HTTPException(status_code=400, detail="Can only give feedback on assistant messages")
+            target_msg = msg
+            # Look back for the preceding user message
+            if i > 0 and messages[i - 1].role == "user":
+                question_text = messages[i - 1].content
+            break
+
+    if not target_msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    feedback_store.add_feedback(
+        message_id=message_id,
+        chat_id=chat_id,
+        feedback=body.feedback,
+        question=question_text,
+        answer=target_msg.content,
+        doc_ids=chat.doc_ids,
+    )
+
+    return FeedbackResponse(success=True)

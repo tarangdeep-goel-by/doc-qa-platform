@@ -193,7 +193,8 @@ class QAEngine:
                 top_k=top_k,
                 doc_ids=doc_ids,
                 alpha=alpha,
-                use_rrf=True
+
+
             )
 
         candidates = {}
@@ -265,6 +266,76 @@ class QAEngine:
 
         return boosted
 
+    def _fetch_neighbor_chunks(
+        self, chunks: List[Dict], max_extra: int = 2
+    ) -> List[Dict]:
+        """For structured chunks, include adjacent chunks from the same document.
+
+        Legal clauses and technical specs often reference adjacent sections.
+        Only fetches neighbors for non-prose chunks.
+        """
+        if not chunks:
+            return chunks
+
+        # Collect which (doc_id, chunk_index) neighbors we need
+        existing_keys = {
+            (c["payload"]["doc_id"], c["payload"]["chunk_index"])
+            for c in chunks
+        }
+        needed = set()
+        for chunk in chunks:
+            structure = chunk["payload"].get("structure", {})
+            stype = structure.get("structure_type", "prose") if isinstance(structure, dict) else "prose"
+            if stype == "prose":
+                continue
+            doc_id = chunk["payload"]["doc_id"]
+            idx = chunk["payload"]["chunk_index"]
+            for offset in [-1, 1]:
+                neighbor_key = (doc_id, idx + offset)
+                if neighbor_key not in existing_keys and idx + offset >= 0:
+                    needed.add(neighbor_key)
+
+        if not needed or len(needed) > max_extra * len(chunks):
+            return chunks  # safety: don't fetch too many
+
+        # Limit to max_extra
+        needed_list = list(needed)[:max_extra]
+
+        # Fetch from Qdrant using scroll with filter
+        neighbors = []
+        for doc_id, chunk_idx in needed_list:
+            try:
+                from qdrant_client.models import Filter, FieldCondition, MatchValue
+                results = self.vector_store.client.scroll(
+                    collection_name=self.vector_store.collection_name,
+                    scroll_filter=Filter(
+                        must=[
+                            FieldCondition(key="doc_id", match=MatchValue(value=doc_id)),
+                            FieldCondition(key="chunk_index", match=MatchValue(value=chunk_idx)),
+                        ]
+                    ),
+                    limit=1,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                points, _ = results
+                if points:
+                    p = points[0]
+                    neighbors.append({
+                        "id": p.id,
+                        "score": 0.0,  # neighbor, not directly retrieved
+                        "payload": p.payload,
+                    })
+            except Exception as e:
+                logger.debug(f"Failed to fetch neighbor chunk ({doc_id}, {chunk_idx}): {e}")
+
+        if neighbors:
+            logger.info(f"Neighbor fetch: added {len(neighbors)} adjacent chunks")
+            # Append at end (lower priority than directly retrieved)
+            chunks = chunks + neighbors
+
+        return chunks
+
     def _retrieve(
         self,
         question: str,
@@ -277,7 +348,7 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
+
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
@@ -337,7 +408,7 @@ class QAEngine:
                             min_score=min_score,
                             use_query_expansion=use_query_expansion,
                             query_expansion_variants=query_expansion_variants,
-                            use_rrf=use_rrf,
+
                             rerank_blending=rerank_blending,
                             use_query_decomposition=False,
                             use_adaptive_alpha=use_adaptive_alpha,
@@ -385,7 +456,7 @@ class QAEngine:
             query_embeddings = [self.embedder.embed_text(question)]
 
         # Pipeline config logging
-        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
+        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
 
         # Step 3: Retrieve relevant chunks (get more candidates if reranking)
         retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
@@ -412,7 +483,6 @@ class QAEngine:
                 top_k=retrieval_k,
                 doc_ids=doc_ids,
                 alpha=effective_alpha,
-                use_rrf=use_rrf
             )
         elif use_hybrid:
             search_results = self.vector_store.hybrid_search(
@@ -421,7 +491,6 @@ class QAEngine:
                 top_k=retrieval_k,
                 doc_ids=doc_ids,
                 alpha=effective_alpha,
-                use_rrf=use_rrf
             )
         else:
             search_results = self.vector_store.search(
@@ -450,6 +519,9 @@ class QAEngine:
         query_type = self._classify_query_type(question)
         if query_type != "general":
             search_results = self._boost_by_structure(search_results, query_type)
+
+        # Fetch adjacent chunks for structured results
+        search_results = self._fetch_neighbor_chunks(search_results, max_extra=2)
 
         # Check confidence
         reranking_applied = use_reranking and self.reranker and len(search_results) > 0
@@ -514,7 +586,7 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
+
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
@@ -531,7 +603,7 @@ class QAEngine:
             min_score=min_score,
             use_query_expansion=use_query_expansion,
             query_expansion_variants=query_expansion_variants,
-            use_rrf=use_rrf,
+
             rerank_blending=rerank_blending,
             use_query_decomposition=use_query_decomposition,
             use_adaptive_alpha=use_adaptive_alpha,
@@ -594,7 +666,7 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
-        use_rrf: bool = True,
+
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
@@ -612,7 +684,7 @@ class QAEngine:
                 min_score=min_score,
                 use_query_expansion=use_query_expansion,
                 query_expansion_variants=query_expansion_variants,
-                use_rrf=use_rrf,
+    
                 rerank_blending=rerank_blending,
                 use_query_decomposition=use_query_decomposition,
                 use_adaptive_alpha=use_adaptive_alpha,
@@ -719,25 +791,6 @@ class QAEngine:
 
         logger.debug(f"Dynamic cutoff: {len(chunks)} -> {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
         return kept
-
-    def _reorder_top_and_tail(self, chunks):
-        """Place best chunks at start and end, weakest in middle.
-
-        LLMs attend most to the beginning and end of context (lost-in-the-middle).
-        Interleave: best→position 1, 2nd best→position N, 3rd→position 2, etc.
-        """
-        if len(chunks) <= 2:
-            return chunks
-        reordered = [None] * len(chunks)
-        left, right = 0, len(chunks) - 1
-        for i, chunk in enumerate(chunks):
-            if i % 2 == 0:
-                reordered[left] = chunk
-                left += 1
-            else:
-                reordered[right] = chunk
-                right -= 1
-        return reordered
 
     def _format_sources(self, search_results: List[Dict]) -> List[Dict]:
         """Build sources list for API response from search results."""
@@ -862,9 +915,6 @@ Answer:"""
         Returns:
             Formatted context string with visual hierarchy
         """
-        # Reorder: best chunks at start and end (lost-in-the-middle mitigation)
-        search_results = self._reorder_top_and_tail(search_results)
-
         context_parts = []
         for i, result in enumerate(search_results, 1):
             payload = result["payload"]
@@ -889,7 +939,7 @@ Answer:"""
         from .gemini_retry import gemini_retry
 
         response = gemini_retry(lambda: self.client.models.generate_content(
-            model=self.model_name,
+            model=self.fast_model_name,
             contents=prompt,
             config={
                 "temperature": 0.4,
@@ -897,45 +947,5 @@ Answer:"""
                 "maxOutputTokens": 8192,
             }
         ))
-        return response.text.strip()
+        return (response.text or "").strip()
 
-    def _check_source_metadata(self, sources: List[Dict]) -> str:
-        """
-        Generate warnings based on source metadata.
-
-        Args:
-            sources: List of source dictionaries with metadata
-
-        Returns:
-            Warning string to append to answer (empty if no warnings)
-        """
-        warnings = []
-
-        if not sources:
-            return ""
-
-        # Check for low scores
-        if sources[0]["score"] < 0.5:
-            warnings.append(
-                "⚠️ Note: The retrieved information may not be directly related to your question. "
-                "Consider rephrasing or checking if the relevant documents are uploaded."
-            )
-
-        # Could add more checks:
-        # - Conflicting information from different documents
-        # - Outdated documents (if date metadata available)
-        # - Missing page numbers
-
-        return "\n\n" + "\n".join(warnings) if warnings else ""
-
-    def check_gemini_connection(self) -> bool:
-        """Check if Gemini API is accessible."""
-        try:
-            # Try a simple generation
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents="Test"
-            )
-            return True
-        except Exception:
-            return False
