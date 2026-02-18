@@ -1,14 +1,14 @@
 # Project Status - Document Q&A Platform
 
-**Last Updated**: February 6, 2026
+**Last Updated**: February 18, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
 
 ---
 
-## Current Status: 4.72/5 — Highest Score Ever (Multi-Doc, 77 Questions)
+## Current Status: 4.62/5 — Structure-Aware Chunking + Dark Glass UI
 
-Fixed eval harness bugs (broken doc_id resolution, missing pipeline params) and added pdfplumber table-aware extraction. Multi-doc benchmark now scores 4.72/5 across 77 questions spanning 3 diverse documents — up from 2.85 which was caused by eval bugs, not pipeline issues. Added eval history tracking for comparing runs over time.
+Structure-aware chunking pipeline with enriched text, neighbor chunk retrieval, and multi-format document support. Separation letter (previously 2.50/5) now scores 4.67/5 after uploading the actual PDF. Frontend completely redesigned: dark glass aesthetic, chat-style message layout, auto-creating new chat from landing page.
 
 ---
 
@@ -23,12 +23,14 @@ Fixed eval harness bugs (broken doc_id resolution, missing pipeline params) and 
 
 ### Document Processing Pipeline
 - [x] PDF upload via API endpoint
-- [x] Text extraction using PyPDF2
-- [x] Smart text chunking (2500 chars, 500 overlap)
-- [x] Sentence-boundary aware chunking
+- [x] Text extraction using PyPDF2 + pdfplumber (table-aware)
+- [x] **Structure-aware chunking** — detects tables, lists, specs, headers; splits on block boundaries ✨
+- [x] Enriched text with context headers for embedding + BM25 ✨
+- [x] Adaptive chunk sizes (800-1500 dense, 2000-2500 prose) ✨
 - [x] Gemini embedding generation (gemini-embedding-001, 768-dim, MTEB 71.5%)
 - [x] Vector storage in Qdrant
 - [x] Document metadata management (JSON store)
+- [x] **Multi-format support**: PDF, DOCX, HTML, TXT ✨
 
 ### Query & Retrieval (RAG)
 - [x] Question embedding
@@ -87,6 +89,50 @@ Fixed eval harness bugs (broken doc_id resolution, missing pipeline params) and 
 ### Query Endpoints
 - [x] `POST /api/query/ask` - Ask questions with optional document filtering
 - [x] `GET /api/query/documents` - List available documents
+
+---
+
+## Recent Changes (February 18, 2026)
+
+### Structure-Aware Chunking + Frontend Redesign
+
+**Backend — Structure-Aware Chunking Pipeline:**
+- Structure detector enhanced: detects tables, lists, specs, section headers, block boundaries
+- Chunker splits on structure boundaries (never mid-table/mid-list), adaptive chunk sizes (800-1500 for dense content, 2000-2500 for prose)
+- Enriched text with context headers (`[Document: X | Page: N | Section: Y]`) for embedding + BM25
+- Neighbor chunk retrieval: fetches adjacent chunks for structured content
+- Multi-format document support: PDF, DOCX, HTML, TXT
+- BM25 point_id O(1) lookup for RRF fusion (replaces O(n) text matching)
+- Chat.from_dict field filtering for schema evolution robustness
+- Removed `use_rrf` toggle (RRF always on)
+- Removed whitespace-collapsing `re.sub(r'\s+', ' ', text)` that destroyed table/list formatting
+
+**Frontend — Dark Glass UI Redesign:**
+- Black background (#09090b) with glass surfaces (backdrop-blur, white/4% opacity)
+- Glass border/hover tokens in Tailwind config for consistency
+- Sans-serif throughout (Inter), serif only for chat header title
+- Citation parser supports `[Source N]` format from backend LLM output
+- Citation links rendered as pill badges
+- Chat-style message layout: user bubbles right-aligned, assistant content left-aligned
+- Removed blog-style section labels ("Your question", "Answer" dividers)
+- Landing page is now new-chat screen with centered input
+- Auto-creates chat on first message with auto-route enabled
+- Toast styling updated to match dark glass theme
+- @tailwindcss/typography plugin for markdown rendering
+
+**Eval Results (77-question multi-doc benchmark):**
+
+| Dataset | Before | After | Delta |
+|---------|:------:|:-----:|:-----:|
+| Atomic Habits (28q) | 4.63 | 4.86 | +0.23 |
+| FX5U (24q) | 4.33 | 4.29 | -0.04 |
+| Separation Letter (28q) | 2.50 | 4.67 | +2.17 |
+| Overall (77q) | 3.79 | 4.62 | +0.83 |
+| p50 Latency | 6,349ms | 5,122ms | -19% |
+
+**Key insight:** Separation letter score jumped from 2.50 to 4.67 primarily because the PDF was finally uploaded to the system. Structure-aware chunking contributed incremental gains across all datasets.
+
+**Commits:** `7561732` (structure-aware chunking), `86b76e5` (BM25 point_id + Chat.from_dict), `361a320` (dark glass UI)
 
 ---
 
@@ -576,7 +622,7 @@ POST /api/chats/{chat_id}/ask
 | Keyword Search | BM25 (rank-bm25) | Stop words, regex tokenizer, cached to disk |
 | Reranker | CrossEncoder | ms-marco-MiniLM-L-6-v2 |
 | LLM | Google Gemini 2.5 Flash | Generation + Query Expansion |
-| Document Processing | PyPDF2 + pdfplumber | Table-aware extraction (USE_PDFPLUMBER toggle) |
+| Document Processing | PyPDF2 + pdfplumber | Table-aware extraction, multi-format (PDF/DOCX/HTML/TXT) |
 | Metadata Store | JSON file | Simple file-based storage |
 | Retrieval Strategy | Hybrid + RRF | Vector + BM25 with Reciprocal Rank Fusion |
 | Score Optimization | Position-Aware | Context-sensitive reranker blending |
@@ -599,16 +645,16 @@ POST /api/chats/{chat_id}/ask
 - **Hybrid Search**: ~100-150ms (vector + BM25 + fusion)
 
 ### Quality Improvements (Measured via Multi-Doc Benchmark — 77 Questions)
-- **Semantic Similarity**: 0.865 avg across 3 documents / 77 questions (was 0.742 baseline, +17%)
-- **ROUGE-L**: 0.222 avg
-- **LLM Judge Overall**: 4.72/5 (Relevance 4.83, Completeness 4.40, Accuracy 4.78, Organization 4.88)
-- **Optimal chunk config**: 2500/500 (confirmed via 6-config experiment)
+- **LLM Judge Overall**: 4.62/5 (AH 4.86, FX5U 4.29, Sep 4.67)
+- **p50 Latency**: 5,122ms (-19% from baseline)
+- **Structure-aware chunking**: adaptive sizes, block-boundary splitting, enriched text
+- **Optimal chunk config**: 2500/500 for prose, 800-1500 for dense structured content
 
 ---
 
 ## 🚧 Known Limitations
 
-1. **PDF-only**: No support for DOCX, HTML, TXT yet
+1. ~~**PDF-only**: No support for DOCX, HTML, TXT yet~~ ✅ **Multi-format support added** (PDF, DOCX, HTML, TXT)
 2. **No authentication**: Open API endpoints
 3. **Synchronous uploads**: User waits for processing to complete
 4. **JSON metadata store**: Not suitable for high concurrency
@@ -618,13 +664,11 @@ POST /api/chats/{chat_id}/ask
 
 ## 📝 Next Steps (Prioritized)
 
-### Phase 1: Additional Document Formats (High Priority)
-- [ ] Add DOCX support (python-docx)
-- [ ] Add HTML support (BeautifulSoup4)
-- [ ] Add plain TXT support
-- [ ] Unified document processor interface
-
-**Estimated Effort**: 4-6 hours
+### Phase 1: Additional Document Formats ✅ COMPLETE
+- [x] Add DOCX support (python-docx)
+- [x] Add HTML support (BeautifulSoup4)
+- [x] Add plain TXT support
+- [x] Unified document processor interface
 
 ### Phase 2: Frontend UI ✅ COMPLETE
 - [x] React + TypeScript setup (Vite, Tailwind CSS)
@@ -765,21 +809,23 @@ None currently! 🎉
 
 1. **To continue development**: `docker-compose up -d` then `docker-compose build backend && docker-compose up -d --force-recreate backend`
 2. **Recent context**:
-   - Multi-doc benchmark: 77 questions, 4.72/5 overall — highest ever
+   - Multi-doc benchmark: 77 questions, 4.62/5 overall
+   - Structure-aware chunking pipeline live (enriched text, neighbor chunks, block-boundary splitting)
+   - Multi-format support: PDF, DOCX, HTML, TXT
+   - Dark glass frontend with chat-style layout
+   - Landing page auto-creates chat on first message
+   - 4 documents uploaded: FX5U manual, Atomic Habits, Separation Letter, Insurance doc
    - Eval history tracking live: `view_history.py --detail --last 5`
-   - pdfplumber enabled, adaptive alpha on, query decomposition on
-   - Using Gemini pay-as-you-go ($300 credit)
-   - 39 eval runs tracked in `evaluation/results/history.jsonl`
-3. **Current state**: System healthy, 3 PDFs uploaded, all evals passing
-4. **Benchmark datasets**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q), `real_world_multi_doc.json` (77q)
+3. **Current state**: System healthy, main branch up to date, frontend + backend running
+4. **Benchmark datasets**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q), `real_world_multi_doc.json` (77q), `conversational.json` (18q)
 5. **Test Suite**: 136 tests
 6. **No blockers**: System stable
 
 **Suggested next steps (prioritized by expected impact):**
-- Completeness is weakest metric at 4.40/5 — some FX5U questions (Q3, Q9, Q15) still low
+- Streaming responses for better UX (currently waits for full response)
+- FX5U table-heavy questions still weakest — consider table-specific retrieval boost
 - Populate `expected_sources` in benchmark datasets to enable retrieval metrics (NDCG, MRR)
-- Consider streaming responses for better UX
-- Add more document types (DOCX, HTML, TXT)
+- Authentication (JWT) for production readiness
 
 **Run evaluation:**
 
