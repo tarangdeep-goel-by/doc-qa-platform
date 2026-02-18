@@ -143,8 +143,10 @@ class Chat:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Chat":
-        """Create from dictionary."""
-        return cls(**data)
+        """Create from dictionary, ignoring unknown fields."""
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
 
 
 @dataclass

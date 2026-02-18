@@ -48,15 +48,16 @@ class BM25Index:
         os.makedirs(cache_dir, exist_ok=True)
         self.index: Optional[BM25Okapi] = None
         self.doc_ids: List[str] = []
-        self.chunk_indices: List[int] = []
+        self.point_ids: List[str] = []
         self.chunks: List[Dict[str, Any]] = []
 
-    def build_index(self, chunks: List[Dict[str, Any]]):
+    def build_index(self, chunks: List[Dict[str, Any]], point_ids: List[str] = None):
         """
         Build BM25 index from document chunks.
 
         Args:
             chunks: List of chunk dictionaries with 'text', 'doc_id', etc.
+            point_ids: Qdrant point IDs corresponding to each chunk (for ID-based fusion)
         """
         if not chunks:
             print("Warning: No chunks provided to build BM25 index")
@@ -64,6 +65,7 @@ class BM25Index:
 
         # Store chunks for later retrieval
         self.chunks = chunks
+        self.point_ids = point_ids or [""] * len(chunks)
 
         # Tokenize with stop word removal and punctuation handling
         # Prefer enriched_text (includes context headers) over raw text
@@ -75,7 +77,6 @@ class BM25Index:
         # Build BM25 index
         self.index = BM25Okapi(tokenized_chunks)
         self.doc_ids = [chunk.get("doc_id", "") for chunk in chunks]
-        self.chunk_indices = list(range(len(chunks)))
 
         print(f"Built BM25 index with {len(chunks)} chunks")
 
@@ -124,12 +125,15 @@ class BM25Index:
         results = []
         for idx in top_indices:
             if scores[idx] > 0:  # Only include positive scores
-                results.append({
+                result = {
                     "chunk_index": int(idx),
                     "score": float(scores[idx]),
                     "doc_id": self.doc_ids[idx],
                     "chunk": self.chunks[idx]
-                })
+                }
+                if self.point_ids and idx < len(self.point_ids):
+                    result["point_id"] = self.point_ids[idx]
+                results.append(result)
 
         return results
 
@@ -141,7 +145,7 @@ class BM25Index:
                 pickle.dump({
                     'index': self.index,
                     'doc_ids': self.doc_ids,
-                    'chunk_indices': self.chunk_indices,
+                    'point_ids': self.point_ids,
                     'chunks': self.chunks
                 }, f)
             print(f"Saved BM25 index cache to {cache_file}")
@@ -164,7 +168,7 @@ class BM25Index:
                 data = pickle.load(f)
                 self.index = data['index']
                 self.doc_ids = data['doc_ids']
-                self.chunk_indices = data['chunk_indices']
+                self.point_ids = data.get('point_ids', [""] * len(self.doc_ids))
                 self.chunks = data['chunks']
             print(f"Loaded BM25 index cache from {cache_file}")
             return True

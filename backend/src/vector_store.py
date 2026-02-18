@@ -207,8 +207,8 @@ class VectorStore:
         Should be called after adding or deleting documents.
         """
         # Fetch all points from Qdrant
-        # Note: This uses scroll which is efficient for large datasets
         all_chunks = []
+        point_ids = []
         offset = None
         limit = 100
 
@@ -218,7 +218,7 @@ class VectorStore:
                 limit=limit,
                 offset=offset,
                 with_payload=True,
-                with_vectors=False  # We don't need vectors for BM25
+                with_vectors=False
             )
 
             points, offset = result
@@ -226,15 +226,15 @@ class VectorStore:
             if not points:
                 break
 
-            # Extract payloads
             for point in points:
                 all_chunks.append(point.payload)
+                point_ids.append(str(point.id))
 
             if offset is None:
                 break
 
         print(f"Rebuilding BM25 index with {len(all_chunks)} chunks")
-        self.bm25_index.build_index(all_chunks)
+        self.bm25_index.build_index(all_chunks, point_ids=point_ids)
 
     def _reciprocal_rank_fusion(
         self,
@@ -275,19 +275,11 @@ class VectorStore:
             chunk_scores[chunk_id]['score'] += rrf_score
             chunk_scores[chunk_id]['result'] = result
 
-        # Build O(1) lookup from chunk text to vector result ID
-        text_to_id = {
-            vr["payload"].get("text"): vr["id"]
-            for vr in vector_results
-            if vr["payload"].get("text")
-        }
-
-        # Process BM25 results
+        # Process BM25 results — use point_id for O(1) matching
         for rank, result in enumerate(bm25_results, start=1):
-            chunk_text = result["chunk"]["text"]
-            matching_id = text_to_id.get(chunk_text)
+            matching_id = result.get("point_id")
 
-            if matching_id:
+            if matching_id and matching_id in chunk_scores:
                 # Add RRF score to existing chunk
                 rrf_score = 1.0 / (k + rank)
                 if rank in top_bonuses:
