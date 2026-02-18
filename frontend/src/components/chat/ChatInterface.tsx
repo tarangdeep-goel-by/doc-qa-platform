@@ -1,24 +1,35 @@
 import { useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/appStore'
 import { ChatHeader } from './ChatHeader'
 import { ChatMessageItem } from './ChatMessageItem'
 import { MessageInput } from '../MessageInput'
-import { AlertCircle, Bot } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 export function ChatInterface() {
   const { chatId } = useParams()
+  const location = useLocation()
   const { activeChat, messages, loading, setActiveChat, sendMessage } = useAppStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const initialQuestionSent = useRef(false)
 
-  // Load chat when chatId changes
   useEffect(() => {
     if (chatId) {
       setActiveChat(chatId)
     }
   }, [chatId, setActiveChat])
 
-  // Scroll to bottom when messages change or loading starts
+  // Send initial question when navigated from NewChatScreen
+  useEffect(() => {
+    const state = location.state as { initialQuestion?: string } | null
+    if (state?.initialQuestion && activeChat && !initialQuestionSent.current) {
+      initialQuestionSent.current = true
+      sendMessage(state.initialQuestion)
+      // Clear the state so it doesn't re-send on refresh
+      window.history.replaceState({}, '')
+    }
+  }, [activeChat, location.state, sendMessage])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -31,6 +42,8 @@ export function ChatInterface() {
     )
   }
 
+  const filteredMessages = messages.filter(msg => !(msg.id.startsWith('stream-') && !msg.content))
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -38,7 +51,7 @@ export function ChatInterface() {
 
       {/* Deleted Documents Warning */}
       {activeChat.missing_documents && activeChat.missing_documents.length > 0 && (
-        <div className="bg-yellow-900/20 border-l-4 border-yellow-400 p-fluid-md mx-fluid-lg mt-fluid-md">
+        <div className="bg-yellow-900/20 border-l-4 border-yellow-400 p-fluid-md mx-8 mt-fluid-md rounded-r">
           <div className="flex items-start gap-fluid-sm">
             <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -61,14 +74,14 @@ export function ChatInterface() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-fluid-lg py-fluid-md">
-        <div className="max-w-4xl mx-auto space-y-fluid-lg">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-6">
           {messages.length === 0 ? (
             <div className="py-fluid-2xl text-center">
-              <h2 className="font-serif text-fluid-2xl text-ink mb-fluid-md">
+              <h2 className="font-sans text-fluid-2xl text-ink mb-fluid-md">
                 Start a conversation
               </h2>
-              <p className="font-sans text-fluid-base text-ink/60">
+              <p className="font-sans text-fluid-base text-ink/50">
                 {activeChat.auto_route
                   ? 'Ask a question and relevant documents will be automatically selected'
                   : activeChat.doc_ids.length > 0
@@ -78,36 +91,31 @@ export function ChatInterface() {
               </p>
             </div>
           ) : (
-            messages
-              .filter(msg => !(msg.id.startsWith('stream-') && !msg.content))
-              .map(msg => (
-                <ChatMessageItem key={msg.id} message={msg} />
-              ))
+            filteredMessages.map((msg, idx) => (
+              <ChatMessageItem
+                key={msg.id}
+                message={msg}
+                prevMessage={idx > 0 ? filteredMessages[idx - 1] : undefined}
+              />
+            ))
           )}
 
-          {/* Typing indicator: show only while loading AND last assistant message has no content yet */}
+          {/* Typing indicator */}
           {loading && (!messages.length || messages[messages.length - 1].role !== 'assistant' || !messages[messages.length - 1].content) && (
-            <div className="flex gap-fluid-md justify-start">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-cyan" />
-              </div>
-              <div className="inline-block p-fluid-md rounded-xl bg-cyan/10">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 rounded-full bg-cyan/60 animate-bounce [animation-delay:300ms]" />
-                </div>
-              </div>
+            <div className="flex items-center gap-2 mt-4 text-ink/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-8" />
         </div>
       </div>
 
       {/* Input */}
-      <div className="border-t border-ink/10 bg-cream/80 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-fluid-lg py-fluid-md">
+      <div className="border-t border-glass-border">
+        <div className="max-w-3xl mx-auto px-6 py-4">
           <MessageInput
             onSubmit={sendMessage}
             disabled={loading}

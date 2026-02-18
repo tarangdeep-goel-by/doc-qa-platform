@@ -20,22 +20,22 @@
     scroll-behavior: smooth;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar — thin, dark */
   ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: theme('colors.cream.DEFAULT');
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: theme('colors.ink.DEFAULT' / 0.2);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: theme('colors.burgundy.DEFAULT' / 0.5);
+    background: rgba(255, 255, 255, 0.15);
   }
 }
 

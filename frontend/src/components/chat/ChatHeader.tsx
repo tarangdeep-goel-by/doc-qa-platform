@@ -14,7 +14,7 @@ export function ChatHeader({ chat }: Props) {
   const canRemove = selectedDocs.length > 1
 
   return (
-    <header className="border-b border-ink/10 bg-cream/80 backdrop-blur-sm">
+    <header className="border-b border-glass-border bg-glass backdrop-blur-xl">
       <div className="max-w-4xl mx-auto px-fluid-lg py-fluid-md">
         <h1 className="font-serif text-fluid-2xl text-ink font-medium mb-2">
           {chat.name}

@@ -89,14 +89,14 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-cream-dark/95 backdrop-blur-2xl border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-fluid-lg border-b border-ink/10">
-          <h2 className="font-serif text-fluid-xl text-ink">Create New Chat</h2>
+        <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
+          <h2 className="font-sans text-fluid-xl text-ink">Create New Chat</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-ink/5 rounded-lg transition-colors"
+            className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-ink/60" />
           </button>
@@ -115,7 +115,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Research on ML algorithms"
-                className="w-full px-fluid-md py-fluid-sm border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy/30 font-sans text-fluid-base"
+                className="w-full px-fluid-md py-fluid-sm border border-glass-border bg-glass rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy/30 font-sans text-fluid-base text-ink"
                 autoFocus
               />
             </div>
@@ -145,15 +145,15 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
               </div>
 
               {documents.length === 0 ? (
-                <p className="font-sans text-fluid-sm text-ink/50 p-fluid-md border border-ink/10 rounded-lg">
+                <p className="font-sans text-fluid-sm text-ink/50 p-fluid-md border border-glass-border rounded-lg">
                   No documents available. Upload one below to get started.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto border border-ink/10 rounded-lg p-fluid-sm">
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-glass-border rounded-lg p-fluid-sm">
                   {documents.map(doc => (
                     <label
                       key={doc.doc_id}
-                      className="flex items-start gap-3 p-fluid-sm rounded-lg hover:bg-ink/5 cursor-pointer"
+                      className="flex items-start gap-3 p-fluid-sm rounded-lg hover:bg-glass-hover cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -277,11 +277,11 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 p-fluid-lg border-t border-ink/10">
+          <div className="flex items-center justify-end gap-3 p-fluid-lg border-t border-glass-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-fluid-lg py-fluid-sm border border-ink/20 rounded-lg hover:bg-ink/5 transition-colors font-sans text-fluid-sm"
+              className="px-fluid-lg py-fluid-sm border border-ink/20 rounded-lg hover:bg-glass-hover transition-colors font-sans text-fluid-sm"
             >
               Cancel
             </button>

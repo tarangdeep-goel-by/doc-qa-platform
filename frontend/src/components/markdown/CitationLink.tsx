@@ -5,14 +5,20 @@ interface Props {
 
 export function CitationLink({ index, onClick }: Props) {
   return (
-    <sup>
-      <button
-        onClick={() => onClick(index)}
-        className="text-burgundy hover:underline font-sans text-[0.75em] font-medium cursor-pointer"
-        aria-label={`Go to source ${index}`}
-      >
-        [{index}]
-      </button>
-    </sup>
+    <button
+      onClick={() => onClick(index)}
+      className="
+        inline-flex items-center justify-center
+        min-w-[1.25rem] h-5 px-1
+        rounded-full bg-burgundy/20 text-burgundy
+        text-[0.65rem] font-sans font-bold
+        cursor-pointer hover:bg-burgundy/35
+        transition-colors align-middle mx-0.5
+        leading-none
+      "
+      aria-label={`Go to source ${index}`}
+    >
+      {index}
+    </button>
   )
 }

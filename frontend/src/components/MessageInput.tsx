@@ -1,4 +1,5 @@
 import { useState, FormEvent, KeyboardEvent } from 'react'
+import { Send } from 'lucide-react'
 
 interface Props {
   onSubmit: (question: string) => void
@@ -25,27 +26,35 @@ export function MessageInput({ onSubmit, disabled }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="relative">
-      <textarea
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder="Ask a question about your documents..."
-        className="w-full resize-none font-body text-fluid-base text-ink placeholder:text-ink/30 bg-transparent border-2 border-ink/10 focus:border-burgundy focus:outline-none px-fluid-md py-fluid-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        rows={3}
-      />
-      <div className="flex items-center justify-between mt-2">
-        <span className="font-sans text-fluid-xs text-ink/40">
-          Press Enter to send, Shift+Enter for new line
-        </span>
+      <div className="flex items-end gap-3 rounded-xl border border-glass-border bg-glass backdrop-blur-sm focus-within:border-burgundy/30 transition-colors">
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder="Ask a question about your documents..."
+          className="flex-1 resize-none font-sans text-fluid-base text-ink placeholder:text-ink/25 bg-transparent focus:outline-none px-4 py-3 min-h-[2.75rem] max-h-40 disabled:opacity-50 disabled:cursor-not-allowed"
+          rows={1}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement
+            target.style.height = 'auto'
+            target.style.height = Math.min(target.scrollHeight, 160) + 'px'
+          }}
+        />
         <button
           type="submit"
           disabled={disabled || !question.trim()}
-          className="px-fluid-md py-fluid-xs font-sans text-fluid-sm text-cream bg-burgundy hover:bg-burgundy-dark disabled:bg-ink/20 disabled:cursor-not-allowed transition-colors uppercase tracking-wider"
+          className="flex-shrink-0 p-2.5 m-1.5 rounded-lg
+            bg-burgundy text-cream hover:bg-burgundy-dark
+            disabled:bg-ink/10 disabled:text-ink/25 disabled:cursor-not-allowed
+            transition-colors"
         >
-          {disabled ? 'Thinking...' : 'Ask'}
+          <Send className="w-4 h-4" />
         </button>
       </div>
+      <p className="font-sans text-[0.65rem] text-ink/25 mt-1.5 text-center">
+        Enter to send · Shift+Enter for new line
+      </p>
     </form>
   )
 }

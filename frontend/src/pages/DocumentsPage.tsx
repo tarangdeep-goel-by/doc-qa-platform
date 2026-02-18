@@ -109,7 +109,7 @@ export function DocumentsPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-fluid-lg py-fluid-md border-b border-ink/10">
+      <div className="flex items-center justify-between px-fluid-lg py-fluid-md border-b border-glass-border">
         <div className="flex items-center gap-4">
           <h1 className="font-display text-fluid-2xl text-ink font-semibold">
             Documents
@@ -145,7 +145,7 @@ export function DocumentsPage() {
 
       {/* Bulk Actions Bar */}
       {documents.length > 0 && (
-        <div className="px-fluid-lg py-fluid-sm border-b border-ink/10 bg-ink/5">
+        <div className="px-fluid-lg py-fluid-sm border-b border-glass-border bg-glass">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -190,7 +190,7 @@ export function DocumentsPage() {
                 <div
                   key={doc.doc_id}
                   className={`
-                    border border-ink/10 rounded-lg p-fluid-md hover:border-burgundy/30 transition-colors
+                    border border-glass-border rounded-lg p-fluid-md hover:border-burgundy/30 transition-colors
                     ${isDeleting || isBulkDeleting ? 'opacity-50 pointer-events-none' : ''}
                     ${isSelected ? 'bg-burgundy/5 border-burgundy/30' : ''}
                   `}
@@ -257,7 +257,7 @@ export function DocumentsPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => handleView(doc)}
-                        className="p-2 hover:bg-ink/5 rounded-lg transition-colors"
+                        className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
                         title="View document"
                       >
                         <ExternalLink className="w-4 h-4 text-ink/60" />

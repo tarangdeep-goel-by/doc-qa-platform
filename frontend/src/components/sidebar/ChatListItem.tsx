@@ -53,7 +53,7 @@ export function ChatListItem({
           ? 'bg-burgundy/10 border border-burgundy/20'
           : isSelected
           ? 'bg-burgundy/5 border border-burgundy/30'
-          : 'hover:bg-ink/5 border border-transparent'
+          : 'hover:bg-glass-hover border border-transparent'
         }
         ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
       `}

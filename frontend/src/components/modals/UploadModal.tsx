@@ -104,14 +104,14 @@ export function UploadModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream rounded-xl shadow-2xl max-w-xl w-full">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-cream-dark/95 backdrop-blur-2xl border border-glass-border rounded-xl shadow-2xl max-w-xl w-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-fluid-lg border-b border-ink/10">
-          <h2 className="font-serif text-fluid-xl text-ink">Upload Document</h2>
+        <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
+          <h2 className="font-sans text-fluid-xl text-ink">Upload Document</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-ink/5 rounded-lg transition-colors"
+            className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
             disabled={uploading}
           >
             <X className="w-5 h-5 text-ink/60" />
@@ -130,7 +130,7 @@ export function UploadModal({ onClose }: Props) {
               border-2 border-dashed rounded-lg p-fluid-2xl text-center cursor-pointer transition-all
               ${isDragging
                 ? 'border-burgundy bg-burgundy/5'
-                : 'border-ink/20 hover:border-burgundy/50 hover:bg-ink/5'
+                : 'border-ink/20 hover:border-burgundy/50 hover:bg-glass-hover'
               }
               ${uploading ? 'pointer-events-none opacity-50' : ''}
             `}
@@ -156,7 +156,7 @@ export function UploadModal({ onClose }: Props) {
 
           {/* Selected File */}
           {selectedFile && (
-            <div className="flex items-start gap-3 p-fluid-md border border-ink/10 rounded-lg bg-ink/5">
+            <div className="flex items-start gap-3 p-fluid-md border border-glass-border rounded-lg bg-glass">
               <FileText className="w-5 h-5 text-burgundy flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="font-sans text-fluid-sm text-ink font-medium truncate">
@@ -213,12 +213,12 @@ export function UploadModal({ onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-fluid-lg border-t border-ink/10">
+        <div className="flex items-center justify-end gap-3 p-fluid-lg border-t border-glass-border">
           <button
             type="button"
             onClick={onClose}
             disabled={uploading}
-            className="px-fluid-lg py-fluid-sm border border-ink/20 rounded-lg hover:bg-ink/5 transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-fluid-lg py-fluid-sm border border-ink/20 rounded-lg hover:bg-glass-hover transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>

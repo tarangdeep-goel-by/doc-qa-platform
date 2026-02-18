@@ -8,22 +8,28 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: '#E4E4E4',
-          light: '#C0C0C0',
+          DEFAULT: '#f0f0f0',
+          light: '#a1a1aa',
         },
         cream: {
-          DEFAULT: '#2C2C2C',
-          dark: '#363636',
+          DEFAULT: '#09090b',
+          dark: '#18181b',
         },
         burgundy: {
-          DEFAULT: '#B39CD0',
-          light: '#C4B3DD',
-          dark: '#9A82B8',
+          DEFAULT: '#a78bfa',
+          light: '#c4b5fd',
+          dark: '#8b5cf6',
         },
         cyan: {
-          DEFAULT: '#A8DADC',
-          light: '#BDE4E6',
-          dark: '#8ECACD',
+          DEFAULT: '#67e8f9',
+          light: '#a5f3fc',
+          dark: '#22d3ee',
+        },
+        glass: {
+          DEFAULT: 'rgba(255,255,255,0.04)',
+          hover: 'rgba(255,255,255,0.07)',
+          border: 'rgba(255,255,255,0.08)',
+          strong: 'rgba(255,255,255,0.10)',
         },
       },
       fontFamily: {
@@ -50,5 +56,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
+  // Override prose defaults for dark theme
+  safelist: ['prose-invert'],
 }

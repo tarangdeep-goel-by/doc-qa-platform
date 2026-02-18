@@ -86,10 +86,10 @@ export function AppSidebar() {
 
   return (
     <>
-      <aside className="w-80 bg-cream border-r border-ink/10 flex flex-col">
+      <aside className="w-80 bg-glass backdrop-blur-xl border-r border-glass-border flex flex-col">
         {/* Header */}
-        <div className="p-fluid-lg border-b border-ink/10">
-          <h1 className="font-serif text-fluid-xl text-ink font-medium mb-fluid-md">
+        <div className="p-fluid-lg border-b border-glass-border">
+          <h1 className="font-sans text-fluid-xl text-ink font-medium mb-fluid-md">
             Document Q&A
           </h1>
 
@@ -133,14 +133,14 @@ export function AppSidebar() {
         </div>
 
         {/* Navigation */}
-        <div className="p-fluid-sm border-b border-ink/10">
+        <div className="p-fluid-sm border-b border-glass-border">
           <button
             onClick={() => navigate('/documents')}
             className={`
               w-full flex items-center gap-2 px-fluid-md py-fluid-sm rounded-lg transition-colors font-sans text-fluid-sm
               ${location.pathname === '/documents'
                 ? 'bg-burgundy/10 text-burgundy border border-burgundy/20'
-                : 'text-ink/70 hover:bg-ink/5'
+                : 'text-ink/70 hover:bg-glass-hover'
               }
             `}
           >
@@ -175,7 +175,7 @@ export function AppSidebar() {
         </div>
 
         {/* Footer */}
-        <div className="p-fluid-md border-t border-ink/10">
+        <div className="p-fluid-md border-t border-glass-border">
           <p className="font-sans text-fluid-xs text-ink/40 text-center">
             Powered by AI
           </p>
