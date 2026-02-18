@@ -81,6 +81,7 @@ def init_components():
         model_name=model_name,
         use_reranker=os.environ["USE_RERANKING"].lower() == "true",
         reranker_model=os.environ["RERANKER_MODEL"],
+        fast_model_name=os.environ.get("GEMINI_FAST_MODEL"),
     )
     print("Components ready.")
 

@@ -141,11 +141,13 @@ organization: <score>
 explanation: <one paragraph explaining your ratings>"""
 
     try:
-        response = client.models.generate_content(
+        from src.gemini_retry import gemini_retry
+
+        response = gemini_retry(lambda: client.models.generate_content(
             model=model_name,
             contents=prompt,
             config={"temperature": 0.1},
-        )
+        ))
         text = (response.text or "").strip()
         if not text:
             raise ValueError("Empty response from LLM judge")

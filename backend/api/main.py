@@ -71,7 +71,8 @@ async def lifespan(app: FastAPI):
         gemini_api_key=gemini_api_key,
         model_name=gemini_model,
         use_reranker=use_reranking,
-        reranker_model=reranker_model
+        reranker_model=reranker_model,
+        fast_model_name=os.environ.get("GEMINI_FAST_MODEL"),
     )
 
     # Store in app state
