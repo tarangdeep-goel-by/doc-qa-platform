@@ -1,9 +1,47 @@
 import type { Document, Chat, ChatMessage, Source } from '../types'
+import { useAuthStore } from '../store/authStore'
 
 const API_BASE = '/api'
 
+// --- Auth-aware fetch wrapper ---
+
+let refreshPromise: Promise<boolean> | null = null
+
+function getAuthHeaders(): Record<string, string> {
+  const token = useAuthStore.getState().accessToken
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function authFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  const headers = { ...getAuthHeaders(), ...(init?.headers || {}) }
+  let response = await fetch(input, { ...init, headers })
+
+  // Skip 401 refresh in B2C mode
+  if (response.status === 401 && useAuthStore.getState().authRequired) {
+    // Attempt single refresh (mutex to prevent races)
+    if (!refreshPromise) {
+      refreshPromise = useAuthStore.getState().refresh()
+    }
+    const ok = await refreshPromise
+    refreshPromise = null
+
+    if (ok) {
+      const retryHeaders = { ...getAuthHeaders(), ...(init?.headers || {}) }
+      response = await fetch(input, { ...init, headers: retryHeaders })
+    } else {
+      // Redirect to login
+      window.location.href = '/login'
+      throw new Error('Session expired')
+    }
+  }
+
+  return response
+}
+
+// --- Document API ---
+
 export async function fetchDocuments(): Promise<Document[]> {
-  const response = await fetch(`${API_BASE}/query/documents`)
+  const response = await authFetch(`${API_BASE}/query/documents`)
   if (!response.ok) {
     throw new Error('Failed to fetch documents')
   }
@@ -11,14 +49,12 @@ export async function fetchDocuments(): Promise<Document[]> {
   return data.documents
 }
 
-// Chat API functions
+// --- Chat API ---
 
 export async function createChat(name: string, docIds: string[], autoRoute: boolean = false): Promise<Chat> {
-  const response = await fetch(`${API_BASE}/chats`, {
+  const response = await authFetch(`${API_BASE}/chats`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name,
       doc_ids: docIds,
@@ -34,7 +70,7 @@ export async function createChat(name: string, docIds: string[], autoRoute: bool
 }
 
 export async function fetchChats(): Promise<Chat[]> {
-  const response = await fetch(`${API_BASE}/chats`)
+  const response = await authFetch(`${API_BASE}/chats`)
   if (!response.ok) {
     throw new Error('Failed to fetch chats')
   }
@@ -43,7 +79,7 @@ export async function fetchChats(): Promise<Chat[]> {
 }
 
 export async function fetchChat(chatId: string): Promise<{ chat: Chat; messages: ChatMessage[] }> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}`)
+  const response = await authFetch(`${API_BASE}/chats/${chatId}`)
   if (!response.ok) {
     throw new Error('Failed to fetch chat')
   }
@@ -51,11 +87,9 @@ export async function fetchChat(chatId: string): Promise<{ chat: Chat; messages:
 }
 
 export async function renameChat(chatId: string, name: string): Promise<Chat> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}`, {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   })
 
@@ -67,7 +101,7 @@ export async function renameChat(chatId: string, name: string): Promise<Chat> {
 }
 
 export async function deleteChat(chatId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}`, {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}`, {
     method: 'DELETE',
   })
 
@@ -90,11 +124,9 @@ export interface BulkDeleteChatsResponse {
 }
 
 export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChatsResponse> {
-  const response = await fetch(`${API_BASE}/chats/bulk-delete`, {
+  const response = await authFetch(`${API_BASE}/chats/bulk-delete`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_ids: chatIds }),
   })
 
@@ -106,7 +138,7 @@ export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChat
 }
 
 export async function removeChatDocument(chatId: string, docId: string): Promise<Chat> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}/documents/${docId}`, {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}/documents/${docId}`, {
     method: 'DELETE',
   })
 
@@ -129,14 +161,10 @@ export async function askInChatStream(
   question: string,
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}/ask`, {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}/ask`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      question,
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
   })
 
   if (!response.ok) {
@@ -189,7 +217,7 @@ export async function submitFeedback(
   messageId: string,
   feedback: 'up' | 'down'
 ): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/chats/${chatId}/messages/${messageId}/feedback`, {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}/messages/${messageId}/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ feedback }),
@@ -206,7 +234,7 @@ export async function uploadDocument(file: File): Promise<{ doc_id: string }> {
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch(`${API_BASE}/admin/upload`, {
+  const response = await authFetch(`${API_BASE}/admin/upload`, {
     method: 'POST',
     body: formData,
   })
@@ -227,7 +255,7 @@ export async function uploadDocument(file: File): Promise<{ doc_id: string }> {
 }
 
 export async function deleteDocument(docId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/admin/documents/${docId}`, {
+  const response = await authFetch(`${API_BASE}/admin/documents/${docId}`, {
     method: 'DELETE',
   })
 
@@ -250,11 +278,9 @@ export interface BulkDeleteResponse {
 }
 
 export async function bulkDeleteDocuments(docIds: string[]): Promise<BulkDeleteResponse> {
-  const response = await fetch(`${API_BASE}/admin/documents/bulk-delete`, {
+  const response = await authFetch(`${API_BASE}/admin/documents/bulk-delete`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ doc_ids: docIds }),
   })
 

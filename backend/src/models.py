@@ -136,6 +136,7 @@ class Chat:
     message_count: int = 0
     gemini_chat_history: List[Dict[str, Any]] = field(default_factory=list)
     auto_route: bool = False
+    user_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""

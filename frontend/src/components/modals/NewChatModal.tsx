@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import { useAuthStore } from '../../store/authStore'
 
 interface Props {
   onClose: () => void
@@ -9,6 +10,7 @@ interface Props {
 
 export function NewChatModal({ onClose, onChatCreated }: Props) {
   const { documents, createChat, uploadDocument, loadDocuments } = useAppStore()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [name, setName] = useState('')
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
   const [autoRoute, setAutoRoute] = useState(true)
@@ -196,8 +198,8 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
               )}
             </div>
 
-            {/* Upload document tile */}
-            <div>
+            {/* Upload document tile — admin only */}
+            {isAdmin && <div>
               <label className="block font-sans text-fluid-sm text-ink/70 mb-2">
                 Upload New Document
               </label>
@@ -273,7 +275,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                   </p>
                 </div>
               )}
-            </div>
+            </div>}
           </div>
 
           {/* Footer */}

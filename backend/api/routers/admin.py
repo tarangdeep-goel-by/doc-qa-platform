@@ -8,7 +8,7 @@ import uuid
 logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query, Depends
 from fastapi.responses import FileResponse
 
 from api.schemas import (
@@ -20,8 +20,10 @@ from api.schemas import (
     BulkDeleteResponse,
     DocumentDeleteResult
 )
+from api.auth import require_admin, get_current_user
 from api.helpers import build_document_list
 from src.models import DocumentMetadata, DocumentChunk
+from src.user_store import User
 from src.document_processor import DocumentProcessor
 from src.chunker import TextChunker
 from src.semantic_chunker import SemanticChunker
@@ -31,7 +33,7 @@ router = APIRouter()
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_document(request: Request, file: UploadFile = File(...)):
+async def upload_document(request: Request, file: UploadFile = File(...), _: User = Depends(require_admin)):
     """
     Upload and process a document.
 
@@ -185,7 +187,7 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 
 
 @router.get("/documents", response_model=DocumentListResponse)
-async def list_documents(request: Request):
+async def list_documents(request: Request, _: User = Depends(require_admin)):
     """List all uploaded documents with chat usage information."""
     document_infos = build_document_list(
         request.app.state.document_store,
@@ -195,7 +197,7 @@ async def list_documents(request: Request):
 
 
 @router.get("/documents/{doc_id}", response_model=DocumentDetailResponse)
-async def get_document(request: Request, doc_id: str):
+async def get_document(request: Request, doc_id: str, _: User = Depends(require_admin)):
     """Get detailed information about a document."""
     document_store = request.app.state.document_store
 
@@ -218,7 +220,7 @@ async def get_document(request: Request, doc_id: str):
 
 
 @router.delete("/documents/{doc_id}", response_model=DeleteResponse)
-async def delete_document(request: Request, doc_id: str):
+async def delete_document(request: Request, doc_id: str, _: User = Depends(require_admin)):
     """Delete a document and its chunks from the system."""
     vector_store = request.app.state.vector_store
     document_store = request.app.state.document_store
@@ -262,7 +264,7 @@ async def delete_document(request: Request, doc_id: str):
 
 
 @router.post("/documents/bulk-delete", response_model=BulkDeleteResponse)
-async def bulk_delete_documents(request: Request, bulk_request: BulkDeleteRequest):
+async def bulk_delete_documents(request: Request, bulk_request: BulkDeleteRequest, _: User = Depends(require_admin)):
     """
     Delete multiple documents at once.
 
@@ -332,11 +334,12 @@ async def bulk_delete_documents(request: Request, bulk_request: BulkDeleteReques
 
 
 @router.get("/documents/{doc_id}/file")
-async def download_document(request: Request, doc_id: str):
+async def download_document(request: Request, doc_id: str, _: User = Depends(get_current_user)):
     """
     Serve the document file.
 
     Can be opened in browser with #page=N anchor for specific pages.
+    Any authenticated user can access (clients need for source links).
     """
     document_store = request.app.state.document_store
 
@@ -369,6 +372,7 @@ async def get_interactions(
     request: Request,
     limit: int = Query(default=100, ge=1, le=1000),
     chat_id: Optional[str] = Query(default=None),
+    _: User = Depends(require_admin),
 ):
     """Get recent Q&A interactions."""
     interaction_logger = request.app.state.interaction_logger
@@ -381,6 +385,7 @@ async def get_feedback(
     limit: int = Query(default=100, ge=1, le=1000),
     chat_id: Optional[str] = Query(default=None),
     feedback: Optional[str] = Query(default=None, pattern="^(up|down)$"),
+    _: User = Depends(require_admin),
 ):
     """Get feedback entries."""
     feedback_store = request.app.state.feedback_store

@@ -1,4 +1,9 @@
-"""FastAPI application for document Q&A platform."""
+"""FastAPI application for document Q&A platform.
+
+Supports two modes:
+- SaaS (JWT_SECRET set): Full JWT auth, multi-user, role-based access
+- B2C  (JWT_SECRET empty): Open access, no login required
+"""
 
 import os
 from contextlib import asynccontextmanager
@@ -6,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from api.auth import AUTH_ENABLED
 from api.schemas import HealthResponse
 from src.embedder import Embedder
 from src.vector_store import VectorStore
@@ -43,6 +49,16 @@ async def lifespan(app: FastAPI):
     os.makedirs(upload_dir, exist_ok=True)
 
     print("Initializing application...")
+
+    # Initialize user store (SaaS mode only)
+    if AUTH_ENABLED:
+        from src.user_store import UserStore
+        print("Initializing user store...")
+        user_store = UserStore(db_path=os.path.join(data_dir, "users.db"))
+        app.state.user_store = user_store
+    else:
+        app.state.user_store = None
+        print("Auth disabled — running in open/B2C mode")
 
     # Initialize components
     print("Loading embedder...")
@@ -104,16 +120,17 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Document Q&A Platform",
-    description="RAG-based platform for uploading documents and asking questions",
-    version="1.0.0",
+    title="Document Q&A SaaS Platform",
+    description="RAG-based SaaS platform for document Q&A with JWT auth",
+    version="2.0.0",
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware — tighten origins via env var
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -121,6 +138,9 @@ app.add_middleware(
 
 # Include routers (imported here to avoid circular imports)
 from .routers import admin, query, chats
+if AUTH_ENABLED:
+    from .routers import auth_router
+    app.include_router(auth_router.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(chats.router, prefix="/api/chats", tags=["Chats"])
@@ -131,7 +151,7 @@ app.include_router(chats.router, prefix="/api/chats", tags=["Chats"])
 async def root():
     """Root endpoint."""
     return {
-        "message": "Document Q&A Platform API",
+        "message": "Document Q&A SaaS API",
         "docs": "/docs",
         "health": "/health"
     }
@@ -149,5 +169,6 @@ async def health_check():
     return HealthResponse(
         status="healthy" if qdrant_connected and gemini_configured else "unhealthy",
         qdrant_connected=qdrant_connected,
-        gemini_configured=gemini_configured
+        gemini_configured=gemini_configured,
+        auth_required=AUTH_ENABLED,
     )

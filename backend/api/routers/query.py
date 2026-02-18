@@ -1,6 +1,6 @@
 """User query endpoints for Q&A."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 
 from api.schemas import (
     QueryRequest,
@@ -8,13 +8,15 @@ from api.schemas import (
     SourceInfo,
     DocumentListResponse,
 )
+from api.auth import get_current_user
 from api.helpers import build_document_list
+from src.user_store import User
 
 router = APIRouter()
 
 
 @router.post("/ask", response_model=QueryResponse)
-async def ask_question(http_request: Request, query: QueryRequest):
+async def ask_question(http_request: Request, query: QueryRequest, _: User = Depends(get_current_user)):
     """
     Ask a question about uploaded documents.
 
@@ -73,7 +75,7 @@ async def ask_question(http_request: Request, query: QueryRequest):
 
 
 @router.get("/documents", response_model=DocumentListResponse)
-async def list_available_documents(request: Request):
+async def list_available_documents(request: Request, _: User = Depends(get_current_user)):
     """List documents available for querying with chat usage information."""
     document_infos = build_document_list(
         request.app.state.document_store,

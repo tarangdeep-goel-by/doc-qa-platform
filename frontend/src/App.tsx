@@ -4,6 +4,9 @@ import { AppLayout } from './layouts/AppLayout'
 import { NewChatScreen } from './components/chat/NewChatScreen'
 import { ChatInterface } from './components/chat/ChatInterface'
 import { DocumentsPage } from './pages/DocumentsPage'
+import { LoginPage } from './components/auth/LoginPage'
+import { RequireAuth } from './components/auth/RequireAuth'
+import { RequireRole } from './components/auth/RequireRole'
 
 function App() {
   return (
@@ -19,11 +22,22 @@ function App() {
         }}
       />
       <Routes>
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<NewChatScreen />} />
-          <Route path="chat/:chatId" element={<ChatInterface />} />
-          <Route path="documents" element={<DocumentsPage />} />
+        {/* Public */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Authenticated */}
+        <Route element={<RequireAuth />}>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<NewChatScreen />} />
+            <Route path="chat/:chatId" element={<ChatInterface />} />
+            <Route path="documents" element={
+              <RequireRole allow={(u) => u.role === 'admin' || !!u.features?.client_document_view}>
+                <DocumentsPage />
+              </RequireRole>
+            } />
+          </Route>
         </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

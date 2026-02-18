@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Plus, FileText, Trash2, X, Check } from 'lucide-react'
+import { Plus, FileText, Trash2, X, Check, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAppStore } from '../../store/appStore'
+import { useAuthStore } from '../../store/authStore'
 import { ChatListItem } from './ChatListItem'
 import { NewChatModal } from '../modals/NewChatModal'
 import * as api from '../../api/client'
@@ -12,10 +13,14 @@ export function AppSidebar() {
   const location = useLocation()
   const { chatId } = useParams()
   const { chats, loadChats, loadDocuments } = useAppStore()
+  const { user, logout, authRequired } = useAuthStore()
   const [showNewChatModal, setShowNewChatModal] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedChats, setSelectedChats] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const isAdmin = user?.role === 'admin'
+  const canViewDocs = isAdmin || !!user?.features?.client_document_view
 
   useEffect(() => {
     loadChats()
@@ -84,6 +89,11 @@ export function AppSidebar() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <>
       <aside className="w-80 bg-glass backdrop-blur-xl border-r border-glass-border flex flex-col">
@@ -132,22 +142,24 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Navigation */}
-        <div className="p-fluid-sm border-b border-glass-border">
-          <button
-            onClick={() => navigate('/documents')}
-            className={`
-              w-full flex items-center gap-2 px-fluid-md py-fluid-sm rounded-lg transition-colors font-sans text-fluid-sm
-              ${location.pathname === '/documents'
-                ? 'bg-burgundy/10 text-burgundy border border-burgundy/20'
-                : 'text-ink/70 hover:bg-glass-hover'
-              }
-            `}
-          >
-            <FileText className="w-4 h-4" />
-            Documents
-          </button>
-        </div>
+        {/* Navigation — documents link */}
+        {canViewDocs && (
+          <div className="p-fluid-sm border-b border-glass-border">
+            <button
+              onClick={() => navigate('/documents')}
+              className={`
+                w-full flex items-center gap-2 px-fluid-md py-fluid-sm rounded-lg transition-colors font-sans text-fluid-sm
+                ${location.pathname === '/documents'
+                  ? 'bg-burgundy/10 text-burgundy border border-burgundy/20'
+                  : 'text-ink/70 hover:bg-glass-hover'
+                }
+              `}
+            >
+              <FileText className="w-4 h-4" />
+              Documents
+            </button>
+          </div>
+        )}
 
         {/* Chat list */}
         <div className="flex-1 overflow-y-auto">
@@ -174,11 +186,31 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — user info + logout (SaaS only) */}
         <div className="p-fluid-md border-t border-glass-border">
-          <p className="font-sans text-fluid-xs text-ink/40 text-center">
-            Powered by AI
-          </p>
+          {authRequired && user ? (
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="font-sans text-fluid-xs text-ink/70 truncate">
+                  {user.email}
+                </p>
+                <p className="font-sans text-fluid-xs text-ink/40 capitalize">
+                  {user.role}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-ink/40 hover:text-ink/70 hover:bg-glass-hover rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <p className="font-sans text-fluid-xs text-ink/40 text-center">
+              Powered by AI
+            </p>
+          )}
         </div>
       </aside>
 

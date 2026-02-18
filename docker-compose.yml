@@ -17,6 +17,9 @@ x-env-common: &env-common
   USE_QUERY_DECOMPOSITION: "true"
   USE_ADAPTIVE_ALPHA: "true"
   TOP_K_RESULTS: "12"
+  JWT_SECRET: ${JWT_SECRET:-}
+  JWT_ACCESS_EXPIRY_MINUTES: "15"
+  JWT_REFRESH_EXPIRY_DAYS: "7"
 
 services:
   qdrant:
@@ -51,6 +54,8 @@ services:
       CHUNK_OVERLAP: "500"
       USE_SEMANTIC_CHUNKING: "false"
       USE_PDFPLUMBER: "true"
+      ALLOWED_ORIGINS: "http://localhost:3000"
+      CLIENT_DOCUMENT_VIEW: "true"
     depends_on:
       - qdrant
     restart: unless-stopped

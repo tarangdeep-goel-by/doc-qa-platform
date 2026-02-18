@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppStore } from '../store/appStore'
+import { useAuthStore } from '../store/authStore'
 import { UploadModal } from '../components/modals/UploadModal'
 import * as api from '../api/client'
 import type { Document } from '../types'
@@ -11,6 +12,7 @@ import type { Document } from '../types'
 export function DocumentsPage() {
   const navigate = useNavigate()
   const { documents, loadDocuments, deleteDocument } = useAppStore()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
@@ -120,31 +122,33 @@ export function DocumentsPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {selectedDocs.size > 0 && (
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            {selectedDocs.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="font-sans text-fluid-sm font-medium">
+                  Delete {selectedDocs.size}
+                </span>
+              </button>
+            )}
             <button
-              onClick={handleBulkDelete}
-              disabled={isBulkDeleting}
-              className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="font-sans text-fluid-sm font-medium">
-                Delete {selectedDocs.size}
-              </span>
+              <Upload className="w-4 h-4" />
+              <span className="font-sans text-fluid-sm font-medium">Upload</span>
             </button>
-          )}
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 px-fluid-md py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="font-sans text-fluid-sm font-medium">Upload</span>
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Bulk Actions Bar */}
-      {documents.length > 0 && (
+      {/* Bulk Actions Bar — admin only */}
+      {isAdmin && documents.length > 0 && (
         <div className="px-fluid-lg py-fluid-sm border-b border-glass-border bg-glass">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -169,15 +173,19 @@ export function DocumentsPage() {
               No documents yet
             </h2>
             <p className="font-sans text-fluid-sm text-ink/60 text-center max-w-md mb-fluid-lg">
-              Upload your first document to start asking questions. Supported: PDF, DOCX, HTML, TXT
+              {isAdmin
+                ? 'Upload your first document to start asking questions. Supported: PDF, DOCX, HTML, TXT'
+                : 'No documents have been uploaded yet. Please contact your admin.'}
             </p>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-fluid-lg py-fluid-md bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
-            >
-              <Upload className="w-5 h-5" />
-              <span className="font-sans text-fluid-base font-medium">Upload Document</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-fluid-lg py-fluid-md bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="font-sans text-fluid-base font-medium">Upload Document</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="px-fluid-lg py-fluid-md space-y-fluid-md">
@@ -196,15 +204,17 @@ export function DocumentsPage() {
                   `}
                 >
                   <div className="flex items-start gap-fluid-md">
-                    {/* Checkbox */}
-                    <div className="flex items-start pt-1">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelection(doc.doc_id)}
-                        className="w-4 h-4 rounded border-ink/20 text-burgundy focus:ring-burgundy"
-                      />
-                    </div>
+                    {/* Checkbox — admin only */}
+                    {isAdmin && (
+                      <div className="flex items-start pt-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(doc.doc_id)}
+                          className="w-4 h-4 rounded border-ink/20 text-burgundy focus:ring-burgundy"
+                        />
+                      </div>
+                    )}
 
                     {/* Document Info */}
                     <div className="flex-1 min-w-0">
@@ -262,14 +272,16 @@ export function DocumentsPage() {
                       >
                         <ExternalLink className="w-4 h-4 text-ink/60" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(doc)}
-                        className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="Delete document"
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(doc)}
+                          className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Delete document"
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -279,8 +291,8 @@ export function DocumentsPage() {
         )}
       </div>
 
-      {/* Upload Modal */}
-      {showUploadModal && (
+      {/* Upload Modal — admin only */}
+      {isAdmin && showUploadModal && (
         <UploadModal onClose={() => setShowUploadModal(false)} />
       )}
     </div>

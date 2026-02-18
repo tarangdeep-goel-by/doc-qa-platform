@@ -8,7 +8,7 @@ import uuid
 logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 
 from api.schemas import (
@@ -28,26 +28,30 @@ from api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
 )
+from api.auth import get_current_user
 from src.models import ChatMessage
+from src.user_store import User
 from src.doc_router import route_query
 
 router = APIRouter()
 
 
-@router.post("", response_model=ChatResponse)
-async def create_chat(request: Request, body: CreateChatRequest):
-    """
-    Create a new chat session.
+def _verify_chat_owner(chat, user: User):
+    """Return 404 if chat doesn't belong to user."""
+    if chat.user_id and chat.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Chat not found")
 
-    Associates specific documents with this chat.
-    """
+
+@router.post("", response_model=ChatResponse)
+async def create_chat(request: Request, body: CreateChatRequest, user: User = Depends(get_current_user)):
+    """Create a new chat session."""
     chat_manager = request.app.state.chat_manager
 
-    # Create chat
     chat = chat_manager.create_chat(
         name=body.name,
         doc_ids=body.doc_ids,
-        auto_route=body.auto_route
+        auto_route=body.auto_route,
+        user_id=user.id,
     )
 
     return ChatResponse(
@@ -62,11 +66,13 @@ async def create_chat(request: Request, body: CreateChatRequest):
 
 
 @router.get("", response_model=ChatListResponse)
-async def list_chats(request: Request):
-    """List all chat sessions sorted by updated_at (newest first)."""
+async def list_chats(request: Request, user: User = Depends(get_current_user)):
+    """List user's chat sessions sorted by updated_at (newest first)."""
     chat_manager = request.app.state.chat_manager
 
-    chats = chat_manager.list_chats()
+    all_chats = chat_manager.list_chats()
+    # Filter to user's chats only
+    user_chats = [c for c in all_chats if c.user_id == user.id]
 
     chat_responses = [
         ChatResponse(
@@ -78,14 +84,14 @@ async def list_chats(request: Request):
             message_count=chat.message_count,
             auto_route=chat.auto_route
         )
-        for chat in chats
+        for chat in user_chats
     ]
 
     return ChatListResponse(chats=chat_responses)
 
 
 @router.get("/{chat_id}", response_model=ChatDetailResponse)
-async def get_chat(request: Request, chat_id: str):
+async def get_chat(request: Request, chat_id: str, user: User = Depends(get_current_user)):
     """Get chat details with all messages."""
     chat_manager = request.app.state.chat_manager
     document_store = request.app.state.document_store
@@ -94,6 +100,8 @@ async def get_chat(request: Request, chat_id: str):
 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+
+    _verify_chat_owner(chat, user)
 
     # Validate documents still exist
     missing_docs = []
@@ -141,16 +149,16 @@ async def get_chat(request: Request, chat_id: str):
 
 
 @router.patch("/{chat_id}", response_model=ChatResponse)
-async def rename_chat(request: Request, chat_id: str, body: RenameChatRequest):
+async def rename_chat(request: Request, chat_id: str, body: RenameChatRequest, user: User = Depends(get_current_user)):
     """Rename a chat."""
     chat_manager = request.app.state.chat_manager
 
-    success = chat_manager.rename_chat(chat_id, body.name)
-
-    if not success:
+    chat, _ = chat_manager.get_chat(chat_id)
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
 
-    # Get updated chat
+    chat_manager.rename_chat(chat_id, body.name)
     chat, _ = chat_manager.get_chat(chat_id)
 
     return ChatResponse(
@@ -165,28 +173,26 @@ async def rename_chat(request: Request, chat_id: str, body: RenameChatRequest):
 
 
 @router.delete("/{chat_id}", response_model=DeleteChatResponse)
-async def delete_chat(request: Request, chat_id: str):
+async def delete_chat(request: Request, chat_id: str, user: User = Depends(get_current_user)):
     """Delete a chat and all its messages."""
     chat_manager = request.app.state.chat_manager
 
-    success = chat_manager.delete_chat(chat_id)
-
-    if not success:
+    chat, _ = chat_manager.get_chat(chat_id)
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
+
+    chat_manager.delete_chat(chat_id)
 
     return DeleteChatResponse(
         success=True,
-        message=f"Chat deleted successfully"
+        message="Chat deleted successfully"
     )
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteChatsResponse)
-async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsRequest):
-    """
-    Delete multiple chats at once.
-
-    Returns status for each chat deletion attempt.
-    """
+async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsRequest, user: User = Depends(get_current_user)):
+    """Delete multiple chats at once."""
     chat_manager = request.app.state.chat_manager
 
     results = []
@@ -195,10 +201,9 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
 
     for chat_id in bulk_request.chat_ids:
         try:
-            # Get chat info for better error message
             chat, _ = chat_manager.get_chat(chat_id)
 
-            if not chat:
+            if not chat or (chat.user_id and chat.user_id != user.id):
                 results.append(ChatDeleteResult(
                     chat_id=chat_id,
                     success=False,
@@ -207,7 +212,6 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
                 failed += 1
                 continue
 
-            # Delete chat
             success = chat_manager.delete_chat(chat_id)
 
             if success:
@@ -242,13 +246,14 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
 
 
 @router.delete("/{chat_id}/documents/{doc_id}", response_model=ChatResponse)
-async def remove_chat_document(request: Request, chat_id: str, doc_id: str):
+async def remove_chat_document(request: Request, chat_id: str, doc_id: str, user: User = Depends(get_current_user)):
     """Remove a document from a chat's doc_ids."""
     chat_manager = request.app.state.chat_manager
 
     chat, _ = chat_manager.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
 
     if doc_id not in chat.doc_ids:
         raise HTTPException(status_code=404, detail="Document not in this chat")
@@ -268,24 +273,16 @@ async def remove_chat_document(request: Request, chat_id: str, doc_id: str):
 
 
 @router.post("/{chat_id}/ask")
-async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
-    """
-    Ask a question in a chat context. Returns SSE stream.
-
-    Event format:
-        data: {"type": "retrieval_done", "sources": [...]}\n\n
-        data: {"type": "chunk", "content": "partial text..."}\n\n
-        data: {"type": "done", "message_id": "uuid"}\n\n
-        data: {"type": "error", "detail": "..."}\n\n
-    """
+async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest, user: User = Depends(get_current_user)):
+    """Ask a question in a chat context. Returns SSE stream."""
     chat_manager = request.app.state.chat_manager
     qa_engine = request.app.state.qa_engine
     document_store = request.app.state.document_store
 
-    # Validate chat exists (raise before streaming starts)
     chat, messages = chat_manager.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
 
     # Auto-route: on first question, detect relevant docs via BM25
     routed_doc_ids = None
@@ -440,7 +437,8 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest):
 
 @router.post("/{chat_id}/messages/{message_id}/feedback", response_model=FeedbackResponse)
 async def submit_feedback(
-    request: Request, chat_id: str, message_id: str, body: FeedbackRequest
+    request: Request, chat_id: str, message_id: str, body: FeedbackRequest,
+    user: User = Depends(get_current_user),
 ):
     """Submit thumbs up/down feedback on an assistant message."""
     chat_manager = request.app.state.chat_manager
@@ -449,6 +447,7 @@ async def submit_feedback(
     chat, messages = chat_manager.get_chat(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
 
     # Find the assistant message
     target_msg = None

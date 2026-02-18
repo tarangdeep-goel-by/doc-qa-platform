@@ -111,6 +111,7 @@ class HealthResponse(BaseModel):
     status: str
     qdrant_connected: bool
     gemini_configured: bool
+    auth_required: bool = True
 
 
 # Chat Schemas
@@ -206,3 +207,24 @@ class FeedbackRequest(BaseModel):
 class FeedbackResponse(BaseModel):
     """Response after submitting feedback."""
     success: bool
+
+
+# Auth Schemas
+class LoginRequest(BaseModel):
+    """Login request."""
+    email: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class UserInfo(BaseModel):
+    """Public user info."""
+    id: str
+    email: str
+    role: str
+    features: Dict[str, bool] = Field(default_factory=dict)
+
+
+class LoginResponse(BaseModel):
+    """Login response with access token."""
+    access_token: str
+    user: UserInfo

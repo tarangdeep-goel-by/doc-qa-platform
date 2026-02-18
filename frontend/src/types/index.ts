@@ -1,3 +1,15 @@
+export interface User {
+  id: string
+  email: string
+  role: 'admin' | 'client'
+  features?: Record<string, boolean>
+}
+
+export interface LoginResponse {
+  access_token: string
+  user: User
+}
+
 export interface ChatUsageInfo {
   id: string
   name: string
