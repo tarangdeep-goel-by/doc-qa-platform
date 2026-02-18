@@ -1,12 +1,12 @@
 """Question-answering engine using RAG (Retrieval Augmented Generation)."""
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from google import genai
 from .embedder import Embedder
 from .vector_store import VectorStore
 from .reranker import Reranker
+from .structure_detector import detect_structure
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +21,22 @@ class QAEngine:
         gemini_api_key: str,
         model_name: str,
         use_reranker: bool,
-        reranker_model: str,
-        fast_model_name: str = None
+        reranker_model: str
     ):
+        """
+        Initialize QA engine.
+
+        Args:
+            embedder: Embedder instance
+            vector_store: VectorStore instance
+            gemini_api_key: Google Gemini API key
+            model_name: Gemini model name
+            use_reranker: Whether to initialize reranker (slower startup, better quality)
+            reranker_model: Cross-encoder model name for reranking
+        """
         self.embedder = embedder
         self.vector_store = vector_store
-        self.fast_model_name = fast_model_name or model_name
+        self.model_name = model_name
 
         # Create Gemini client (new SDK)
         self.client = genai.Client(api_key=gemini_api_key)
@@ -35,77 +45,92 @@ class QAEngine:
         self.reranker = Reranker(model_name=reranker_model) if use_reranker else None
         self.use_reranking = use_reranker
 
-    def _classify_and_expand(self, question: str, num_variants: int = 2) -> Dict[str, Any]:
-        """Classify question complexity and generate expansion variants in a single Gemini call.
+    def _expand_query(self, question: str, num_variants: int) -> List[str]:
+        """
+        Generate alternative phrasings of the question to improve recall.
 
-        Replaces separate _is_complex_question + _expand_query/_decompose_query calls,
-        saving one Gemini round-trip per question. Also fixes NoneType crash when
-        Gemini returns empty response for classification.
+        Args:
+            question: Original user question
+            num_variants: Number of alternative phrasings to generate
 
         Returns:
-            dict with is_complex, variants (original + alternatives), sub_questions (if complex)
+            List of query variants [original, variant1, variant2, ...]
         """
         try:
+            prompt = f"""Generate {num_variants} alternative ways to phrase this question.
+Keep the core intent but use different words, synonyms, or perspectives.
+Each variant should be concise and clear.
+
+Question: {question}
+
+Return ONLY the {num_variants} variants, one per line, without numbering or additional text."""
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+            variants_text = (response.text or "").strip()
+
+            # Parse variants (one per line)
+            variants = [v.strip() for v in variants_text.split('\n') if v.strip()]
+
+            # Limit to requested number
+            variants = variants[:num_variants]
+
+            # Return original + variants
+            return [question] + variants
+
+        except Exception as e:
+            # If expansion fails, fall back to original query only
+            print(f"Warning: Query expansion failed: {e}")
+            return [question]
+
+    def _is_complex_question(self, question: str) -> bool:
+        """Classify whether a question needs decomposition into sub-questions."""
+        try:
             prompt = (
-                f"Analyze this question. Respond in the EXACT format below.\n\n"
-                f"1. Classify as SIMPLE or COMPLEX:\n"
-                f"   - COMPLEX = asks about multiple distinct topics, requires comparing/contrasting, "
-                f"or needs information from different sections\n"
-                f"   - SIMPLE = asks about one specific thing\n\n"
-                f"2. Write {num_variants} alternative phrasings using different words or perspectives.\n\n"
-                f"3. If COMPLEX, also break into 2-4 simpler sub-questions (each independently answerable).\n\n"
+                "Classify this question as SIMPLE or COMPLEX.\n"
+                "COMPLEX = asks about multiple distinct topics, requires comparing/contrasting, "
+                "or needs information from different sections.\n"
+                "SIMPLE = asks about one specific thing.\n\n"
                 f"Question: {question}\n\n"
-                f"CLASSIFICATION: [SIMPLE or COMPLEX]\n"
-                f"VARIANTS:\n"
-                f"1. [alternative phrasing]\n"
-                f"2. [alternative phrasing]\n"
-                f"SUB_QUESTIONS:\n"
-                f"1. [only if COMPLEX, otherwise write NONE]"
+                "Reply with ONLY the word SIMPLE or COMPLEX."
             )
             response = self.client.models.generate_content(
-                model=self.fast_model_name,
+                model=self.model_name,
                 contents=prompt,
-                config={"temperature": 0.2, "maxOutputTokens": 512}
+                config={"temperature": 0.0, "maxOutputTokens": 10}
             )
-
-            text = (response.text or "").strip()
-            if not text:
-                return {"is_complex": False, "variants": [question], "sub_questions": []}
-
-            is_complex = False
-            variants = []
-            sub_questions = []
-            section = None
-
-            for line in text.split("\n"):
-                line = line.strip()
-                if not line:
-                    continue
-                upper = line.upper()
-                if "CLASSIFICATION:" in upper:
-                    is_complex = "COMPLEX" in upper
-                    section = "classification"
-                elif upper.startswith("VARIANT"):
-                    section = "variants"
-                elif "SUB_QUESTION" in upper.replace("-", "_").replace(" ", "_"):
-                    section = "sub_questions"
-                elif section == "variants" and len(line) > 2 and line[0].isdigit():
-                    item = line.lstrip("0123456789.-) ").strip()
-                    if len(item) > 10:
-                        variants.append(item)
-                elif section == "sub_questions" and len(line) > 2 and line[0].isdigit():
-                    item = line.lstrip("0123456789.-) ").strip()
-                    if len(item) > 10:
-                        sub_questions.append(item)
-
-            return {
-                "is_complex": is_complex,
-                "variants": [question] + variants[:num_variants],
-                "sub_questions": sub_questions[:4] if is_complex else [],
-            }
+            text = response.text or ""
+            return "COMPLEX" in text.strip().upper()
         except Exception as e:
-            logger.warning(f"classify_and_expand failed: {e}")
-            return {"is_complex": False, "variants": [question], "sub_questions": []}
+            print(f"Warning: Complexity classification failed: {e}")
+            return False
+
+    def _decompose_query(self, question: str) -> List[str]:
+        """Break a complex question into 2-4 simpler sub-questions."""
+        try:
+            prompt = (
+                "Break this complex question into 2-4 simpler sub-questions.\n"
+                "Each sub-question should be independently answerable from a document.\n"
+                "Keep sub-questions concise and specific.\n\n"
+                f"Question: {question}\n\n"
+                "Return ONLY the sub-questions, one per line, no numbering or bullets."
+            )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config={"temperature": 0.2, "maxOutputTokens": 256}
+            )
+            subs = [
+                line.strip().lstrip("0123456789.-) ")
+                for line in (response.text or "").strip().split("\n")
+                if line.strip() and len(line.strip()) > 10
+            ]
+            return subs[:4] if subs else [question]
+        except Exception as e:
+            print(f"Warning: Query decomposition failed: {e}")
+            return [question]
 
     def _synthesize_answers(
         self, question: str, sub_results: List[Dict[str, Any]]
@@ -169,11 +194,13 @@ class QAEngine:
         query_embedding: List[float],
         doc_ids: Optional[List[str]] = None,
         top_k: int = 12
-    ) -> float:
+    ) -> Tuple[List[Dict], float]:
         """
-        Try multiple alpha values for hybrid search and pick the best based on
-        top retrieval score. Returns only the selected alpha — the caller handles
-        searching and reranking with that alpha.
+        Try multiple alpha values for hybrid search and pick the best based on reranker confidence.
+
+        This addresses the issue where technical documents (with exact terms like "FX5U")
+        need BM25-heavy search (low alpha), while narrative content works better with
+        vector-heavy search (high alpha).
 
         Args:
             question: User question
@@ -182,47 +209,50 @@ class QAEngine:
             top_k: Number of results to return
 
         Returns:
-            Selected alpha value
+            Tuple of (best_results, selected_alpha)
         """
         alphas = [0.2, 0.5, 0.8]  # BM25-heavy, balanced, vector-heavy
+        candidates = {}
 
-        # Run all hybrid searches in parallel (stateless HTTP + read-only BM25)
-        def _search_for_alpha(alpha):
-            return alpha, self.vector_store.hybrid_search(
+        for alpha in alphas:
+            # Run hybrid search with this alpha
+            results = self.vector_store.hybrid_search(
                 query_vector=query_embedding,
                 query_text=question,
                 top_k=top_k,
                 doc_ids=doc_ids,
                 alpha=alpha,
+                use_rrf=True
             )
 
-        search_results_by_alpha = {}
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [executor.submit(_search_for_alpha, a) for a in alphas]
-            for future in futures:
-                try:
-                    alpha, results = future.result()
-                    if results:
-                        search_results_by_alpha[alpha] = results
-                except Exception as e:
-                    logger.warning(f"Alpha search failed: {e}")
+            if not results:
+                continue
 
-        if not search_results_by_alpha:
-            return 0.5
+            # Score with reranker to determine confidence
+            if self.use_reranking and self.reranker:
+                reranked = self.reranker.rerank(question, results)
+                # Use top reranker score as confidence metric
+                top_score = reranked[0]["rerank_score"] if reranked else -999
+                candidates[alpha] = (results, reranked, top_score)
+            else:
+                # Fallback: use retrieval score
+                top_score = results[0]["score"] if results else -999
+                candidates[alpha] = (results, None, top_score)
 
-        # Pick alpha with highest top retrieval score (no reranking needed)
-        best_alpha = max(
-            search_results_by_alpha,
-            key=lambda a: search_results_by_alpha[a][0]["score"]
-        )
-        best_score = search_results_by_alpha[best_alpha][0]["score"]
+        if not candidates:
+            return [], 0.5
+
+        # Pick alpha with highest reranker confidence
+        best_alpha = max(candidates, key=lambda a: candidates[a][2])
+        best_results, best_reranked, best_score = candidates[best_alpha]
 
         logger.info(
-            f"Alpha selection: tried {list(search_results_by_alpha.keys())}, "
+            f"Alpha selection: tried {list(candidates.keys())}, "
             f"picked alpha={best_alpha} (score={best_score:.3f})"
         )
 
-        return best_alpha
+        # Return reranked results if available, otherwise original
+        return best_reranked or best_results, best_alpha
 
     def _boost_by_structure(
         self, chunks: List[Dict], query_type: str, boost_factor: float = 0.15
@@ -265,242 +295,9 @@ class QAEngine:
         boosted.sort(key=lambda x: x["score"], reverse=True)
 
         if boost_count > 0:
-            logger.info(f"Structure boost: {boost_count}/{len(chunks)} chunks boosted for query_type={query_type}")
+            print(f"Structure boost: {boost_count}/{len(chunks)} chunks boosted for query_type={query_type}")
 
         return boosted
-
-    def _retrieve(
-        self,
-        question: str,
-        top_k: int,
-        doc_ids: Optional[List[str]] = None,
-        chat_history: Optional[List[Dict]] = None,
-        use_hybrid: bool = True,
-        hybrid_alpha: float = 0.5,
-        use_reranking: bool = True,
-        min_score: float = 0.3,
-        use_query_expansion: bool = False,
-        query_expansion_variants: int = 2,
-        rerank_blending: str = "position_aware",
-        use_query_decomposition: bool = False,
-        use_adaptive_alpha: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Run retrieval pipeline: classify, search, rerank, filter.
-
-        Returns dict with keys:
-            - search_results: filtered chunks
-            - sources: formatted sources list
-            - context: formatted context string
-            - prompt: final LLM prompt
-            - query_type: classified query type
-            - early_return: None or a complete response dict (for empty/low-confidence/decomposed)
-            - decomposed_result: full response dict if query was decomposed, else None
-        """
-        # Guard: empty question
-        if not question or not question.strip():
-            return {
-                "early_return": {
-                    "question": question,
-                    "answer": "I don't have enough information to answer an empty question. Please provide a specific question about your documents.",
-                    "sources": [],
-                    "low_confidence": True,
-                    "retrieved_count": 0,
-                    "_chunks": [],
-                }
-            }
-
-        # Step 0+1: Combined classification + expansion (single Gemini call)
-        query_variants = [question]
-        query_weights = [1.0]
-
-        if use_query_decomposition or use_query_expansion:
-            # Parallel: classify+expand and embed original question concurrently
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                ce_future = executor.submit(self._classify_and_expand, question, query_expansion_variants)
-                embed_future = executor.submit(self.embedder.embed_text, question)
-
-                ce_result = ce_future.result()
-                original_embedding = embed_future.result()
-
-            # Handle complex question decomposition
-            if use_query_decomposition and ce_result["is_complex"]:
-                sub_questions = ce_result["sub_questions"]
-                logger.info(f"Query decomposition: COMPLEX, {len(sub_questions)} sub-questions: {sub_questions}")
-
-                if len(sub_questions) > 1:
-                    def _run_sub_question(sq):
-                        return self.answer_question(
-                            question=sq,
-                            top_k=top_k,
-                            doc_ids=doc_ids,
-                            use_hybrid=use_hybrid,
-                            hybrid_alpha=hybrid_alpha,
-                            use_reranking=use_reranking,
-                            min_score=min_score,
-                            use_query_expansion=use_query_expansion,
-                            query_expansion_variants=query_expansion_variants,
-                            rerank_blending=rerank_blending,
-                            use_query_decomposition=False,
-                            use_adaptive_alpha=use_adaptive_alpha,
-                        )
-
-                    with ThreadPoolExecutor(max_workers=len(sub_questions)) as executor:
-                        sub_results = list(executor.map(_run_sub_question, sub_questions))
-
-                    all_sources = []
-                    for sr in sub_results:
-                        all_sources.extend(sr.get("sources", []))
-
-                    seen_texts = set()
-                    unique_sources = []
-                    for s in all_sources:
-                        key = s["chunk_text"][:100]
-                        if key not in seen_texts:
-                            seen_texts.add(key)
-                            unique_sources.append(s)
-
-                    return {
-                        "early_return": None,
-                        "decomposed_result": {
-                            "question": question,
-                            "sub_results": sub_results,
-                            "sources": unique_sources[:top_k],
-                            "retrieved_count": len(unique_sources),
-                            "sub_questions": [sr["question"] for sr in sub_results],
-                        }
-                    }
-
-            # Use query variants for expansion (simple questions or decomp disabled)
-            if use_query_expansion:
-                query_variants = ce_result["variants"]
-                query_weights = [2.0] + [1.0] * (len(query_variants) - 1)
-
-            # Embed extra variants in batch (original already done in parallel)
-            if use_query_expansion and len(query_variants) > 1:
-                extra_variants = query_variants[1:]  # skip original
-                extra_embeddings = list(self.embedder.embed_texts(extra_variants))
-                query_embeddings = [original_embedding] + extra_embeddings
-            else:
-                query_embeddings = [original_embedding]
-        else:
-            query_embeddings = [self.embedder.embed_text(question)]
-
-        # Pipeline config logging
-        logger.info(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
-
-        # Step 3: Retrieve relevant chunks (get more candidates if reranking)
-        retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
-
-        # Phase A: Find best alpha via parallel search
-        alpha_selected = None
-        if use_adaptive_alpha and use_hybrid:
-            alpha_selected = self._search_with_alpha_selection(
-                question=question,
-                query_embedding=query_embeddings[0],
-                doc_ids=doc_ids,
-                top_k=retrieval_k
-            )
-            logger.info(f"Pipeline: adaptive alpha selected={alpha_selected}")
-
-        # Phase B: Main retrieval using best alpha (or default)
-        effective_alpha = alpha_selected if alpha_selected is not None else hybrid_alpha
-
-        if use_query_expansion and len(query_variants) > 1:
-            search_results = self.vector_store.multi_query_hybrid_search(
-                query_variants=query_variants,
-                query_embeddings=query_embeddings,
-                query_weights=query_weights,
-                top_k=retrieval_k,
-                doc_ids=doc_ids,
-                alpha=effective_alpha,
-            )
-        elif use_hybrid:
-            search_results = self.vector_store.hybrid_search(
-                query_vector=query_embeddings[0],
-                query_text=query_variants[0],
-                top_k=retrieval_k,
-                doc_ids=doc_ids,
-                alpha=effective_alpha,
-            )
-        else:
-            search_results = self.vector_store.search(
-                query_vector=query_embeddings[0],
-                top_k=retrieval_k,
-                doc_ids=doc_ids
-            )
-
-        logger.info(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
-
-        # Step 2.5: Rerank
-        if use_reranking and self.reranker and search_results:
-            pre_rerank_count = len(search_results)
-            search_results = self.reranker.rerank_with_position_blending(
-                query=question,
-                chunks=search_results,
-                blend_strategy=rerank_blending
-            )
-            logger.info(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
-
-        # Step 2.6-2.9: Post-processing
-        search_results = self._deduplicate_chunks(search_results)
-        search_results = self._filter_noise_chunks(search_results)
-        search_results = self._dynamic_score_cutoff(search_results)
-
-        query_type = self._classify_query_type(question)
-        if query_type != "general":
-            search_results = self._boost_by_structure(search_results, query_type)
-
-        # Check confidence
-        reranking_applied = use_reranking and self.reranker and len(search_results) > 0
-
-        if not search_results:
-            return {
-                "early_return": {
-                    "question": question,
-                    "answer": "I couldn't find any relevant information in the documents to answer this question.",
-                    "sources": [],
-                    "retrieved_count": 0,
-                    "low_confidence": True,
-                    "_chunks": [],
-                }
-            }
-
-        top_score = search_results[0]["score"] if search_results else 0
-        if not reranking_applied and top_score < min_score:
-            return {
-                "early_return": {
-                    "question": question,
-                    "answer": (
-                        "I don't have enough information to answer that question confidently. "
-                        "This could mean:\n"
-                        "- The information isn't in the uploaded documents\n"
-                        "- The question needs to be more specific\n"
-                        "- Try rephrasing or check if the right documents are uploaded"
-                    ),
-                    "sources": self._format_sources(search_results),
-                    "retrieved_count": len(search_results),
-                    "low_confidence": True,
-                    "top_score": top_score,
-                    "_chunks": search_results,
-                }
-            }
-
-        logger.info(f"Pipeline: {len(search_results)} chunks sent to LLM")
-
-        context = self._format_context_with_sources(search_results)
-        sources = self._format_sources(search_results)
-        prompt = self._build_prompt(question, context, query_type, chat_history=chat_history)
-
-        return {
-            "early_return": None,
-            "decomposed_result": None,
-            "search_results": search_results,
-            "sources": sources,
-            "context": context,
-            "prompt": prompt,
-            "query_type": query_type,
-        }
 
     def answer_question(
         self,
@@ -514,136 +311,241 @@ class QAEngine:
         min_score: float = 0.3,
         use_query_expansion: bool = False,
         query_expansion_variants: int = 2,
+        use_rrf: bool = True,
         rerank_blending: str = "position_aware",
         use_query_decomposition: bool = False,
         use_adaptive_alpha: bool = True
     ) -> Dict[str, Any]:
-        """Answer a question using RAG pipeline (non-streaming)."""
-        retrieval = self._retrieve(
-            question=question,
-            top_k=top_k,
-            doc_ids=doc_ids,
-            chat_history=chat_history,
-            use_hybrid=use_hybrid,
-            hybrid_alpha=hybrid_alpha,
-            use_reranking=use_reranking,
-            min_score=min_score,
-            use_query_expansion=use_query_expansion,
-            query_expansion_variants=query_expansion_variants,
-            rerank_blending=rerank_blending,
-            use_query_decomposition=use_query_decomposition,
-            use_adaptive_alpha=use_adaptive_alpha,
-        )
+        """
+        Answer a question using RAG pipeline.
 
-        # Handle early returns (empty, low-confidence)
-        if retrieval.get("early_return"):
-            return retrieval["early_return"]
+        Args:
+            question: User question
+            top_k: Number of chunks to retrieve
+            doc_ids: Optional list of document IDs to filter search
+            chat_history: Optional chat history for context (Gemini format)
+            use_hybrid: Whether to use hybrid search (vector + BM25) or pure vector
+            hybrid_alpha: Weight for hybrid search (0=all BM25, 1=all vector, 0.5=balanced)
+            use_reranking: Whether to rerank results with cross-encoder
+            min_score: Minimum confidence score threshold (0-1)
+            use_query_expansion: Whether to generate alternative query phrasings (improves recall)
+            query_expansion_variants: Number of alternative phrasings to generate
+            use_rrf: Whether to use Reciprocal Rank Fusion (True) or weighted fusion (False)
+            rerank_blending: Blending strategy for reranking ("position_aware" or "replace")
+            use_query_decomposition: Whether to decompose complex questions into sub-questions
+            use_adaptive_alpha: Whether to try multiple alpha values and pick best (improves technical doc retrieval)
 
-        # Handle decomposed queries
-        if retrieval.get("decomposed_result"):
-            dr = retrieval["decomposed_result"]
-            answer = self._synthesize_answers(question, dr["sub_results"])
+        Returns:
+            Dictionary with answer and sources
+        """
+        # Step 0: Query decomposition (if enabled)
+        if use_query_decomposition and self._is_complex_question(question):
+            print(f"Query decomposition: question classified as COMPLEX")
+            sub_questions = self._decompose_query(question)
+            print(f"Query decomposition: {len(sub_questions)} sub-questions: {sub_questions}")
+
+            if len(sub_questions) > 1:
+                # Answer each sub-question through the full pipeline (without decomposition)
+                sub_results = []
+                all_sources = []
+                for sq in sub_questions:
+                    sr = self.answer_question(
+                        question=sq,
+                        top_k=top_k,
+                        doc_ids=doc_ids,
+                        use_hybrid=use_hybrid,
+                        hybrid_alpha=hybrid_alpha,
+                        use_reranking=use_reranking,
+                        min_score=min_score,
+                        use_query_expansion=use_query_expansion,
+                        query_expansion_variants=query_expansion_variants,
+                        use_rrf=use_rrf,
+                        rerank_blending=rerank_blending,
+                        use_query_decomposition=False,  # prevent recursion
+                        use_adaptive_alpha=use_adaptive_alpha,
+                    )
+                    sub_results.append(sr)
+                    all_sources.extend(sr.get("sources", []))
+
+                # Deduplicate sources across sub-answers
+                seen_texts = set()
+                unique_sources = []
+                for s in all_sources:
+                    key = s["chunk_text"][:100]
+                    if key not in seen_texts:
+                        seen_texts.add(key)
+                        unique_sources.append(s)
+
+                # Synthesize final answer
+                answer = self._synthesize_answers(question, sub_results)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "sources": unique_sources[:top_k],
+                    "retrieved_count": len(unique_sources),
+                    "decomposed": True,
+                    "sub_questions": [sr["question"] for sr in sub_results],
+                }
+
+        # Pipeline config logging
+        print(f"Pipeline config: top_k={top_k}, hybrid={use_hybrid}, reranking={use_reranking}, expansion={use_query_expansion}, rrf={use_rrf}, decomp={use_query_decomposition}, adaptive_alpha={use_adaptive_alpha}")
+
+        # Step 1: Query expansion (if enabled)
+        if use_query_expansion:
+            query_variants = self._expand_query(question, num_variants=query_expansion_variants)
+            # Weight original query 2×, variants 1× each
+            query_weights = [2.0] + [1.0] * query_expansion_variants
+        else:
+            query_variants = [question]
+            query_weights = [1.0]
+
+        # Step 2: Embed all query variants
+        query_embeddings = [self.embedder.embed_text(q) for q in query_variants]
+
+        # Step 3: Retrieve relevant chunks (get more candidates if reranking)
+        retrieval_k = top_k * 2 if use_reranking and self.reranker else top_k
+
+        # Use adaptive alpha selection for single-query hybrid search (most impactful case)
+        alpha_selected = None
+        if use_adaptive_alpha and use_hybrid and not use_query_expansion and self.reranker:
+            # Adaptive alpha: try multiple alphas, pick best based on reranker confidence
+            search_results, alpha_selected = self._search_with_alpha_selection(
+                question=question,
+                query_embedding=query_embeddings[0],
+                doc_ids=doc_ids,
+                top_k=retrieval_k
+            )
+            print(f"Pipeline: {len(search_results)} chunks retrieved via adaptive alpha={alpha_selected}")
+            # Results are already reranked by _search_with_alpha_selection
+        elif use_query_expansion and len(query_variants) > 1:
+            # Multi-query search with fusion
+            search_results = self.vector_store.multi_query_hybrid_search(
+                query_variants=query_variants,
+                query_embeddings=query_embeddings,
+                query_weights=query_weights,
+                top_k=retrieval_k,
+                doc_ids=doc_ids,
+                alpha=hybrid_alpha,
+                use_rrf=use_rrf
+            )
+        elif use_hybrid:
+            # Single query hybrid search
+            search_results = self.vector_store.hybrid_search(
+                query_vector=query_embeddings[0],
+                query_text=query_variants[0],
+                top_k=retrieval_k,
+                doc_ids=doc_ids,
+                alpha=hybrid_alpha,
+                use_rrf=use_rrf
+            )
+        else:
+            # Single query vector search
+            search_results = self.vector_store.search(
+                query_vector=query_embeddings[0],
+                top_k=retrieval_k,
+                doc_ids=doc_ids
+            )
+
+        if alpha_selected is None:
+            print(f"Pipeline: {len(search_results)} chunks retrieved (retrieval_k={retrieval_k})")
+
+        # Step 2.5: Rerank if enabled (skip if already reranked by adaptive alpha)
+        if use_reranking and self.reranker and search_results and alpha_selected is None:
+            pre_rerank_count = len(search_results)
+            search_results = self.reranker.rerank_with_position_blending(
+                query=question,
+                chunks=search_results,
+                blend_strategy=rerank_blending
+            )
+            print(f"Pipeline: {pre_rerank_count} chunks reranked (all kept)")
+
+        # Step 2.6: Deduplicate near-identical chunks (overlap can cause duplicates)
+        search_results = self._deduplicate_chunks(search_results)
+
+        # Step 2.7: Filter noise chunks (very short/substance-free)
+        search_results = self._filter_noise_chunks(search_results)
+
+        # Step 2.8: Dynamic score cutoff (replaces hardcoded top_k from reranker)
+        search_results = self._dynamic_score_cutoff(search_results)
+
+        # Step 2.9: Structure-aware boosting
+        query_type = self._classify_query_type(question)
+        if query_type != "general":
+            search_results = self._boost_by_structure(search_results, query_type)
+
+        # Step 2.10: Check if we have confident results
+        reranking_applied = use_reranking and self.reranker and len(search_results) > 0
+
+        if not search_results:
             return {
                 "question": question,
-                "answer": answer,
-                "sources": dr["sources"],
-                "retrieved_count": dr["retrieved_count"],
-                "decomposed": True,
-                "sub_questions": dr["sub_questions"],
-                "_chunks": [],
+                "answer": "I couldn't find any relevant information in the documents to answer this question.",
+                "sources": [],
+                "retrieved_count": 0,
+                "low_confidence": True
             }
 
-        # Normal path: generate answer
-        answer = self._generate_answer(retrieval["prompt"])
+        # Check top score against threshold
+        # Skip when reranking is active — cross-encoder blended scores use a
+        # different scale (can be negative) so the 0-1 threshold doesn't apply.
+        top_score = search_results[0]["score"] if search_results else 0
+        if not reranking_applied and top_score < min_score:
+            # Format sources consistently even for low confidence responses
+            formatted_sources = [
+                {
+                    "doc_id": result["payload"]["doc_id"],
+                    "doc_title": result["payload"]["doc_title"],
+                    "chunk_text": result["payload"]["text"][:200] + "..." if len(result["payload"]["text"]) > 200 else result["payload"]["text"],
+                    "score": round(result["score"], 3),
+                    "page_num": result["payload"].get("page_num")
+                }
+                for result in search_results
+            ]
+
+            return {
+                "question": question,
+                "answer": (
+                    "I don't have enough information to answer that question confidently. "
+                    "This could mean:\n"
+                    "- The information isn't in the uploaded documents\n"
+                    "- The question needs to be more specific\n"
+                    "- Try rephrasing or check if the right documents are uploaded"
+                ),
+                "sources": formatted_sources,
+                "retrieved_count": len(search_results),
+                "low_confidence": True,
+                "top_score": top_score
+            }
+
+        print(f"Pipeline: {len(search_results)} chunks sent to LLM")
+
+        # Step 3: Build context from retrieved chunks with enhanced formatting
+        context = self._format_context_with_sources(search_results)
+
+        # Build sources list for response
+        sources = []
+        for result in search_results:
+            payload = result["payload"]
+            score = result["score"]
+
+            sources.append({
+                "doc_id": payload["doc_id"],
+                "doc_title": payload["doc_title"],
+                "chunk_text": payload["text"][:200] + "..." if len(payload["text"]) > 200 else payload["text"],
+                "score": round(score, 3),
+                "page_num": payload.get("page_num")
+            })
+
+        # Step 4: Generate answer with Gemini
+        prompt = self._build_prompt(question, context, query_type)
+        answer = self._generate_answer(prompt)
+
         return {
             "question": question,
             "answer": answer,
-            "sources": retrieval["sources"],
-            "retrieved_count": len(retrieval["search_results"]),
-            "_chunks": retrieval["search_results"],
+            "sources": sources,
+            "retrieved_count": len(search_results)
         }
-
-    def _generate_answer_stream(self, prompt: str):
-        """Yield text chunks from Gemini streaming API."""
-        from .gemini_retry import gemini_retry
-
-        response = gemini_retry(lambda: self.client.models.generate_content_stream(
-            model=self.fast_model_name,
-            contents=prompt,
-            config={
-                "temperature": 0.4,
-                "topP": 0.9,
-                "maxOutputTokens": 8192,
-            },
-        ))
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
-
-    def answer_question_stream(
-        self,
-        question: str,
-        top_k: int,
-        doc_ids: Optional[List[str]] = None,
-        chat_history: Optional[List[Dict]] = None,
-        use_hybrid: bool = True,
-        hybrid_alpha: float = 0.5,
-        use_reranking: bool = True,
-        min_score: float = 0.3,
-        use_query_expansion: bool = False,
-        query_expansion_variants: int = 2,
-        rerank_blending: str = "position_aware",
-        use_query_decomposition: bool = False,
-        use_adaptive_alpha: bool = True
-    ):
-        """Stream an answer using RAG pipeline. Yields SSE event dicts."""
-        try:
-            retrieval = self._retrieve(
-                question=question,
-                top_k=top_k,
-                doc_ids=doc_ids,
-                chat_history=chat_history,
-                use_hybrid=use_hybrid,
-                hybrid_alpha=hybrid_alpha,
-                use_reranking=use_reranking,
-                min_score=min_score,
-                use_query_expansion=use_query_expansion,
-                query_expansion_variants=query_expansion_variants,
-                rerank_blending=rerank_blending,
-                use_query_decomposition=use_query_decomposition,
-                use_adaptive_alpha=use_adaptive_alpha,
-            )
-
-            # Handle early returns (no streaming needed)
-            if retrieval.get("early_return"):
-                er = retrieval["early_return"]
-                yield {"type": "retrieval_done", "sources": er.get("sources", [])}
-                yield {"type": "chunk", "content": er["answer"]}
-                yield {"type": "done", "full_content": er["answer"]}
-                return
-
-            # Handle decomposed queries (sub-questions answered non-streaming, synthesis non-streaming)
-            if retrieval.get("decomposed_result"):
-                dr = retrieval["decomposed_result"]
-                yield {"type": "retrieval_done", "sources": dr["sources"]}
-                answer = self._synthesize_answers(question, dr["sub_results"])
-                yield {"type": "chunk", "content": answer}
-                yield {"type": "done", "full_content": answer}
-                return
-
-            # Normal path: emit sources, then stream LLM generation
-            yield {"type": "retrieval_done", "sources": retrieval["sources"]}
-
-            full_content = []
-            for text_chunk in self._generate_answer_stream(retrieval["prompt"]):
-                full_content.append(text_chunk)
-                yield {"type": "chunk", "content": text_chunk}
-
-            yield {"type": "done", "full_content": "".join(full_content)}
-
-        except Exception as e:
-            logger.exception("Streaming answer failed")
-            yield {"type": "error", "detail": str(e)}
 
     def _deduplicate_chunks(
         self, chunks: List[Dict], threshold: float = 0.85
@@ -669,14 +571,14 @@ class QAEngine:
                 unique.append(chunk)
 
         if len(unique) < len(chunks):
-            logger.debug(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
+            print(f"Deduplication: {len(chunks)} -> {len(unique)} chunks")
         return unique
 
     def _filter_noise_chunks(self, chunks: List[Dict], min_length: int = 50) -> List[Dict]:
         """Remove very short or noise-only chunks that add no substance."""
         filtered = [c for c in chunks if len(c["payload"]["text"].strip()) >= min_length]
         if len(filtered) < len(chunks):
-            logger.debug(f"Noise filter: {len(chunks)} → {len(filtered)} chunks (removed {len(chunks) - len(filtered)} short chunks)")
+            print(f"Noise filter: {len(chunks)} → {len(filtered)} chunks (removed {len(chunks) - len(filtered)} short chunks)")
         return filtered if filtered else chunks  # fallback: keep originals if all filtered
 
     def _dynamic_score_cutoff(self, chunks, max_chunks=15, drop_ratio=0.6):
@@ -713,10 +615,29 @@ class QAEngine:
         elif len(kept) > max_chunks:
             kept = kept[:max_chunks]
 
-        logger.debug(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
+        print(f"Dynamic cutoff: {len(chunks)} → {len(kept)} chunks (cutoff={cutoff:.3f}, top={top_score:.3f}, range={score_range:.3f}, min={min_chunks})")
         return kept
 
-    def _build_prompt(self, question: str, context: str, query_type: str = "general", chat_history: Optional[List[Dict]] = None) -> str:
+    def _reorder_top_and_tail(self, chunks):
+        """Place best chunks at start and end, weakest in middle.
+
+        LLMs attend most to the beginning and end of context (lost-in-the-middle).
+        Interleave: best→position 1, 2nd best→position N, 3rd→position 2, etc.
+        """
+        if len(chunks) <= 2:
+            return chunks
+        reordered = [None] * len(chunks)
+        left, right = 0, len(chunks) - 1
+        for i, chunk in enumerate(chunks):
+            if i % 2 == 0:
+                reordered[left] = chunk
+                left += 1
+            else:
+                reordered[right] = chunk
+                right -= 1
+        return reordered
+
+    def _build_prompt(self, question: str, context: str, query_type: str = "general") -> str:
         """
         Build prompt for Gemini with per-source engagement and few-shot example.
 
@@ -738,15 +659,14 @@ class QAEngine:
         return f"""You are an expert technical writer producing a clear, well-structured reference answer. Use ONLY the provided sources.
 
 INSTRUCTIONS:
-1. Read every source carefully. Extract ALL specific details — numbers, dates, names, conditions, definitions, amounts, limits, exceptions, and caveats.
-2. Be EXHAUSTIVE: for each topic, include the primary answer AND all secondary details such as sub-types, variants, edge cases, practical tips, restrictions, and "what NOT to do" warnings found in the sources.
-3. If multiple sources cover the same topic, merge ALL their details into one comprehensive description. Do not drop details just because they seem minor.
+1. Read every source. Extract specific details — numbers, dates, names, conditions, definitions, amounts.
+2. For each major point, describe it fully using information from the sources. Do not merely name a concept; explain what it is, why it matters, and include any qualifications or exceptions found in the sources.
+3. If multiple sources cover the same topic, merge their details into one comprehensive description.
 4. Cite sources inline as [Source N]. Place one citation at the end of a sentence or paragraph that covers that source — do NOT repeat the same citation on every line within the same section.
 5. NEVER say information is "not provided" if it appears in any source.
 6. Use structured formatting: **headings** (##) to separate major topics, **bold labels** for key terms, bullets for lists, numbered steps for procedures, and tables for comparisons or specifications.
 7. Never claim that information is absent or a feature does not exist unless sources explicitly state so.
-8. Prefer completeness over brevity. Include all relevant details from the sources, but do not repeat the same idea. Avoid filler introductions — go straight to the content.
-9. Structure dense answers carefully: group related details under clear headings, use tables for numeric specs, and use bullet lists for multiple items. Every section should be scannable.
+8. Be concise. One clear sentence is better than three that repeat the same idea. Avoid filler introductions like "Here's how X works:" — go straight to the content.
 
 CITATION DETAILS:
 - NEVER put the same [Source N] on consecutive lines. If steps 1-5 all come from Source 3, cite [Source 3] once after step 5 or in a note below the list.
@@ -801,33 +721,9 @@ Both methods default to a 30-second timeout with 0 retries.
 Context from documents:
 {context}
 
-{self._format_chat_history(chat_history)}Question: {question}
+Question: {question}
 {suffix}
 Answer:"""
-
-    def _format_chat_history(self, chat_history: Optional[List[Dict]]) -> str:
-        """Format chat history as conversation context for the prompt."""
-        if not chat_history:
-            return ""
-        lines = ["Previous conversation:"]
-        for turn in chat_history[-5:]:  # last 5 turns
-            lines.append(f"User: {turn['question']}")
-            lines.append(f"Assistant: {turn['answer']}")
-        lines.append("")
-        return "\n".join(lines) + "\n"
-
-    def _format_sources(self, search_results: List[Dict]) -> List[Dict]:
-        """Build sources list for API response from search results."""
-        return [
-            {
-                "doc_id": r["payload"]["doc_id"],
-                "doc_title": r["payload"]["doc_title"],
-                "chunk_text": r["payload"]["text"][:200] + "..." if len(r["payload"]["text"]) > 200 else r["payload"]["text"],
-                "score": round(r["score"], 3),
-                "page_num": r["payload"].get("page_num"),
-            }
-            for r in search_results
-        ]
 
     def _format_context_with_sources(self, search_results: List[Dict]) -> str:
         """
@@ -839,6 +735,9 @@ Answer:"""
         Returns:
             Formatted context string with visual hierarchy
         """
+        # Reorder: best chunks at start and end (lost-in-the-middle mitigation)
+        search_results = self._reorder_top_and_tail(search_results)
+
         context_parts = []
         for i, result in enumerate(search_results, 1):
             payload = result["payload"]
@@ -859,17 +758,58 @@ Answer:"""
         return "\n\n" + "="*80 + "\n\n".join(context_parts)
 
     def _generate_answer(self, prompt: str) -> str:
-        """Generate answer using Gemini with retry on transient errors."""
-        from .gemini_retry import gemini_retry
+        """Generate answer using Gemini."""
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config={
+                    "temperature": 0.4,        # Balanced: factual but not overly terse
+                    "topP": 0.9,              # Reasonable diversity (camelCase!)
+                    "maxOutputTokens": 8192   # Allow thorough answers (camelCase!)
+                }
+            )
+            return (response.text or "").strip()
+        except Exception as e:
+            return f"Error generating answer: {str(e)}"
 
-        response = gemini_retry(lambda: self.client.models.generate_content(
-            model=self.fast_model_name,
-            contents=prompt,
-            config={
-                "temperature": 0.4,
-                "topP": 0.9,
-                "maxOutputTokens": 8192,
-            }
-        ))
-        return response.text.strip()
+    def _check_source_metadata(self, sources: List[Dict]) -> str:
+        """
+        Generate warnings based on source metadata.
 
+        Args:
+            sources: List of source dictionaries with metadata
+
+        Returns:
+            Warning string to append to answer (empty if no warnings)
+        """
+        warnings = []
+
+        if not sources:
+            return ""
+
+        # Check for low scores
+        if sources[0]["score"] < 0.5:
+            warnings.append(
+                "⚠️ Note: The retrieved information may not be directly related to your question. "
+                "Consider rephrasing or checking if the relevant documents are uploaded."
+            )
+
+        # Could add more checks:
+        # - Conflicting information from different documents
+        # - Outdated documents (if date metadata available)
+        # - Missing page numbers
+
+        return "\n\n" + "\n".join(warnings) if warnings else ""
+
+    def check_gemini_connection(self) -> bool:
+        """Check if Gemini API is accessible."""
+        try:
+            # Try a simple generation
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents="Test"
+            )
+            return True
+        except Exception:
+            return False

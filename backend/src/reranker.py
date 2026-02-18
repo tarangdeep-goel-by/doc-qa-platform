@@ -1,11 +1,7 @@
 """Cross-encoder reranker for improving retrieval quality."""
 
-import logging
-import threading
 from sentence_transformers import CrossEncoder
 from typing import List, Dict, Any
-
-logger = logging.getLogger(__name__)
 
 
 class Reranker:
@@ -19,10 +15,9 @@ class Reranker:
             model_name: HuggingFace model name for cross-encoder
         """
         self.model_name = model_name
-        logger.info(f"Loading reranker model: {model_name}")
+        print(f"Loading reranker model: {model_name}")
         self.model = CrossEncoder(model_name)
-        self._lock = threading.Lock()
-        logger.info("Reranker model loaded successfully")
+        print(f"Reranker model loaded successfully")
 
     def rerank(
         self,
@@ -62,8 +57,7 @@ class Reranker:
 
         # Get reranking scores from cross-encoder
         # These scores represent how well each chunk answers the query
-        with self._lock:
-            scores = self.model.predict(pairs)
+        scores = self.model.predict(pairs)
 
         # Combine chunks with their rerank scores
         reranked = []
@@ -122,8 +116,7 @@ class Reranker:
 
         # Get reranking scores
         pairs = [(query, text) for text in chunk_texts]
-        with self._lock:
-            rerank_scores = self.model.predict(pairs)
+        rerank_scores = self.model.predict(pairs)
 
         # Apply position-aware blending
         reranked = []

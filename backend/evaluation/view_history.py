@@ -92,7 +92,7 @@ def print_detail(entries: list[dict]):
     config_keys = [
         "embedding_model", "chunk_size", "chunk_overlap", "top_k",
         "use_hybrid", "hybrid_alpha", "use_reranking", "use_query_expansion",
-        "use_adaptive_alpha", "reranker_blending",
+        "use_rrf", "use_adaptive_alpha", "reranker_blending",
     ]
 
     for i, e in enumerate(entries):

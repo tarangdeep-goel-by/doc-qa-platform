@@ -1,6 +1,5 @@
 """Performance metrics: latency tracking and throughput measurement."""
 
-import math
 import time
 import statistics
 from typing import List, Dict, Any, Optional
@@ -53,7 +52,7 @@ class PerformanceTracker:
                 "mean": round(statistics.mean(totals), 1),
                 "p50": round(totals[n // 2], 1),
                 "p95": round(totals[int(n * 0.95)], 1) if n >= 20 else round(totals[-1], 1),
-                "p99": round(totals[min(int(math.ceil(n * 0.99)) - 1, n - 1)], 1) if n >= 100 else round(totals[-1], 1),
+                "p99": round(totals[int(n * 0.99)], 1) if n >= 100 else round(totals[-1], 1),
             },
         }
 

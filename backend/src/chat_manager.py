@@ -3,8 +3,6 @@
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 import json
-import os
-import tempfile
 import uuid
 from datetime import datetime
 
@@ -25,14 +23,13 @@ class ChatManager:
         self.chats_dir = self.base_dir / "chats"
         self.chats_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_chat(self, name: str, doc_ids: List[str], auto_route: bool = False) -> Chat:
+    def create_chat(self, name: str, doc_ids: List[str]) -> Chat:
         """
         Create a new chat session.
 
         Args:
             name: Chat name (or preview from first question)
             doc_ids: Document IDs associated with this chat
-            auto_route: Whether to auto-detect docs from first question
 
         Returns:
             Created Chat object
@@ -47,8 +44,7 @@ class ChatManager:
             created_at=now,
             updated_at=now,
             message_count=0,
-            gemini_chat_history=[],
-            auto_route=auto_route
+            gemini_chat_history=[]
         )
 
         # Create chat directory
@@ -60,7 +56,8 @@ class ChatManager:
 
         # Initialize empty messages file
         messages_file = chat_dir / "messages.json"
-        self._atomic_write_json(messages_file, [])
+        with open(messages_file, 'w') as f:
+            json.dump([], f)
 
         return chat
 
@@ -119,7 +116,7 @@ class ChatManager:
                 with open(metadata_file, 'r') as f:
                     chat_data = json.load(f)
                 chats.append(Chat.from_dict(chat_data))
-            except (json.JSONDecodeError, TypeError, OSError):
+            except (json.JSONDecodeError, TypeError):
                 continue
 
         # Sort by updated_at (newest first)
@@ -153,7 +150,8 @@ class ChatManager:
         messages_data.append(message.to_dict())
 
         # Save messages
-        self._atomic_write_json(messages_file, messages_data)
+        with open(messages_file, 'w') as f:
+            json.dump(messages_data, f, indent=2)
 
         # Update chat metadata (updated_at and message_count)
         chat, _ = self.get_chat(chat_id)
@@ -236,21 +234,11 @@ class ChatManager:
         chat.updated_at = datetime.now().isoformat()
         self._save_chat_metadata(chat)
 
-    def _atomic_write_json(self, path: Path, data) -> None:
-        """Write JSON atomically via temp file + os.replace to avoid reader collisions."""
-        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, 'w') as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
-
     def _save_chat_metadata(self, chat: Chat):
         """Save chat metadata to disk."""
         chat_dir = self.chats_dir / chat.id
         chat_dir.mkdir(exist_ok=True)
 
         metadata_file = chat_dir / "metadata.json"
-        self._atomic_write_json(metadata_file, chat.to_dict())
+        with open(metadata_file, 'w') as f:
+            json.dump(chat.to_dict(), f, indent=2)

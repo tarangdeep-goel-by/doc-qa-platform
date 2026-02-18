@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -34,11 +35,7 @@ from dotenv import load_dotenv
 
 load_dotenv(backend_dir / ".env")
 
-from evaluation.benchmark_dataset import (
-    BenchmarkDataset,
-    ConversationalDataset,
-    detect_dataset_type,
-)
+from evaluation.benchmark_dataset import BenchmarkDataset
 from evaluation.metrics.retrieval import (
     compute_retrieval_metrics,
     aggregate_retrieval_metrics,
@@ -49,8 +46,7 @@ from evaluation.metrics.answer_quality import (
 )
 from evaluation.metrics.performance import PerformanceTracker, Timer, LatencyRecord
 from evaluation.reporters import console_reporter, html_reporter
-from src.rag_config import RAGConfig
-from evaluation.history import build_metrics_entry
+
 
 
 def init_components():
@@ -78,7 +74,6 @@ def init_components():
         vector_size=embedding_dim,
         bm25_cache_dir=os.environ["BM25_CACHE_DIR"],
     )
-    fast_model_name = os.environ.get("GEMINI_FAST_MODEL", model_name)
     qa_engine = QAEngine(
         embedder=embedder,
         vector_store=vector_store,
@@ -86,7 +81,6 @@ def init_components():
         model_name=model_name,
         use_reranker=os.environ["USE_RERANKING"].lower() == "true",
         reranker_model=os.environ["RERANKER_MODEL"],
-        fast_model_name=fast_model_name,
     )
     print("Components ready.")
 
@@ -94,22 +88,24 @@ def init_components():
 
 
 def get_rag_config() -> dict:
-    """Read current RAG config from environment (typed values, fast-fail).
-
-    Merges RAGConfig pipeline params with static env vars (embedding, chunk, model)
-    that aren't part of the per-query pipeline config.
-    """
-    rag = RAGConfig.from_env()
-    config = rag.to_dict()
-    # Add static params that live in env but aren't per-query pipeline knobs
-    config.update({
+    """Read current RAG config from environment (typed values, fast-fail)."""
+    return {
         "embedding_model": os.environ["EMBEDDING_MODEL"],
         "embedding_dim": int(os.environ["EMBEDDING_DIM"]),
         "chunk_size": int(os.environ["CHUNK_SIZE"]),
         "chunk_overlap": int(os.environ["CHUNK_OVERLAP"]),
+        "top_k": int(os.environ["TOP_K_RESULTS"]),
+        "use_hybrid": os.environ["USE_HYBRID_SEARCH"].lower() == "true",
+        "hybrid_alpha": float(os.environ["HYBRID_ALPHA"]),
+        "use_reranking": os.environ["USE_RERANKING"].lower() == "true",
+        "use_query_expansion": os.environ["USE_QUERY_EXPANSION"].lower() == "true",
+        "query_expansion_variants": int(os.environ["QUERY_EXPANSION_VARIANTS"]),
+        "use_rrf": os.environ["USE_RRF"].lower() == "true",
+        "reranker_blending": os.environ["RERANKER_BLENDING"],
+        "use_query_decomposition": os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true",
+        "use_adaptive_alpha": os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true",
         "fast_model": os.environ.get("GEMINI_FAST_MODEL", os.environ["GEMINI_MODEL"]),
-    })
-    return config
+    }
 
 
 def run_evaluation(
@@ -140,10 +136,21 @@ def run_evaluation(
     from google import genai
 
     client = genai.Client(api_key=gemini_api_key) if use_judge else None
-    rag_config = RAGConfig.from_env()
     config = get_rag_config()
     perf = PerformanceTracker()
     perf.start_suite()
+
+    # Read RAG params from env
+    top_k = int(os.environ["TOP_K_RESULTS"])
+    use_hybrid = os.environ["USE_HYBRID_SEARCH"].lower() == "true"
+    hybrid_alpha = float(os.environ["HYBRID_ALPHA"])
+    use_reranking = os.environ["USE_RERANKING"].lower() == "true"
+    use_query_expansion = os.environ["USE_QUERY_EXPANSION"].lower() == "true"
+    query_expansion_variants = int(os.environ["QUERY_EXPANSION_VARIANTS"])
+    use_rrf = os.environ["USE_RRF"].lower() == "true"
+    rerank_blending = os.environ["RERANKER_BLENDING"]
+    use_adaptive_alpha = os.environ["USE_ADAPTIVE_ALPHA"].lower() == "true"
+    use_query_decomposition = os.environ["USE_QUERY_DECOMPOSITION"].lower() == "true"
 
     per_query_results = []
     all_retrieval_metrics = []
@@ -160,7 +167,17 @@ def run_evaluation(
         with Timer() as total_timer:
             result = qa_engine.answer_question(
                 question=bq.question,
-                **rag_config.to_answer_kwargs(doc_ids=doc_ids)
+                top_k=top_k,
+                doc_ids=doc_ids,
+                use_hybrid=use_hybrid,
+                hybrid_alpha=hybrid_alpha,
+                use_reranking=use_reranking,
+                use_query_expansion=use_query_expansion,
+                query_expansion_variants=query_expansion_variants,
+                use_rrf=use_rrf,
+                rerank_blending=rerank_blending,
+                use_adaptive_alpha=use_adaptive_alpha,
+                use_query_decomposition=use_query_decomposition,
             )
 
         our_answer = result.get("answer", "")
@@ -224,7 +241,7 @@ def run_evaluation(
     ablation_results = {}
     if feature_ablation:
         ablation_results = _run_ablation(
-            dataset, qa_engine, embedder, doc_ids
+            dataset, qa_engine, embedder, doc_ids, top_k
         )
 
     results = {
@@ -247,193 +264,18 @@ def run_evaluation(
     return results
 
 
-def run_conversational_evaluation(
-    dataset: ConversationalDataset,
-    qa_engine,
-    embedder,
-    gemini_api_key: str,
-    model_name: str,
-    doc_ids: list = None,
-    use_judge: bool = True,
-) -> dict:
-    """Run evaluation on multi-turn conversations with accumulated chat history.
-
-    Each conversation's turns are processed sequentially, building up chat_history
-    exactly like the production chats endpoint (last 5 turns, 300-char truncated answers).
-    """
-    from google import genai
-
-    client = genai.Client(api_key=gemini_api_key) if use_judge else None
-    rag_config = RAGConfig.from_env()
-    config = get_rag_config()
-    perf = PerformanceTracker()
-    perf.start_suite()
-
-    conversation_results = []
-    all_answer_metrics = []
-    all_retrieval_metrics = []
-
-    total_turns = dataset.total_turns
-    turn_counter = 0
-
-    print(f"\nRunning {len(dataset.conversations)} conversations ({total_turns} total turns)...")
-    print(f"  LLM judge: {'ON' if use_judge else 'OFF'}")
-    print(f"  Doc filter: {doc_ids if doc_ids else 'all docs'}")
-
-    # Track scores by turn position and context dependency for conversational metrics
-    scores_by_turn_pos = {}  # turn_number -> [overall scores]
-    context_dep_scores = []
-    context_indep_scores = []
-
-    for conv in dataset.conversations:
-        print(f"\n--- Conversation: {conv.id} ({len(conv.turns)} turns) ---")
-        chat_history = []
-        turn_results = []
-
-        for turn_idx, turn in enumerate(conv.turns, 1):
-            turn_counter += 1
-            print(f"\n  [{turn_counter}/{total_turns}] Turn {turn_idx}: {turn.question}")
-
-            with Timer() as total_timer:
-                result = qa_engine.answer_question(
-                    question=turn.question,
-                    chat_history=chat_history if chat_history else None,
-                    **rag_config.to_answer_kwargs(doc_ids=doc_ids)
-                )
-
-            our_answer = result.get("answer", "")
-            sources = result.get("sources", [])
-
-            # Compute metrics (same as standalone)
-            retrieval_metrics = compute_retrieval_metrics(
-                sources=sources,
-                expected_sources=[],  # conversational dataset doesn't use expected_sources
-            )
-            all_retrieval_metrics.append(retrieval_metrics)
-
-            answer_metrics = compute_answer_metrics(
-                our_answer=our_answer,
-                reference_answer=turn.claude_answer,
-                embedder=embedder,
-                client=client if use_judge else None,
-                question=turn.question,
-                model_name=model_name,
-            )
-            all_answer_metrics.append(answer_metrics)
-
-            perf.record(LatencyRecord(
-                question_id=turn.id,
-                total_ms=total_timer.elapsed_ms,
-            ))
-
-            # Build per-turn result
-            turn_result = {
-                "turn_id": turn.id,
-                "turn_number": turn_idx,
-                "conversation_id": conv.id,
-                "question": turn.question,
-                "difficulty": turn.difficulty,
-                "category": turn.category,
-                "depends_on_context": turn.depends_on_context,
-                "our_answer": our_answer,
-                "claude_answer": turn.claude_answer,
-                "sources": sources,
-                "retrieval_metrics": retrieval_metrics,
-                "answer_metrics": answer_metrics,
-                "latency_ms": round(total_timer.elapsed_ms, 1),
-                "low_confidence": result.get("low_confidence", False),
-                "chat_history_length": len(chat_history),
-            }
-            turn_results.append(turn_result)
-
-            # Track conversational metrics
-            overall = answer_metrics.get("llm_judge", {}).get("overall")
-            if overall is not None:
-                scores_by_turn_pos.setdefault(turn_idx, []).append(overall)
-                if turn.depends_on_context:
-                    context_dep_scores.append(overall)
-                else:
-                    context_indep_scores.append(overall)
-
-            # Print quick summary
-            sim = answer_metrics.get("semantic_similarity", 0)
-            rl = answer_metrics.get("rouge_l", 0)
-            judge_str = ""
-            if overall is not None:
-                judge_str = f"  Judge={overall:.1f}"
-            print(f"    Sim={sim:.3f}  ROUGE-L={rl:.3f}{judge_str}  {total_timer.elapsed_ms:.0f}ms")
-
-            # Accumulate chat history (mirrors chats.py: truncate to 300 chars, keep last 5)
-            chat_history.append({
-                "question": turn.question,
-                "answer": our_answer[:300],
-            })
-            chat_history = chat_history[-5:]
-
-        conversation_results.append({
-            "conversation_id": conv.id,
-            "doc_ids_hint": conv.doc_ids_hint,
-            "turn_count": len(conv.turns),
-            "turns": turn_results,
-        })
-
-    # Aggregate metrics
-    agg_retrieval = aggregate_retrieval_metrics(all_retrieval_metrics)
-    agg_answer = aggregate_answer_metrics(all_answer_metrics)
-    perf_stats = perf.compute_stats()
-
-    # Build conversational-specific metrics
-    conversational_metrics = {}
-    for pos, scores in sorted(scores_by_turn_pos.items()):
-        conversational_metrics[f"avg_turn{pos}_score"] = round(sum(scores) / len(scores), 2)
-
-    if 1 in scores_by_turn_pos and scores_by_turn_pos:
-        max_pos = max(scores_by_turn_pos.keys())
-        if max_pos > 1 and max_pos in scores_by_turn_pos:
-            avg_first = sum(scores_by_turn_pos[1]) / len(scores_by_turn_pos[1])
-            avg_last = sum(scores_by_turn_pos[max_pos]) / len(scores_by_turn_pos[max_pos])
-            conversational_metrics["score_degradation"] = round(avg_last - avg_first, 2)
-
-    if context_dep_scores:
-        conversational_metrics["context_dependent_accuracy"] = round(
-            sum(context_dep_scores) / len(context_dep_scores), 2
-        )
-    if context_indep_scores:
-        conversational_metrics["context_independent_accuracy"] = round(
-            sum(context_indep_scores) / len(context_indep_scores), 2
-        )
-
-    results = {
-        "timestamp": datetime.now().isoformat(),
-        "dataset": dataset.dataset_name,
-        "eval_type": "conversational",
-        "conversation_count": len(dataset.conversations),
-        "turn_count": total_turns,
-        "config": config,
-        "conversations": conversation_results,
-        "summary": {
-            "retrieval": agg_retrieval,
-            "answer_quality": agg_answer,
-            "performance": perf_stats,
-            "conversational": conversational_metrics,
-        },
-    }
-
-    return results
-
-
-def _run_ablation(dataset, qa_engine, embedder, doc_ids) -> dict:
+def _run_ablation(dataset, qa_engine, embedder, doc_ids, top_k) -> dict:
     """Run A/B tests with features toggled on/off.
 
-    Uses current RAGConfig as baseline — overrides one feature at a time.
+    Tests: query expansion, reranking, RRF.
     """
-    rag_config = RAGConfig.from_env()
     print("\n\nRunning feature ablation...")
     ablation = {}
 
     configs = [
         ("no_query_expansion", {"use_query_expansion": False}),
         ("no_reranking", {"use_reranking": False}),
+        ("no_rrf", {"use_rrf": False}),
         ("no_adaptive_alpha", {"use_adaptive_alpha": False}),
         ("vector_only", {"use_hybrid": False, "use_query_expansion": False, "use_adaptive_alpha": False}),
     ]
@@ -443,10 +285,19 @@ def _run_ablation(dataset, qa_engine, embedder, doc_ids) -> dict:
         metrics_list = []
 
         for bq in dataset.questions:
-            result = qa_engine.answer_question(
-                question=bq.question,
-                **rag_config.to_answer_kwargs(doc_ids=doc_ids, **overrides)
-            )
+            params = {
+                "question": bq.question,
+                "top_k": top_k,
+                "doc_ids": doc_ids,
+                "use_hybrid": True,
+                "use_reranking": True,
+                "use_query_expansion": True,
+                "use_rrf": True,
+                "use_adaptive_alpha": True,
+            }
+            params.update(overrides)
+
+            result = qa_engine.answer_question(**params)
             sources = result.get("sources", [])
 
             metrics = compute_retrieval_metrics(sources, bq.expected_sources)
@@ -464,26 +315,35 @@ def append_to_history(results: dict, output_path: str, label: str = ""):
     history_path = Path(__file__).parent / "results" / "history.jsonl"
     history_path.parent.mkdir(parents=True, exist_ok=True)
 
-    eval_type = results.get("eval_type", "standalone")
+    summary = results.get("summary", {})
+    aq = summary.get("answer_quality", {})
+    perf = summary.get("performance", {})
 
+    latency = perf.get("latency_ms", {})
     entry = {
         "run_id": f"{datetime.now().strftime('%Y%m%d_%H%M')}_{Path(output_path).stem[:30]}",
         "timestamp": results.get("timestamp", datetime.now().isoformat()),
         "dataset": results.get("dataset", ""),
-        "eval_type": eval_type,
         "document": results.get("document", ""),
-        "query_count": results.get("query_count", 0) or results.get("turn_count", 0),
+        "query_count": results.get("query_count", 0),
         "config": results.get("config", {}),
-        "metrics": build_metrics_entry(results.get("summary", {})),
+        "metrics": {
+            "overall": aq.get("avg_judge_overall"),
+            "accuracy": aq.get("avg_judge_accuracy"),
+            "completeness": aq.get("avg_judge_completeness"),
+            "organization": aq.get("avg_judge_organization"),
+            "relevance": aq.get("avg_judge_relevance"),
+            "semantic_similarity": round(aq.get("avg_semantic_similarity", 0), 4),
+            "rouge_l": round(aq.get("avg_rouge_l", 0), 4),
+            "avg_ndcg5": round(summary.get("retrieval", {}).get("avg_ndcg@5", 0), 4),
+            "latency_p50_ms": round(latency.get("p50", 0), 1),
+            "latency_p95_ms": round(latency.get("p95", 0), 1),
+            "latency_mean_ms": round(latency.get("mean", 0), 1),
+            "latency_max_ms": round(latency.get("max", 0), 1),
+        },
         "label": label,
         "result_file": str(Path(output_path).name),
     }
-
-    # Add conversational-specific metrics to history
-    if eval_type == "conversational":
-        conv_metrics = results.get("summary", {}).get("conversational", {})
-        if conv_metrics:
-            entry["metrics"]["conversational"] = conv_metrics
 
     with open(history_path, "a") as f:
         f.write(json.dumps(entry, default=str) + "\n")
@@ -558,12 +418,6 @@ def main():
         help="Skip LLM-as-judge (faster, no API cost)",
     )
     parser.add_argument(
-        "--use-judge",
-        action="store_true",
-        default=False,
-        help="Explicitly enable LLM-as-judge (default: already on, this is a no-op for clarity)",
-    )
-    parser.add_argument(
         "--ablation",
         action="store_true",
         help="Run feature ablation tests",
@@ -606,9 +460,10 @@ def main():
     if not args.dataset:
         parser.error("--dataset is required for evaluation mode")
 
-    # Auto-detect dataset type
-    ds_type = detect_dataset_type(args.dataset)
-    is_conversational = ds_type == "conversational"
+    dataset = BenchmarkDataset.from_file(args.dataset)
+    print(f"Loaded dataset: {dataset.dataset_name}")
+    print(f"  Document: {dataset.document}")
+    print(f"  Questions: {len(dataset.questions)}")
 
     embedder, vector_store, qa_engine, gemini_api_key, model_name = init_components()
 
@@ -623,37 +478,16 @@ def main():
         else:
             print("  WARNING: No document store found — searching unfiltered")
 
-    if is_conversational:
-        dataset = ConversationalDataset.from_file(args.dataset)
-        print(f"Loaded conversational dataset: {dataset.dataset_name}")
-        print(f"  Conversations: {len(dataset.conversations)}")
-        print(f"  Total turns: {dataset.total_turns}")
-
-        results = run_conversational_evaluation(
-            dataset=dataset,
-            qa_engine=qa_engine,
-            embedder=embedder,
-            gemini_api_key=gemini_api_key,
-            model_name=model_name,
-            doc_ids=doc_ids if doc_ids else None,
-            use_judge=not args.no_judge,
-        )
-    else:
-        dataset = BenchmarkDataset.from_file(args.dataset)
-        print(f"Loaded dataset: {dataset.dataset_name}")
-        print(f"  Document: {dataset.document}")
-        print(f"  Questions: {len(dataset.questions)}")
-
-        results = run_evaluation(
-            dataset=dataset,
-            qa_engine=qa_engine,
-            embedder=embedder,
-            gemini_api_key=gemini_api_key,
-            model_name=model_name,
-            doc_ids=doc_ids if doc_ids else None,
-            use_judge=not args.no_judge,
-            feature_ablation=args.ablation,
-        )
+    results = run_evaluation(
+        dataset=dataset,
+        qa_engine=qa_engine,
+        embedder=embedder,
+        gemini_api_key=gemini_api_key,
+        model_name=model_name,
+        doc_ids=doc_ids if doc_ids else None,
+        use_judge=not args.no_judge,
+        feature_ablation=args.ablation,
+    )
 
     # Save JSON results
     output_path = Path(args.output)
@@ -667,15 +501,8 @@ def main():
 
     # Console report
     console_reporter.report_summary(results)
-    if is_conversational:
-        turn_counter = 0
-        for conv in results.get("conversations", []):
-            for turn in conv.get("turns", []):
-                turn_counter += 1
-                console_reporter.report_query_result(turn, turn_counter)
-    else:
-        for i, q in enumerate(results["queries"], 1):
-            console_reporter.report_query_result(q, i)
+    for i, q in enumerate(results["queries"], 1):
+        console_reporter.report_query_result(q, i)
 
     # HTML report
     if args.html:

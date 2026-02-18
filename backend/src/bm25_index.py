@@ -1,14 +1,11 @@
 """BM25 keyword-based search index for document retrieval."""
 
-import logging
 import re
 from rank_bm25 import BM25Okapi
 from typing import List, Dict, Any, Optional
 import pickle
 import os
 import numpy as np
-
-logger = logging.getLogger(__name__)
 
 # Common English stop words (avoids NLTK dependency)
 _STOP_WORDS = frozenset({
@@ -51,24 +48,22 @@ class BM25Index:
         os.makedirs(cache_dir, exist_ok=True)
         self.index: Optional[BM25Okapi] = None
         self.doc_ids: List[str] = []
-        self.point_ids: List[str] = []
+        self.chunk_indices: List[int] = []
         self.chunks: List[Dict[str, Any]] = []
 
-    def build_index(self, chunks: List[Dict[str, Any]], point_ids: List[str] = None):
+    def build_index(self, chunks: List[Dict[str, Any]]):
         """
         Build BM25 index from document chunks.
 
         Args:
             chunks: List of chunk dictionaries with 'text', 'doc_id', etc.
-            point_ids: Qdrant point IDs corresponding to each chunk (for ID-based fusion)
         """
         if not chunks:
-            logger.warning("No chunks provided to build BM25 index")
+            print("Warning: No chunks provided to build BM25 index")
             return
 
         # Store chunks for later retrieval
         self.chunks = chunks
-        self.point_ids = point_ids or [""] * len(chunks)
 
         # Tokenize with stop word removal and punctuation handling
         tokenized_chunks = [tokenize(chunk["text"]) for chunk in chunks]
@@ -76,8 +71,9 @@ class BM25Index:
         # Build BM25 index
         self.index = BM25Okapi(tokenized_chunks)
         self.doc_ids = [chunk.get("doc_id", "") for chunk in chunks]
+        self.chunk_indices = list(range(len(chunks)))
 
-        logger.info(f"Built BM25 index with {len(chunks)} chunks")
+        print(f"Built BM25 index with {len(chunks)} chunks")
 
         # Cache the index
         self._save_cache()
@@ -124,15 +120,12 @@ class BM25Index:
         results = []
         for idx in top_indices:
             if scores[idx] > 0:  # Only include positive scores
-                result = {
+                results.append({
                     "chunk_index": int(idx),
                     "score": float(scores[idx]),
                     "doc_id": self.doc_ids[idx],
                     "chunk": self.chunks[idx]
-                }
-                if self.point_ids and idx < len(self.point_ids):
-                    result["point_id"] = self.point_ids[idx]
-                results.append(result)
+                })
 
         return results
 
@@ -144,12 +137,12 @@ class BM25Index:
                 pickle.dump({
                     'index': self.index,
                     'doc_ids': self.doc_ids,
-                    'point_ids': self.point_ids,
+                    'chunk_indices': self.chunk_indices,
                     'chunks': self.chunks
                 }, f)
-            logger.info(f"Saved BM25 index cache to {cache_file}")
+            print(f"Saved BM25 index cache to {cache_file}")
         except Exception as e:
-            logger.warning(f"Failed to save BM25 cache: {e}")
+            print(f"Warning: Failed to save BM25 cache: {e}")
 
     def load_cache(self) -> bool:
         """
@@ -167,11 +160,17 @@ class BM25Index:
                 data = pickle.load(f)
                 self.index = data['index']
                 self.doc_ids = data['doc_ids']
-                self.point_ids = data.get('point_ids', [""] * len(self.doc_ids))
+                self.chunk_indices = data['chunk_indices']
                 self.chunks = data['chunks']
-            logger.info(f"Loaded BM25 index cache from {cache_file}")
+            print(f"Loaded BM25 index cache from {cache_file}")
             return True
         except Exception as e:
-            logger.warning(f"Failed to load BM25 cache: {e}")
+            print(f"Warning: Failed to load BM25 cache: {e}")
             return False
 
+    def clear_cache(self):
+        """Clear BM25 index cache from disk."""
+        cache_file = os.path.join(self.cache_dir, "bm25_index.pkl")
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+            print(f"Cleared BM25 cache: {cache_file}")
