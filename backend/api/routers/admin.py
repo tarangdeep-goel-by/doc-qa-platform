@@ -10,6 +10,11 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query, Depends
 from fastapi.responses import FileResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+UPLOAD_RATE_LIMIT = os.environ.get("UPLOAD_RATE_LIMIT", "10/minute")
 
 from api.schemas import (
     UploadResponse,
@@ -33,6 +38,7 @@ router = APIRouter()
 
 
 @router.post("/upload", response_model=UploadResponse)
+@limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_document(request: Request, file: UploadFile = File(...), _: User = Depends(require_admin)):
     """
     Upload and process a document.
@@ -50,6 +56,12 @@ async def upload_document(request: Request, file: UploadFile = File(...), _: Use
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
         )
+
+    # Enforce upload size limit
+    max_upload_mb = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "50"))
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > max_upload_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size: {max_upload_mb}MB")
 
     # Get app state
     embedder = request.app.state.embedder
@@ -81,10 +93,27 @@ async def upload_document(request: Request, file: UploadFile = File(...), _: Use
     file_path = os.path.join(upload_dir, saved_filename)
 
     try:
+        # Read and validate file content
+        content = await file.read()
+
+        # Enforce size limit (in case Content-Length was missing/spoofed)
+        if len(content) > max_upload_mb * 1024 * 1024:
+            raise HTTPException(status_code=413, detail=f"File too large. Maximum size: {max_upload_mb}MB")
+
+        # Validate magic bytes
+        MAGIC_SIGNATURES = {
+            '.pdf': [b'%PDF'],
+            '.docx': [b'PK\x03\x04'],
+            '.html': [b'<!DOCTYPE', b'<!doctype', b'<html', b'<HTML'],
+            '.htm': [b'<!DOCTYPE', b'<!doctype', b'<html', b'<HTML'],
+        }
+        expected_sigs = MAGIC_SIGNATURES.get(ext.lower())
+        if expected_sigs and not any(content.lstrip()[:16].startswith(sig) for sig in expected_sigs):
+            raise HTTPException(status_code=400, detail="File content does not match expected format")
+
         # Save uploaded file
         logger.info(f"Saving file: {file.filename}")
         with open(file_path, "wb") as f:
-            content = await file.read()
             f.write(content)
 
         # Process document
@@ -178,12 +207,12 @@ async def upload_document(request: Request, file: UploadFile = File(...), _: Use
             processing_time=round(processing_time, 2)
         )
 
-    except Exception as e:
+    except Exception:
         # Cleanup on error
         if os.path.exists(file_path):
             os.remove(file_path)
         logger.exception("Failed to process document")
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process document")
 
 
 @router.get("/documents", response_model=DocumentListResponse)
@@ -259,8 +288,9 @@ async def delete_document(request: Request, doc_id: str, _: User = Depends(requi
             message=message
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+    except Exception:
+        logger.exception("Failed to delete document %s", doc_id)
+        raise HTTPException(status_code=500, detail="Failed to delete document")
 
 
 @router.post("/documents/bulk-delete", response_model=BulkDeleteResponse)
@@ -317,11 +347,12 @@ async def bulk_delete_documents(request: Request, bulk_request: BulkDeleteReques
             ))
             successful += 1
 
-        except Exception as e:
+        except Exception:
+            logger.exception("Failed to delete document %s in bulk", doc_id)
             results.append(DocumentDeleteResult(
                 doc_id=doc_id,
                 success=False,
-                message=f"Failed: {str(e)}"
+                message="Delete failed"
             ))
             failed += 1
 

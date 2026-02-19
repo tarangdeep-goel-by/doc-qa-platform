@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 import json
 import os
+import threading
 
 
 @dataclass
@@ -74,6 +75,7 @@ class DocumentStore:
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
         self.metadata_file = os.path.join(data_dir, "documents.json")
+        self._lock = threading.Lock()
         self._ensure_data_dir()
 
     def _ensure_data_dir(self):
@@ -85,10 +87,11 @@ class DocumentStore:
 
     def save_document(self, doc: DocumentMetadata):
         """Save document metadata."""
-        docs = self.load_all()
-        docs[doc.doc_id] = doc.to_dict()
-        with open(self.metadata_file, 'w') as f:
-            json.dump(docs, f, indent=2)
+        with self._lock:
+            docs = self.load_all()
+            docs[doc.doc_id] = doc.to_dict()
+            with open(self.metadata_file, 'w') as f:
+                json.dump(docs, f, indent=2)
 
     def get_document(self, doc_id: str) -> Optional[DocumentMetadata]:
         """Get document by ID."""
@@ -98,13 +101,14 @@ class DocumentStore:
 
     def delete_document(self, doc_id: str) -> bool:
         """Delete document metadata."""
-        docs = self.load_all()
-        if doc_id in docs:
-            del docs[doc_id]
-            with open(self.metadata_file, 'w') as f:
-                json.dump(docs, f, indent=2)
-            return True
-        return False
+        with self._lock:
+            docs = self.load_all()
+            if doc_id in docs:
+                del docs[doc_id]
+                with open(self.metadata_file, 'w') as f:
+                    json.dump(docs, f, indent=2)
+                return True
+            return False
 
     def load_all(self) -> Dict[str, Dict[str, Any]]:
         """Load all documents."""

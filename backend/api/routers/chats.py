@@ -10,6 +10,10 @@ from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 from api.schemas import (
     CreateChatRequest,
@@ -229,11 +233,12 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
                 ))
                 failed += 1
 
-        except Exception as e:
+        except Exception:
+            logger.exception("Failed to delete chat %s in bulk", chat_id)
             results.append(ChatDeleteResult(
                 chat_id=chat_id,
                 success=False,
-                message=f"Failed: {str(e)}"
+                message="Delete failed"
             ))
             failed += 1
 
@@ -273,6 +278,7 @@ async def remove_chat_document(request: Request, chat_id: str, doc_id: str, user
 
 
 @router.post("/{chat_id}/ask")
+@limiter.limit("30/minute")
 async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest, user: User = Depends(get_current_user)):
     """Ask a question in a chat context. Returns SSE stream."""
     chat_manager = request.app.state.chat_manager
@@ -420,9 +426,9 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest, us
                 elif event["type"] == "error":
                     yield _sse_event({"type": "error", "detail": event["detail"]})
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to stream answer in chat")
-            yield _sse_event({"type": "error", "detail": str(e)})
+            yield _sse_event({"type": "error", "detail": "An error occurred while generating the answer"})
 
     return StreamingResponse(
         event_generator(),

@@ -5,10 +5,17 @@ Supports two modes:
 - B2C  (JWT_SECRET empty): Open access, no login required
 """
 
+import logging
 import os
+import traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
 from api.auth import AUTH_ENABLED
@@ -24,6 +31,15 @@ from src.feedback_store import FeedbackStore
 
 # Load environment variables
 load_dotenv()
+
+# Configure structured logging
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -48,27 +64,27 @@ async def lifespan(app: FastAPI):
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(upload_dir, exist_ok=True)
 
-    print("Initializing application...")
+    logger.info("Initializing application...")
 
     # Initialize user store (SaaS mode only)
     if AUTH_ENABLED:
         from src.user_store import UserStore
-        print("Initializing user store...")
+        logger.info("Initializing user store...")
         user_store = UserStore(db_path=os.path.join(data_dir, "users.db"))
         app.state.user_store = user_store
     else:
         app.state.user_store = None
-        print("Auth disabled — running in open/B2C mode")
+        logger.info("Auth disabled — running in open/B2C mode")
 
     # Initialize components
-    print("Loading embedder...")
+    logger.info("Loading embedder...")
     embedder = Embedder(
         model_name=embedding_model,
         gemini_api_key=gemini_api_key,
         output_dimensionality=embedding_dim,
     )
 
-    print("Connecting to Qdrant...")
+    logger.info("Connecting to Qdrant...")
     vector_store = VectorStore(
         host=qdrant_host,
         port=qdrant_port,
@@ -77,15 +93,15 @@ async def lifespan(app: FastAPI):
         bm25_cache_dir=bm25_cache_dir
     )
 
-    print("Initializing document store...")
+    logger.info("Initializing document store...")
     document_store = DocumentStore(data_dir=data_dir)
 
-    print("Initializing chat manager...")
+    logger.info("Initializing chat manager...")
     chat_manager = ChatManager(base_dir=data_dir)
 
     fast_model = os.environ.get("GEMINI_FAST_MODEL", gemini_model)
 
-    print("Initializing QA engine...")
+    logger.info("Initializing QA engine...")
     qa_engine = QAEngine(
         embedder=embedder,
         vector_store=vector_store,
@@ -110,12 +126,18 @@ async def lifespan(app: FastAPI):
     app.state.interaction_logger = InteractionLogger(data_dir=data_dir)
     app.state.feedback_store = FeedbackStore(data_dir=data_dir)
 
-    print("Application initialized successfully!")
+    logger.info("Application initialized successfully!")
 
     yield
 
     # Cleanup
-    print("Shutting down application...")
+    logger.info("Shutting down application...")
+    try:
+        vector_store.client.close()
+        logger.info("Qdrant client closed")
+    except Exception:
+        logger.warning("Failed to close Qdrant client", exc_info=True)
+    logging.shutdown()
 
 
 # Create FastAPI app
@@ -126,14 +148,40 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware — tighten origins via env var
-allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# Global exception handler — never leak internals
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception on %s %s:\n%s", request.method, request.url.path, traceback.format_exc())
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        if os.environ.get("COOKIE_SECURE", "true").lower() == "true":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS middleware
+cors_origins = os.environ.get("CORS_ORIGINS", os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Include routers (imported here to avoid circular imports)

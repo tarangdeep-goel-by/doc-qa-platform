@@ -3,6 +3,11 @@
 import os
 
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+limiter = Limiter(key_func=get_remote_address)
 
 from api.auth import (
     create_access_token,
@@ -32,6 +37,7 @@ def _user_info(user: "User") -> UserInfo:
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit("5/minute")
 async def login(request: Request, response: Response, body: LoginRequest):
     """Authenticate user, return access token + set refresh cookie."""
     user_store = request.app.state.user_store
@@ -50,7 +56,7 @@ async def login(request: Request, response: Response, body: LoginRequest):
         key=REFRESH_COOKIE,
         value=refresh_token,
         httponly=True,
-        secure=False,  # True in prod with HTTPS
+        secure=COOKIE_SECURE,
         samesite="lax",
         path="/api/auth/refresh",
         max_age=JWT_REFRESH_EXPIRY_DAYS * 86400,
@@ -63,6 +69,7 @@ async def login(request: Request, response: Response, body: LoginRequest):
 
 
 @router.post("/refresh", response_model=LoginResponse)
+@limiter.limit("10/minute")
 async def refresh(request: Request, response: Response):
     """Issue new access token from refresh cookie."""
     refresh_token = request.cookies.get(REFRESH_COOKIE)

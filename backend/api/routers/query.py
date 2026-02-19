@@ -1,6 +1,14 @@
 """User query endpoints for Q&A."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, Depends
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+logger = logging.getLogger(__name__)
 
 from api.schemas import (
     QueryRequest,
@@ -16,15 +24,16 @@ router = APIRouter()
 
 
 @router.post("/ask", response_model=QueryResponse)
-async def ask_question(http_request: Request, query: QueryRequest, _: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def ask_question(request: Request, query: QueryRequest, _: User = Depends(get_current_user)):
     """
     Ask a question about uploaded documents.
 
     Uses RAG pipeline to retrieve relevant chunks and generate answer.
     """
-    qa_engine = http_request.app.state.qa_engine
-    document_store = http_request.app.state.document_store
-    rag_config = http_request.app.state.rag_config
+    qa_engine = request.app.state.qa_engine
+    document_store = request.app.state.document_store
+    rag_config = request.app.state.rag_config
 
     try:
         # Validate doc_ids if provided
@@ -70,8 +79,9 @@ async def ask_question(http_request: Request, query: QueryRequest, _: User = Dep
             retrieved_count=result["retrieved_count"]
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(e)}")
+    except Exception:
+        logger.exception("Failed to answer question")
+        raise HTTPException(status_code=500, detail="Failed to answer question")
 
 
 @router.get("/documents", response_model=DocumentListResponse)

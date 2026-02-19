@@ -717,9 +717,9 @@ class QAEngine:
 
             yield {"type": "done", "full_content": "".join(full_content)}
 
-        except Exception as e:
+        except Exception:
             logger.exception("Streaming answer failed")
-            yield {"type": "error", "detail": str(e)}
+            yield {"type": "error", "detail": "An error occurred while generating the answer"}
 
     def _deduplicate_chunks(
         self, chunks: List[Dict], threshold: float = 0.85

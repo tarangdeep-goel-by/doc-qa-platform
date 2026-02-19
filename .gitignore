@@ -67,6 +67,9 @@ htmlcov/
 backend/data/interactions.jsonl
 backend/data/feedback.jsonl
 
+# Eval result files (history.jsonl is tracked, individual results are not)
+backend/evaluation/results/*.json
+
 # Misc
 .cache/
 *.bak
