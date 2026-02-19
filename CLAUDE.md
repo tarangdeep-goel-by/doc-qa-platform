@@ -2,14 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Information
-
-**GitHub Repository**: https://github.com/<your-username>/doc-qa-platform
-**Owner**: tarangdeep-goel-by
-
 ## What This Is
 
-Full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDFs, ask questions, get AI-powered answers with source citations.
+Full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDFs, ask questions, get AI-powered answers with source citations. Supports two deployment modes: **B2C** (open access, no login) and **SaaS** (JWT auth, multi-user, role-based access).
 
 **Stack**: React + TypeScript frontend, FastAPI backend, Qdrant vector DB, Google Gemini LLM
 
@@ -28,45 +23,19 @@ cd frontend && npm run dev
 # Qdrant: http://localhost:6333/dashboard
 ```
 
-## Project Structure
-
-```
-doc-qa-platform/
-├── frontend/                # React + TypeScript + Zustand + Tailwind
-│   └── CLAUDE.md            # Frontend architecture & patterns
-├── backend/
-│   ├── api/                 # FastAPI routers (admin, query, chats)
-│   │   └── schemas.py       # Pydantic models
-│   ├── src/                 # Core pipeline
-│   │   ├── qa_engine.py     # RAG orchestrator (search → rerank → generate)
-│   │   ├── vector_store.py  # Qdrant + BM25 hybrid search
-│   │   ├── document_processor.py  # PDF extraction (PyPDF2 + pdfplumber)
-│   │   ├── embedder.py      # Gemini embeddings
-│   │   ├── chunker.py       # Text chunking with overlap
-│   │   ├── bm25_index.py    # Persistent BM25 keyword index
-│   │   └── chat_manager.py  # Chat session persistence (JSON files)
-│   ├── evaluation/          # Eval framework
-│   │   ├── run_evaluation.py      # Main eval harness
-│   │   ├── view_history.py        # CLI history viewer
-│   │   ├── backfill_history.py    # One-time ledger backfill
-│   │   ├── datasets/              # Benchmark question sets (JSON)
-│   │   └── results/               # Eval outputs + history.jsonl ledger
-│   ├── tests/               # 136 pytest tests
-│   └── CLAUDE.md            # Backend architecture & patterns
-├── docker-compose.yml       # Qdrant + backend + test services
-└── PROJECT_STATUS.md        # Current state, recent changes, roadmap
-```
-
 ## Docker Development (Primary Workflow)
 
 **No local Python env** — all backend code runs inside Docker container `doc-qa-backend`.
 
 ```bash
-# Rebuild after code changes (container only mounts data/, not code)
+# Rebuild after code changes (container only mounts data/ and eval results, not code)
 docker-compose build backend && docker-compose up -d --force-recreate backend
 
 # Run tests
 docker-compose run --rm test
+
+# Run specific test
+docker-compose run --rm test pytest tests/test_api.py::TestChats -v
 
 # Run evals (always use -t for live progress output)
 docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
@@ -74,14 +43,36 @@ docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
   --output evaluation/results/output.json \
   --label "description of changes"
 
+# Generate eval dataset from any uploaded PDF
+docker exec -t doc-qa-backend python evaluation/generate_dataset.py \
+  --pdf data/uploads/<doc_id>.pdf \
+  --output evaluation/datasets/my_dataset.json \
+  --num-questions 30 --doc-name "My Document Title"
+
 # View eval history
 docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
 
 # Check backend logs
 docker-compose logs -f backend
+
+# SaaS mode: seed admin user
+docker exec doc-qa-backend python -m scripts.seed_admin \
+  --email admin@example.com --password secret
 ```
 
-**Critical gotcha**: `docker-compose restart` does NOT pick up rebuilt images. Always use `docker-compose up -d --force-recreate backend` after `docker-compose build backend`.
+**Critical gotchas**:
+- `docker-compose restart` does NOT pick up rebuilt images. Always use `docker-compose up -d --force-recreate backend` after build.
+- `docker exec` without `-t` buffers stdout until process exits — no live progress. Always use `-t` for evals.
+- Volumes mounted: `backend/data/` and `backend/evaluation/results/` — code is baked into image.
+
+## Authentication Modes
+
+Controlled by `JWT_SECRET` env var in `docker-compose.yml`:
+
+- **B2C mode** (default, `JWT_SECRET` empty): All endpoints open, no login. Anonymous user gets admin role.
+- **SaaS mode** (`JWT_SECRET` set): JWT auth required. Roles: `admin` | `client`. Auth router registered at `/api/auth/`. User store in `data/users.db` (SQLite).
+
+Auth dependency: `get_current_user` (returns `ANONYMOUS_USER` in B2C) and `require_admin` in `api/auth.py`.
 
 ## RAG Pipeline Architecture
 
@@ -94,137 +85,78 @@ Query Expansion (optional, generates alternative phrasings via Gemini)
   ↓
 Parallel Search: [Vector/Semantic] + [BM25/Keyword]
   ↓
-Fusion: RRF (Reciprocal Rank Fusion) or Weighted (adaptive alpha)
+Fusion: RRF (always on) + Weighted (adaptive alpha auto-adjusts per query type)
   ↓
-Dynamic Score Cutoff (step 2.8 — trims low-scoring chunks post-retrieval)
+Dynamic Score Cutoff (trims low-scoring chunks post-retrieval)
   ↓
 Cross-Encoder Reranking + Position-Aware Blending
   ↓
-Context Assembly → Gemini LLM → Answer with Source Citations
+Context Assembly → Gemini LLM → Streamed Answer with Source Citations
 ```
 
-### RAG Config (Environment Variables)
+### RAG Config — Single Source of Truth
 
-All set in `docker-compose.yml`, read by backend at startup:
+`RAGConfig` dataclass (`src/rag_config.py`) reads all pipeline params from env vars at startup. **Never manually wire params** — use `rag_config.to_answer_kwargs()`:
 
-| Variable | Current Value | Notes |
-|----------|--------------|-------|
-| `EMBEDDING_MODEL` | `gemini-embedding-001` | Changing requires Qdrant collection rebuild |
+```python
+rag_config = RAGConfig.from_env()
+result = qa_engine.answer_question(question=q, **rag_config.to_answer_kwargs(doc_ids=ids))
+```
+
+When adding a new pipeline param: add to `RAGConfig` dataclass + `from_env()` — it flows to all callers automatically.
+
+### Environment Variables (docker-compose.yml)
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Main LLM |
+| `GEMINI_FAST_MODEL` | `gemini-2.5-flash-lite` | Fast model for titles, expansion |
+| `EMBEDDING_MODEL` | `gemini-embedding-001` | Changing requires Qdrant rebuild |
 | `EMBEDDING_DIM` | `768` | Must match embedding model |
-| `CHUNK_SIZE` | `2500` | Changing requires re-uploading all documents |
-| `CHUNK_OVERLAP` | `500` | Changing requires re-uploading all documents |
-| `TOP_K_RESULTS` | `12` | Initial fetch count; dynamic cutoff trims further |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `2500` / `500` | Changing requires re-upload |
+| `TOP_K_RESULTS` | `12` | Initial fetch; dynamic cutoff trims further |
 | `USE_HYBRID_SEARCH` | `true` | BM25 + vector fusion |
-| `HYBRID_ALPHA` | `0.5` | 0=keyword only, 1=semantic only |
 | `USE_ADAPTIVE_ALPHA` | `true` | Auto-adjusts alpha per query type |
 | `USE_RERANKING` | `true` | Cross-encoder reranking |
-| `RERANKER_BLENDING` | `position_aware` | Weight top results higher |
-| `USE_RRF` | `true` | Reciprocal Rank Fusion |
-| `USE_QUERY_EXPANSION` | `false` | Currently off (adds latency) |
-| `USE_QUERY_DECOMPOSITION` | `true` | Splits multi-part questions |
-| `USE_PDFPLUMBER` | `true` | Table-aware PDF extraction |
+| `USE_QUERY_EXPANSION` | `true` | Generate alternative phrasings |
+| `USE_QUERY_DECOMPOSITION` | `true` | Split multi-part questions |
+| `USE_SEMANTIC_CHUNKING` | `false` | Alternative chunker |
+| `JWT_SECRET` | `${JWT_SECRET:-}` | Empty = B2C, set = SaaS |
 
-**Data-breaking changes**: Changing `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `CHUNK_SIZE`, or `CHUNK_OVERLAP` requires:
-1. `docker-compose down -v` (deletes Qdrant data)
-2. `docker-compose up -d`
-3. Re-upload all documents
+**Data-breaking changes**: Changing `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `CHUNK_SIZE`, or `CHUNK_OVERLAP` requires `docker-compose down -v` + re-upload all documents.
 
 ## Evaluation Framework
 
-### Running Evals
+- **Datasets**: JSON files in `evaluation/datasets/` — generate new ones with `generate_dataset.py`
+- **Doc resolution**: Uses all doc_ids from `data/documents.json` (mirrors real user behavior)
+- **History ledger**: `evaluation/results/history.jsonl` — append-only JSONL
+- **Metrics**: LLM judge, semantic similarity, ROUGE-L, latency
+- **CLI flags**: `--use-judge` (LLM scoring), `--no-judge` (fast, metrics only), `--ablation` (feature ablation), `--conversational` (multi-turn)
 
-```bash
-# Multi-doc benchmark (77 questions, ~20 min)
-docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
-  --dataset evaluation/datasets/real_world_multi_doc.json \
-  --output evaluation/results/multi_doc_eval.json \
-  --label "description" --use-judge
+**Eval gotcha**: Pipeline params must flow through `RAGConfig` — check `to_answer_kwargs()`, not just config logging.
 
-# View history (39+ runs tracked)
-docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
+## Adding a New RAG Feature
 
-# Filter by dataset
-docker exec doc-qa-backend python evaluation/view_history.py --dataset fx5u
+1. Add env var to `docker-compose.yml` (in `x-env-common`)
+2. Add field to `RAGConfig` dataclass + `from_env()` in `src/rag_config.py`
+3. Implement in `src/qa_engine.py` or `src/vector_store.py`
+4. Tests + rebuild + eval
+
+## Persistent Data (`data/` directory)
+
 ```
-
-### Eval Architecture
-
-- **Datasets**: JSON files in `evaluation/datasets/` with questions + expected answers
-- **Doc resolution**: Eval uses all doc_ids from `data/documents.json` (mirrors real user behavior)
-- **History ledger**: `evaluation/results/history.jsonl` — append-only JSONL, one line per run
-- **Metrics**: LLM judge (accuracy, completeness, organization, relevance), semantic similarity, ROUGE-L, latency
-- **Current best**: 4.72/5 overall on 77-question multi-doc benchmark
-
-### Eval Gotchas
-
-- Pipeline params (`use_query_decomposition`, `use_adaptive_alpha`) must be explicitly passed to `qa_engine.answer_question()` — easy to miss when adding new params
-- Env vars use fast-fail (`os.environ["KEY"]`) — missing vars raise KeyError immediately, no silent defaults
-- Always use `docker exec -t` (not `docker exec`) for live progress — without `-t`, stdout buffers until process exits
-
-## Testing
-
-```bash
-# All tests (136 tests, needs backend + Qdrant running)
-docker-compose run --rm test
-
-# Unit tests only (fast)
-docker-compose run --rm unit-tests
-
-# Integration tests (needs Qdrant)
-docker-compose run --rm integration-tests
-
-# API tests (needs backend + Qdrant)
-docker-compose run --rm api-tests
-
-# Specific test file
-docker-compose run --rm test pytest tests/test_api.py -v
+data/
+├── documents.json       # DocumentStore metadata
+├── chats/{chat_id}.json # Chat sessions + messages
+├── uploads/{doc_id}.pdf # Uploaded PDFs
+├── bm25/                # BM25 index cache (pickle)
+├── interactions.jsonl   # InteractionLogger (every Q&A logged)
+├── feedback.jsonl       # FeedbackStore (thumbs up/down)
+└── users.db             # SQLite user store (SaaS mode only)
 ```
-
-## Key Design Decisions
-
-- **Zustand** for frontend state — minimal boilerplate, no providers
-- **Qdrant** for vectors — self-hosted, production-ready
-- **Gemini** for LLM + embeddings — large context window, fast, cheap
-- **Hybrid search** — semantic + keyword (BM25) for better recall
-- **JSON file storage** for chats/docs — simple, no DB migration needed yet
-- **pdfplumber** for PDF extraction — handles tables better than PyPDF2 (still available as fallback)
-
-## Common Tasks
-
-### Adding a New RAG Feature
-
-1. Add env var to `docker-compose.yml` (all services that need it)
-2. Implement in `backend/src/qa_engine.py` or `backend/src/vector_store.py`
-3. Wire through in `backend/api/routers/query.py` AND `backend/api/routers/chats.py`
-4. Wire through in `backend/evaluation/run_evaluation.py` (fast-fail env read + pass to answer_question)
-5. Add tests
-6. Rebuild container and run eval
-
-### Debugging RAG Quality
-
-1. Run eval with `--use-judge` flag
-2. Check per-question scores in output JSON
-3. Look at `sources` in responses — are the right chunks being retrieved?
-4. Check if question type maps to the right search strategy (adaptive alpha)
-5. Compare against history: `view_history.py --detail --last 10`
 
 ## Detailed Guides
 
-- **Frontend**: `frontend/CLAUDE.md` — components, Zustand, design system, API client
-- **Backend**: `backend/CLAUDE.md` — RAG pipeline, testing, env config, error handling
+- **Frontend**: `frontend/CLAUDE.md` — dark glass design system, Zustand, auth components
+- **Backend**: `backend/CLAUDE.md` — RAG pipeline, RAGConfig, streaming, testing, auth
 - **Project status**: `PROJECT_STATUS.md` — recent changes, metrics, roadmap
-
-## Troubleshooting
-
-**Container has stale code**: Rebuild and force-recreate (restart alone doesn't work):
-```bash
-docker-compose build backend && docker-compose up -d --force-recreate backend
-```
-
-**Eval shows wrong scores**: Check that all pipeline params are wired through to `qa_engine.answer_question()` in `run_evaluation.py`. Config dict logging can look correct while the actual function call misses params.
-
-**No live output from docker exec**: Use `docker exec -t` (allocate pseudo-TTY).
-
-**Qdrant connection failed**: `docker-compose restart qdrant` or full `docker-compose down && docker-compose up -d`.
-
-**Frontend can't reach API**: Check backend is running at http://localhost:8000/health, check proxy in `frontend/vite.config.ts`.
