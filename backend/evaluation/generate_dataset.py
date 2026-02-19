@@ -2,9 +2,8 @@
 """
 Generate eval datasets automatically from any PDF document.
 
-Uses Gemini long-context as an "oracle" — feeds the full document text to the model
-to generate diverse questions and high-quality reference answers. The oracle sees
-everything (no retrieval), so its answers serve as a gold-standard benchmark.
+Uses Gemini File API to upload the PDF once, then references it in all API calls.
+Gemini reads the PDF natively (layout, tables, images) — no text extraction needed.
 
 Usage:
     # Inside Docker container:
@@ -37,44 +36,27 @@ load_dotenv(backend_dir / ".env")
 
 from google import genai
 
+
 # ---------------------------------------------------------------------------
-# PDF text extraction (reuses project's pdfplumber logic)
+# Gemini File API upload
 # ---------------------------------------------------------------------------
 
-def extract_pdf_text(pdf_path: str) -> tuple[str, dict]:
-    """Extract full text from PDF using pdfplumber (table-aware)."""
-    import pdfplumber
-
-    full_text_parts = []
-    with pdfplumber.open(pdf_path) as pdf:
-        metadata = {
-            "total_pages": len(pdf.pages),
-        }
-        for i, page in enumerate(pdf.pages, 1):
-            text = page.extract_text() or ""
-            # Extract tables as markdown
-            tables = page.extract_tables()
-            table_text = ""
-            for table in tables:
-                if table:
-                    rows = []
-                    for row in table:
-                        cells = [str(c).strip() if c else "" for c in row]
-                        rows.append("| " + " | ".join(cells) + " |")
-                    if rows:
-                        # Add markdown header separator after first row
-                        header_sep = "| " + " | ".join(["---"] * len(table[0])) + " |"
-                        rows.insert(1, header_sep)
-                        table_text += "\n" + "\n".join(rows) + "\n"
-
-            page_content = f"--- Page {i} ---\n{text}"
-            if table_text:
-                page_content += f"\n[Tables]{table_text}"
-            full_text_parts.append(page_content)
-
-    full_text = "\n\n".join(full_text_parts)
-    print(f"  Extracted {metadata['total_pages']} pages, {len(full_text):,} chars")
-    return full_text, metadata
+def upload_pdf(client, pdf_path: str, doc_name: str) -> genai.types.File:
+    """Upload PDF to Gemini File API. Returns File reference for generate_content calls."""
+    uploaded = client.files.upload(
+        file=pdf_path,
+        config=genai.types.UploadFileConfig(
+            mime_type="application/pdf",
+            display_name=doc_name,
+        ),
+    )
+    # Wait for ACTIVE state (processing is usually instant for PDFs)
+    while uploaded.state.name == "PROCESSING":
+        time.sleep(2)
+        uploaded = client.files.get(name=uploaded.name)
+    if uploaded.state.name != "ACTIVE":
+        raise RuntimeError(f"File upload failed: state={uploaded.state.name}")
+    return uploaded
 
 
 # ---------------------------------------------------------------------------
@@ -84,8 +66,7 @@ def extract_pdf_text(pdf_path: str) -> tuple[str, dict]:
 QUESTION_GEN_PROMPT = """\
 You are an expert at creating evaluation questions for document Q&A systems.
 
-Given the following document, generate exactly {num_questions} diverse questions that test
-a RAG system's ability to find and synthesize information from this document.
+The document has been provided as an attached PDF file. Generate exactly {num_questions} diverse questions that test a RAG system's ability to find and synthesize information from this document.
 
 QUESTION DIVERSITY REQUIREMENTS — include a mix of:
 1. **Factual/lookup** (easy): Questions with a direct answer in one place in the document
@@ -110,24 +91,18 @@ Output ONLY a JSON array of objects, each with:
 - "category": one of "factual", "multi_part", "synthesis", "table_data", "overview", "specific_detail", "comparison", "procedural"
 - "requires_synthesis": true/false (does it need info from multiple sections?)
 
-DOCUMENT:
-{document_text}
-
 Generate exactly {num_questions} questions as a JSON array. Output ONLY the JSON array, no other text."""
 
 
-def generate_questions(client, model: str, doc_text: str, num_questions: int) -> list[dict]:
+def generate_questions(client, model: str, uploaded_file: genai.types.File, num_questions: int) -> list[dict]:
     """Generate diverse questions from the document using Gemini."""
     print(f"  Generating {num_questions} questions...")
 
-    prompt = QUESTION_GEN_PROMPT.format(
-        num_questions=num_questions,
-        document_text=doc_text,
-    )
+    prompt = QUESTION_GEN_PROMPT.format(num_questions=num_questions)
 
     response = _call_with_retry(
-        client, model, prompt, temperature=0.7,
-        response_mime_type="application/json",
+        client, model, contents=[uploaded_file, prompt],
+        temperature=0.7, response_mime_type="application/json",
     )
 
     questions = json.loads(response.text)
@@ -148,9 +123,7 @@ def generate_questions(client, model: str, doc_text: str, num_questions: int) ->
 # ---------------------------------------------------------------------------
 
 ORACLE_ANSWER_PROMPT = """\
-You are an expert at answering questions about documents. You have access to the
-COMPLETE document below. Answer the question thoroughly and accurately using ONLY
-information from this document.
+You are an expert at answering questions about documents. The document has been provided as an attached PDF file. Answer the question thoroughly and accurately using ONLY information from this document.
 
 RULES:
 - Be comprehensive but concise
@@ -159,15 +132,12 @@ RULES:
 - If the question asks about something not covered in the document, say so clearly
 - Structure longer answers with clear organization (lists, sections as appropriate)
 
-DOCUMENT:
-{document_text}
-
 QUESTION: {question}
 
-Provide a thorough, accurate answer based on the document above."""
+Provide a thorough, accurate answer based on the document."""
 
 
-def _call_with_retry(client, model: str, prompt: str, temperature: float = 0.2,
+def _call_with_retry(client, model: str, contents, temperature: float = 0.2,
                      response_mime_type: str | None = None, max_retries: int = 5):
     """Call Gemini with exponential backoff on rate limit errors."""
     config = genai.types.GenerateContentConfig(temperature=temperature)
@@ -179,7 +149,7 @@ def _call_with_retry(client, model: str, prompt: str, temperature: float = 0.2,
     for attempt in range(max_retries):
         try:
             return client.models.generate_content(
-                model=model, contents=prompt, config=config,
+                model=model, contents=contents, config=config,
             )
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
@@ -192,7 +162,7 @@ def _call_with_retry(client, model: str, prompt: str, temperature: float = 0.2,
 
 
 def generate_oracle_answers(
-    client, model: str, doc_text: str, questions: list[dict], delay: float = 1.0,
+    client, model: str, uploaded_file: genai.types.File, questions: list[dict], delay: float = 1.0,
     save_path: str | None = None, doc_name: str = "", description: str = "",
 ) -> list[dict]:
     """Generate oracle answers for each question using full document context.
@@ -212,12 +182,9 @@ def generate_oracle_answers(
         if skipped and i == skipped + 1:
             print(f"    Skipped {skipped} already-answered questions")
 
-        prompt = ORACLE_ANSWER_PROMPT.format(
-            document_text=doc_text,
-            question=q["question"],
-        )
+        prompt = ORACLE_ANSWER_PROMPT.format(question=q["question"])
 
-        response = _call_with_retry(client, model, prompt, temperature=0.2)
+        response = _call_with_retry(client, model, contents=[uploaded_file, prompt], temperature=0.2)
 
         q["claude_answer"] = response.text
         print(f"    [{i}/{total}] {q['question'][:60]}...")
@@ -316,44 +283,46 @@ def main():
     print(f"  Questions: {args.num_questions}")
     print()
 
-    # Step 1: Extract text
-    print("Step 1: Extracting PDF text...")
-    doc_text, metadata = extract_pdf_text(str(pdf_path))
+    # Step 1: Upload PDF to Gemini File API
+    print("Step 1: Uploading PDF to Gemini File API...")
+    uploaded_file = upload_pdf(client, str(pdf_path), doc_name)
+    print(f"  Uploaded: {uploaded_file.name} ({uploaded_file.state.name})")
     print()
 
-    # Check if doc is too large for context window
-    # Gemini 2.5 Flash: ~1M tokens ≈ ~4M chars (rough estimate)
-    if len(doc_text) > 3_500_000:
-        print(f"WARNING: Document is very large ({len(doc_text):,} chars).")
-        print("  Truncating to ~3.5M chars to fit context window.")
-        doc_text = doc_text[:3_500_000]
+    try:
+        # Step 2: Generate questions (or load from partial output)
+        questions = None
+        if args.resume and output_path.exists():
+            print("Step 2: Resuming from partial output...")
+            with open(output_path) as f:
+                partial = json.load(f)
+            questions = partial.get("questions", [])
+            answered = sum(1 for q in questions if q.get("claude_answer"))
+            print(f"  Loaded {len(questions)} questions, {answered} already answered")
+        else:
+            print("Step 2: Generating questions...")
+            questions = generate_questions(client, model, uploaded_file, args.num_questions)
         print()
 
-    # Step 2: Generate questions (or load from partial output)
-    questions = None
-    if args.resume and output_path.exists():
-        print("Step 2: Resuming from partial output...")
-        with open(output_path) as f:
-            partial = json.load(f)
-        questions = partial.get("questions", [])
-        answered = sum(1 for q in questions if q.get("claude_answer"))
-        print(f"  Loaded {len(questions)} questions, {answered} already answered")
-    else:
-        print("Step 2: Generating questions...")
-        questions = generate_questions(client, model, doc_text, args.num_questions)
-    print()
+        # Step 3: Generate oracle answers (skips already-answered questions)
+        print("Step 3: Generating oracle answers...")
+        questions = generate_oracle_answers(
+            client, model, uploaded_file, questions, delay=args.delay,
+            save_path=str(output_path), doc_name=doc_name,
+            description=args.description or "",
+        )
+        print()
+    finally:
+        # Step 4: Cleanup — delete uploaded file
+        print("Step 4: Cleaning up uploaded file...")
+        try:
+            client.files.delete(name=uploaded_file.name)
+            print(f"  Deleted: {uploaded_file.name}")
+        except Exception as e:
+            print(f"  Warning: Could not delete file: {e}")
 
-    # Step 3: Generate oracle answers (skips already-answered questions)
-    print("Step 3: Generating oracle answers...")
-    questions = generate_oracle_answers(
-        client, model, doc_text, questions, delay=args.delay,
-        save_path=str(output_path), doc_name=doc_name,
-        description=args.description or "",
-    )
-    print()
-
-    # Step 4: Assemble dataset
-    print("Step 4: Assembling dataset...")
+    # Step 5: Assemble dataset
+    print("Step 5: Assembling dataset...")
     dataset = build_dataset(doc_name, questions, args.description or "")
 
     with open(output_path, "w") as f:
