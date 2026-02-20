@@ -58,7 +58,7 @@ export function NewChatScreen() {
           <button
             type="button"
             onClick={() => setShowDocPicker(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-fluid-xs"
           >
             <BookPlus className="w-3.5 h-3.5" />
             Add Knowledge
@@ -66,13 +66,13 @@ export function NewChatScreen() {
           {selectedDocNames.map((name, i) => (
             <span
               key={selectedDocs[i]}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-burgundy/10 border border-burgundy/20 text-burgundy font-sans text-xs"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-burgundy/10 border border-burgundy/20 text-burgundy font-sans text-fluid-xs max-w-[12rem] md:max-w-none"
             >
-              {name}
+              <span className="truncate">{name}</span>
               <button
                 type="button"
                 onClick={() => removeDoc(selectedDocs[i])}
-                className="hover:text-burgundy/70 transition-colors"
+                className="p-1 -mr-1 rounded-full hover:bg-burgundy/20 text-burgundy/50 hover:text-burgundy transition-colors flex-shrink-0"
               >
                 <X className="w-3 h-3" />
               </button>

@@ -121,7 +121,7 @@ export function NewChatModal(props: Props) {
 
   return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream-dark/95 backdrop-blur-2xl border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
           <h2 className="font-sans text-fluid-xl text-ink">{title}</h2>
@@ -182,24 +182,24 @@ export function NewChatModal(props: Props) {
                   No documents available. Upload one below to get started.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto border border-glass-border rounded-lg p-fluid-sm">
+                <div className="space-y-1 max-h-60 overflow-y-auto border border-glass-border rounded-lg p-fluid-sm">
                   {documents.map(doc => (
                     <label
                       key={doc.doc_id}
-                      className="flex items-start gap-3 p-fluid-sm rounded-lg hover:bg-glass-hover cursor-pointer"
+                      className="flex items-center gap-3 p-2 md:p-fluid-sm rounded-lg hover:bg-glass-hover cursor-pointer min-h-[44px]"
                     >
                       <input
                         type="checkbox"
                         checked={selectedDocs.includes(doc.doc_id)}
                         onChange={() => toggleDoc(doc.doc_id)}
-                        className="mt-1"
+                        className="w-4 h-4 flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-sans text-fluid-sm text-ink font-medium truncate">
                           {doc.title}
                         </p>
                         <p className="font-sans text-fluid-xs text-ink/50">
-                          {doc.chunk_count} sections • {doc.file_size_mb} MB
+                          {doc.chunk_count} sections &bull; {doc.file_size_mb} MB
                         </p>
                       </div>
                     </label>
@@ -314,14 +314,14 @@ export function NewChatModal(props: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="px-fluid-lg py-fluid-sm border border-ink/20 rounded-lg hover:bg-glass-hover transition-colors font-sans text-fluid-sm"
+              className="px-fluid-lg py-2.5 md:py-fluid-sm border border-ink/20 rounded-lg hover:bg-glass-hover transition-colors font-sans text-fluid-sm min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-fluid-lg py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-fluid-lg py-2.5 md:py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               {submitLabel}
             </button>

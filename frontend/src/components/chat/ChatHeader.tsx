@@ -19,7 +19,7 @@ export function ChatHeader({ chat }: Props) {
   const canRemove = selectedDocs.length > 1
 
   return (
-    <header className="border-b border-glass-border bg-glass backdrop-blur-xl">
+    <header className="border-b border-glass-border bg-cream-dark">
       <div className="max-w-4xl mx-auto px-4 md:px-fluid-lg py-fluid-md">
         <div className="flex items-center gap-3 mb-2">
           <button
@@ -35,29 +35,26 @@ export function ChatHeader({ chat }: Props) {
         </div>
 
         {/* Document filter info */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <FileText className="w-4 h-4 text-ink/40" />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <FileText className="w-4 h-4 text-ink/40 flex-shrink-0" />
           {chat.doc_ids.length > 0 ? (
             <>
-              <span className="font-sans text-fluid-sm text-ink/60">
-                Searching in:
-              </span>
-              {selectedDocs.map((doc, idx) => (
-                <span key={doc.doc_id} className="inline-flex items-center">
-                  <span className="font-sans text-fluid-sm text-burgundy">
+              {selectedDocs.map((doc) => (
+                <span
+                  key={doc.doc_id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-burgundy/10 border border-burgundy/20"
+                >
+                  <span className="font-sans text-fluid-xs text-burgundy truncate max-w-[10rem] md:max-w-[14rem]">
                     {doc.title}
                   </span>
                   {canRemove && (
                     <button
                       onClick={() => removeChatDocument(chat.id, doc.doc_id)}
-                      className="ml-1 p-0.5 rounded hover:bg-ink/10 text-ink/40 hover:text-ink/70 transition-colors"
+                      className="p-1 -mr-0.5 rounded-full hover:bg-burgundy/20 text-burgundy/50 hover:text-burgundy transition-colors"
                       title={`Remove ${doc.title}`}
                     >
                       <X className="w-3 h-3" />
                     </button>
-                  )}
-                  {idx < selectedDocs.length - 1 && (
-                    <span className="text-ink/40 mx-1">&bull;</span>
                   )}
                 </span>
               ))}
@@ -69,9 +66,9 @@ export function ChatHeader({ chat }: Props) {
           )}
           <button
             onClick={() => setShowDocPicker(true)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-fluid-xs"
           >
-            <BookPlus className="w-3 h-3" />
+            <BookPlus className="w-3.5 h-3.5" />
             Add Knowledge
           </button>
         </div>

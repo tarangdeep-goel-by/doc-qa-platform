@@ -105,7 +105,7 @@ export function UploadModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream-dark/95 backdrop-blur-2xl border border-glass-border rounded-xl shadow-2xl max-w-xl w-full">
+      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-xl w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
           <h2 className="font-sans text-fluid-xl text-ink">Upload Document</h2>

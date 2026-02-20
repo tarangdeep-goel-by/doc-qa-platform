@@ -28,7 +28,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-cream flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-glass backdrop-blur-xl border border-glass-border rounded-xl shadow-2xl p-fluid-xl">
+        <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl p-fluid-xl">
           <h1 className="font-sans text-fluid-2xl text-ink font-medium text-center mb-fluid-sm">
             Document Q&A
           </h1>

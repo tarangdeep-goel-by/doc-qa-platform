@@ -16,7 +16,7 @@ export function WelcomeScreen() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-fluid-lg mb-fluid-xl">
-          <div className="p-fluid-lg bg-glass border border-glass-border rounded-xl backdrop-blur-sm">
+          <div className="p-fluid-lg bg-glass border border-glass-border rounded-xl ">
             <FileText className="w-8 h-8 text-burgundy mb-fluid-sm" />
             <h3 className="font-sans text-fluid-base text-ink font-medium mb-2">
               Multi-Document Search
@@ -26,7 +26,7 @@ export function WelcomeScreen() {
             </p>
           </div>
 
-          <div className="p-fluid-lg bg-glass border border-glass-border rounded-xl backdrop-blur-sm">
+          <div className="p-fluid-lg bg-glass border border-glass-border rounded-xl ">
             <Sparkles className="w-8 h-8 text-burgundy mb-fluid-sm" />
             <h3 className="font-sans text-fluid-base text-ink font-medium mb-2">
               Context-Aware Answers
@@ -37,7 +37,7 @@ export function WelcomeScreen() {
           </div>
         </div>
 
-        <div className="p-fluid-lg bg-burgundy/5 border border-burgundy/15 rounded-xl backdrop-blur-sm">
+        <div className="p-fluid-lg bg-burgundy/5 border border-burgundy/15 rounded-xl ">
           <h3 className="font-sans text-fluid-base text-ink font-medium mb-2">
             Get Started
           </h3>

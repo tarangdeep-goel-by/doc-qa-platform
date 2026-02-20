@@ -98,7 +98,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <aside className="h-full w-full bg-glass backdrop-blur-xl border-r border-glass-border flex flex-col">
+      <aside className="h-full w-full bg-cream-dark border-r border-glass-border flex flex-col">
         {/* Header */}
         <div className="p-fluid-lg border-b border-glass-border">
           <h1 className="font-sans text-fluid-xl text-ink font-medium mb-fluid-md">
@@ -210,7 +210,7 @@ export function AppSidebar() {
             </div>
           ) : (
             <p className="font-sans text-fluid-xs text-ink/40 text-center">
-              Powered by AI
+              Document Q&A
             </p>
           )}
         </div>

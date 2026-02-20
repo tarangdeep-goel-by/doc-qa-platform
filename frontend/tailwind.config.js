@@ -8,28 +8,28 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: '#f0f0f0',
-          light: '#a1a1aa',
+          DEFAULT: '#f5f0ea',
+          light: '#a8a29e',
         },
         cream: {
-          DEFAULT: '#09090b',
-          dark: '#18181b',
+          DEFAULT: '#0c0a09',
+          dark: '#1c1917',
         },
         burgundy: {
-          DEFAULT: '#a78bfa',
-          light: '#c4b5fd',
-          dark: '#8b5cf6',
+          DEFAULT: '#d97706',
+          light: '#f59e0b',
+          dark: '#b45309',
         },
         cyan: {
-          DEFAULT: '#67e8f9',
-          light: '#a5f3fc',
-          dark: '#22d3ee',
+          DEFAULT: '#5eead4',
+          light: '#99f6e4',
+          dark: '#2dd4bf',
         },
         glass: {
-          DEFAULT: 'rgba(255,255,255,0.04)',
-          hover: 'rgba(255,255,255,0.07)',
-          border: 'rgba(255,255,255,0.08)',
-          strong: 'rgba(255,255,255,0.10)',
+          DEFAULT: 'rgba(245,240,234,0.03)',
+          hover: 'rgba(245,240,234,0.06)',
+          border: 'rgba(245,240,234,0.08)',
+          strong: 'rgba(245,240,234,0.10)',
         },
       },
       fontFamily: {

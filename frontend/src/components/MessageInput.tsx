@@ -26,7 +26,7 @@ export function MessageInput({ onSubmit, disabled }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="relative">
-      <div className="flex items-end gap-3 rounded-xl border border-glass-border bg-glass backdrop-blur-sm focus-within:border-burgundy/30 transition-colors">
+      <div className="flex items-end gap-3 rounded-xl border border-glass-border bg-cream-dark focus-within:border-burgundy/30 transition-colors">
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -52,9 +52,6 @@ export function MessageInput({ onSubmit, disabled }: Props) {
           <Send className="w-4 h-4" />
         </button>
       </div>
-      <p className="font-sans text-[0.65rem] text-ink/25 mt-1.5 text-center">
-        Enter to send · Shift+Enter for new line
-      </p>
     </form>
   )
 }
