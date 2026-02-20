@@ -111,7 +111,23 @@ services:
       - ./backend:/app
     environment:
       <<: *env-common
-    command: pytest tests/test_bm25_index.py tests/test_reranker.py -v --tb=short
+      SKIP_QDRANT_WAIT: "true"
+    command: >-
+      pytest
+      tests/test_bm25_index.py
+      tests/test_reranker.py
+      tests/test_models.py
+      tests/test_structure_detector.py
+      tests/test_chunker.py
+      tests/test_chat_manager.py
+      tests/test_rag_config.py
+      tests/test_observability.py
+      tests/test_user_store.py
+      tests/test_auth.py
+      tests/test_embedder.py
+      tests/test_semantic_chunker.py
+      tests/test_doc_router.py
+      -v --tb=short
     profiles:
       - test
 
@@ -146,6 +162,6 @@ services:
     depends_on:
       - backend
       - qdrant
-    command: pytest tests/test_api.py tests/test_deleted_documents.py -v --tb=short
+    command: pytest tests/test_api.py tests/test_deleted_documents.py tests/test_api_extended.py -v --tb=short
     profiles:
       - test

@@ -22,7 +22,14 @@ def pytest_configure(config):
 
 @pytest.fixture(scope="session", autouse=True)
 def wait_for_qdrant():
-    """Wait for Qdrant to be reachable before any test runs."""
+    """Wait for Qdrant to be reachable before any test runs.
+
+    Set SKIP_QDRANT_WAIT=true for unit tests that don't need Qdrant.
+    """
+    if os.environ.get("SKIP_QDRANT_WAIT", "").lower() in ("true", "1", "yes"):
+        print("Skipping Qdrant wait (SKIP_QDRANT_WAIT=true)")
+        return
+
     from qdrant_client import QdrantClient
 
     host = os.environ.get("QDRANT_HOST", "localhost")
