@@ -175,7 +175,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS middleware
-cors_origins = os.environ.get("CORS_ORIGINS", os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")).split(",")
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

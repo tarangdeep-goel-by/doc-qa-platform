@@ -315,6 +315,8 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest, us
     interaction_logger = request.app.state.interaction_logger
     rag_config = request.app.state.rag_config
 
+    STREAM_TIMEOUT = 300  # 5 minutes
+
     def event_generator():
         start_time = time.time()
         try:
@@ -374,6 +376,10 @@ async def ask_in_chat(request: Request, chat_id: str, body: AskInChatRequest, us
                     chat_history=chat.gemini_chat_history
                 )
             ):
+                if time.time() - start_time > STREAM_TIMEOUT:
+                    yield _sse_event({"type": "error", "detail": "Stream timeout"})
+                    return
+
                 if event["type"] == "retrieval_done":
                     sources_dicts = event["sources"]
                     yield _sse_event({"type": "retrieval_done", "sources": sources_dicts})

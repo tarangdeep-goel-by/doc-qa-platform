@@ -82,8 +82,8 @@ class BulkDeleteResponse(BaseModel):
 # Query Request
 class QueryRequest(BaseModel):
     """Request for asking a question."""
-    question: str = Field(..., min_length=1)
-    doc_ids: Optional[List[str]] = Field(default=None, description="Optional list of document IDs to filter search")
+    question: str = Field(..., min_length=1, max_length=5000)
+    doc_ids: Optional[List[str]] = Field(default=None, max_length=50, description="Optional list of document IDs to filter search")
 
 
 # Source Information
@@ -159,7 +159,7 @@ class ChatDetailResponse(BaseModel):
 
 class AskInChatRequest(BaseModel):
     """Request to ask a question in a chat."""
-    question: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=5000)
 
 
 class AskInChatResponse(BaseModel):

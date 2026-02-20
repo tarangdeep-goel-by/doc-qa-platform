@@ -16,6 +16,8 @@ from src.user_store import User
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 AUTH_ENABLED = bool(JWT_SECRET)
+if AUTH_ENABLED and len(JWT_SECRET) < 32:
+    raise ValueError("JWT_SECRET must be at least 32 characters when auth is enabled")
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_EXPIRY_MINUTES = int(os.environ.get("JWT_ACCESS_EXPIRY_MINUTES", "15"))
 JWT_REFRESH_EXPIRY_DAYS = int(os.environ.get("JWT_REFRESH_EXPIRY_DAYS", "7"))

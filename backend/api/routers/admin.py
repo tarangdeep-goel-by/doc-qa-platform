@@ -88,7 +88,7 @@ async def upload_document(request: Request, file: UploadFile = File(...), _: Use
 
     # Generate document ID
     doc_id = str(uuid.uuid4())
-    file_extension = file.filename.split('.')[-1]
+    file_extension = ext.lstrip('.')
     saved_filename = f"{doc_id}.{file_extension}"
     file_path = os.path.join(upload_dir, saved_filename)
 
@@ -381,6 +381,12 @@ async def download_document(request: Request, doc_id: str, _: User = Depends(get
 
     if not os.path.exists(doc.file_path):
         raise HTTPException(status_code=404, detail="Document file not found on disk")
+
+    # Ensure file is within upload directory (prevent path traversal)
+    upload_dir = os.path.abspath(request.app.state.upload_dir)
+    file_path = os.path.abspath(doc.file_path)
+    if not file_path.startswith(upload_dir):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     MEDIA_TYPES = {
         'pdf': 'application/pdf',
