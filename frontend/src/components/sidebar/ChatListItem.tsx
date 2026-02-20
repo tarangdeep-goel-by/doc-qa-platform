@@ -49,7 +49,7 @@ export function ChatListItem({
     <div
       onClick={handleClick}
       className={`
-        group relative px-fluid-md py-fluid-sm rounded-lg cursor-pointer transition-colors
+        group relative px-fluid-md py-fluid-sm rounded-lg cursor-pointer transition-colors animate-slide-in-left
         ${isActive && !selectionMode
           ? 'bg-burgundy/10 border border-burgundy/20'
           : isSelected

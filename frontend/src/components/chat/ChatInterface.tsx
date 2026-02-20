@@ -107,10 +107,10 @@ export function ChatInterface() {
 
           {/* Typing indicator */}
           {loading && (!messages.length || messages[messages.length - 1].role !== 'assistant' || !messages[messages.length - 1].content) && (
-            <div className="flex items-center gap-2 mt-4 text-ink/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
+            <div className="flex items-center gap-1.5 mt-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-burgundy/60 animate-breathe [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-burgundy/60 animate-breathe [animation-delay:200ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-burgundy/60 animate-breathe [animation-delay:400ms]" />
             </div>
           )}
 

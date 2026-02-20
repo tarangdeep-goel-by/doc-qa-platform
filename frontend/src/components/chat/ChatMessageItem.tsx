@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import type { ChatMessage } from '../../types'
 import { SourcesBadge, type SourcesBadgeRef } from '../SourcesBadge'
@@ -22,14 +22,18 @@ export function ChatMessageItem({ message, prevMessage }: Props) {
   const isStreaming = message.id.startsWith('stream-')
   const showFeedback = !isUser && !isStreaming && message.content.length > 0
 
+  const [poppedBtn, setPoppedBtn] = useState<'up' | 'down' | null>(null)
+
   const handleFeedback = (fb: 'up' | 'down') => {
     if (message.feedback === fb) return
+    setPoppedBtn(fb)
+    setTimeout(() => setPoppedBtn(null), 250)
     submitFeedback(message.chat_id, message.id, fb)
   }
 
   if (isUser) {
     return (
-      <div className="flex justify-end mt-6 mb-2">
+      <div className="flex justify-end mt-6 mb-2 animate-slide-up">
         <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-burgundy/15 border border-burgundy/20">
           <p className="font-sans text-sm text-ink leading-relaxed">
             {message.content}
@@ -40,7 +44,7 @@ export function ChatMessageItem({ message, prevMessage }: Props) {
   }
 
   return (
-    <div className="mt-2 mb-4">
+    <div className={`mt-2 mb-4 animate-slide-up ${isStreaming ? 'streaming-cursor' : ''}`}>
       <MarkdownContent
         content={message.content}
         sources={message.sources}
@@ -56,6 +60,8 @@ export function ChatMessageItem({ message, prevMessage }: Props) {
           <button
             onClick={() => handleFeedback('up')}
             className={`p-1.5 rounded-md transition-colors ${
+              poppedBtn === 'up' ? 'animate-feedback-pop' : ''
+            } ${
               message.feedback === 'up'
                 ? 'text-emerald-400 bg-emerald-400/10'
                 : 'text-ink/20 hover:text-ink/50 hover:bg-glass-hover'
@@ -67,6 +73,8 @@ export function ChatMessageItem({ message, prevMessage }: Props) {
           <button
             onClick={() => handleFeedback('down')}
             className={`p-1.5 rounded-md transition-colors ${
+              poppedBtn === 'down' ? 'animate-feedback-pop' : ''
+            } ${
               message.feedback === 'down'
                 ? 'text-red-400 bg-red-400/10'
                 : 'text-ink/20 hover:text-ink/50 hover:bg-glass-hover'

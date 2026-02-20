@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 interface Props {
@@ -104,8 +104,8 @@ export function UploadModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-xl w-full">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-xl w-full animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
           <h2 className="font-sans text-fluid-xl text-ink">Upload Document</h2>
@@ -127,9 +127,9 @@ export function UploadModal({ onClose }: Props) {
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`
-              border-2 border-dashed rounded-lg p-fluid-2xl text-center cursor-pointer transition-all
+              border-2 border-dashed rounded-lg p-fluid-2xl text-center cursor-pointer transition-all duration-200
               ${isDragging
-                ? 'border-burgundy bg-burgundy/5'
+                ? 'border-burgundy bg-burgundy/5 dropzone-active'
                 : 'border-ink/20 hover:border-burgundy/50 hover:bg-glass-hover'
               }
               ${uploading ? 'pointer-events-none opacity-50' : ''}
@@ -144,7 +144,7 @@ export function UploadModal({ onClose }: Props) {
               disabled={uploading}
             />
 
-            <Upload className={`w-12 h-12 mx-auto mb-fluid-md ${isDragging ? 'text-burgundy' : 'text-ink/40'}`} />
+            <Upload className={`w-12 h-12 mx-auto mb-fluid-md transition-all duration-200 ${isDragging ? 'text-burgundy scale-110' : 'text-ink/40'}`} />
 
             <p className="font-sans text-fluid-base text-ink font-medium mb-fluid-xs">
               {isDragging ? 'Drop your document here' : 'Drag & drop your document here'}
@@ -191,8 +191,20 @@ export function UploadModal({ onClose }: Props) {
 
           {/* Success Message */}
           {success && (
-            <div className="flex items-center gap-2 p-fluid-md bg-green-900/20 border border-green-700 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 p-fluid-md bg-green-900/20 border border-green-700 rounded-lg animate-slide-up">
+              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" className="text-green-400" />
+                <path
+                  d="M6 10.5l2.5 2.5L14 7.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-green-400 animate-check-draw"
+                  strokeDasharray="24"
+                  strokeDashoffset="24"
+                />
+              </svg>
               <p className="font-sans text-fluid-sm text-green-300">
                 Document uploaded successfully
               </p>

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { X, Upload, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
 
@@ -120,8 +120,8 @@ export function NewChatModal(props: Props) {
     : (loading ? 'Creating...' : 'Create Chat')
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+      <div className="bg-cream-dark border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
           <h2 className="font-sans text-fluid-xl text-ink">{title}</h2>
@@ -245,9 +245,9 @@ export function NewChatModal(props: Props) {
                 }}
                 onClick={() => !uploading && fileInputRef.current?.click()}
                 className={`
-                  w-full border-2 border-dashed rounded-lg p-fluid-lg flex items-center gap-4 cursor-pointer transition-all
+                  w-full border-2 border-dashed rounded-lg p-fluid-lg flex items-center gap-4 cursor-pointer transition-all duration-200
                   ${isDragging
-                    ? 'border-burgundy bg-burgundy/5'
+                    ? 'border-burgundy bg-burgundy/5 dropzone-active'
                     : 'border-ink/15 hover:border-burgundy/40 hover:bg-ink/[0.02]'
                   }
                   ${uploading ? 'pointer-events-none opacity-60' : ''}
@@ -269,7 +269,7 @@ export function NewChatModal(props: Props) {
                   {uploading ? (
                     <Loader2 className="w-8 h-8 text-burgundy animate-spin" />
                   ) : (
-                    <Upload className={`w-8 h-8 ${isDragging ? 'text-burgundy' : 'text-ink/30'}`} />
+                    <Upload className={`w-8 h-8 transition-all duration-200 ${isDragging ? 'text-burgundy scale-110' : 'text-ink/30'}`} />
                   )}
                 </div>
 
@@ -290,8 +290,20 @@ export function NewChatModal(props: Props) {
               </div>
 
               {uploadSuccess && (
-                <div className="flex items-center gap-2 mt-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div className="flex items-center gap-2 mt-2 animate-slide-up">
+                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" className="text-emerald-600" />
+                    <path
+                      d="M6 10.5l2.5 2.5L14 7.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-emerald-600 animate-check-draw"
+                      strokeDasharray="24"
+                      strokeDashoffset="24"
+                    />
+                  </svg>
                   <p className="font-sans text-fluid-xs text-emerald-700">
                     Uploaded &amp; selected: {uploadSuccess}
                   </p>

@@ -44,7 +44,7 @@ export function NewChatScreen() {
       >
         <Menu className="w-5 h-5" />
       </button>
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl animate-drift-up">
         <h1 className="font-sans text-fluid-2xl text-ink font-medium text-center mb-2">
           What do you want to know?
         </h1>
@@ -66,7 +66,8 @@ export function NewChatScreen() {
           {selectedDocNames.map((name, i) => (
             <span
               key={selectedDocs[i]}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-burgundy/10 border border-burgundy/20 text-burgundy font-sans text-fluid-xs max-w-[12rem] md:max-w-none"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-burgundy/10 border border-burgundy/20 text-burgundy font-sans text-fluid-xs max-w-[12rem] md:max-w-none animate-pop-in"
+              style={{ animationDelay: `${i * 50}ms` }}
             >
               <span className="truncate">{name}</span>
               <button
