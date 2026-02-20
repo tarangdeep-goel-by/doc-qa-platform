@@ -137,6 +137,20 @@ export async function bulkDeleteChats(chatIds: string[]): Promise<BulkDeleteChat
   return response.json()
 }
 
+export async function updateChatDocuments(chatId: string, docIds: string[]): Promise<Chat> {
+  const response = await authFetch(`${API_BASE}/chats/${chatId}/documents`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ doc_ids: docIds }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to update chat documents')
+  }
+
+  return response.json()
+}
+
 export async function removeChatDocument(chatId: string, docId: string): Promise<Chat> {
   const response = await authFetch(`${API_BASE}/chats/${chatId}/documents/${docId}`, {
     method: 'DELETE',

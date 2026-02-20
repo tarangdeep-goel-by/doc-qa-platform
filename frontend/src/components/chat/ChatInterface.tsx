@@ -13,22 +13,27 @@ export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const initialQuestionSent = useRef(false)
 
+  // Load chat and optionally send initial question (single effect to avoid races)
   useEffect(() => {
-    if (chatId) {
-      setActiveChat(chatId)
-    }
-  }, [chatId, setActiveChat])
+    if (!chatId) return
+    let cancelled = false
 
-  // Send initial question when navigated from NewChatScreen
-  useEffect(() => {
-    const state = location.state as { initialQuestion?: string } | null
-    if (state?.initialQuestion && activeChat && !initialQuestionSent.current) {
-      initialQuestionSent.current = true
-      sendMessage(state.initialQuestion)
-      // Clear the state so it doesn't re-send on refresh
-      window.history.replaceState({}, '')
+    const init = async () => {
+      await setActiveChat(chatId)
+      if (cancelled) return
+
+      const navState = location.state as { initialQuestion?: string } | null
+      if (navState?.initialQuestion && !initialQuestionSent.current) {
+        initialQuestionSent.current = true
+        window.history.replaceState({}, '')
+        sendMessage(navState.initialQuestion)
+      }
     }
-  }, [activeChat, location.state, sendMessage])
+
+    init()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -51,7 +56,7 @@ export function ChatInterface() {
 
       {/* Deleted Documents Warning */}
       {activeChat.missing_documents && activeChat.missing_documents.length > 0 && (
-        <div className="bg-yellow-900/20 border-l-4 border-yellow-400 p-fluid-md mx-8 mt-fluid-md rounded-r">
+        <div className="bg-yellow-900/20 border-l-4 border-yellow-400 p-fluid-md mx-4 md:mx-8 mt-fluid-md rounded-r">
           <div className="flex items-start gap-fluid-sm">
             <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -75,7 +80,7 @@ export function ChatInterface() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6">
+        <div className="max-w-3xl mx-auto px-4 py-4 md:px-6 md:py-6">
           {messages.length === 0 ? (
             <div className="py-fluid-2xl text-center">
               <h2 className="font-sans text-fluid-2xl text-ink mb-fluid-md">
@@ -115,7 +120,7 @@ export function ChatInterface() {
 
       {/* Input */}
       <div className="border-t border-glass-border">
-        <div className="max-w-3xl mx-auto px-6 py-4">
+        <div className="max-w-3xl mx-auto px-4 py-3 md:px-6 md:py-4">
           <MessageInput
             onSubmit={sendMessage}
             disabled={loading}

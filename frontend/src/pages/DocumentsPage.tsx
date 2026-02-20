@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { FileText, Upload, Trash2, ExternalLink, MessageSquare } from 'lucide-react'
+import { FileText, Menu, Upload, Trash2, ExternalLink, MessageSquare } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppStore } from '../store/appStore'
 import { useAuthStore } from '../store/authStore'
+import { useUIStore } from '../store/uiStore'
 import { UploadModal } from '../components/modals/UploadModal'
 import * as api from '../api/client'
 import type { Document } from '../types'
@@ -13,6 +14,7 @@ export function DocumentsPage() {
   const navigate = useNavigate()
   const { documents, loadDocuments, deleteDocument } = useAppStore()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
+  const openSidebar = useUIStore(s => s.openSidebar)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
@@ -111,8 +113,15 @@ export function DocumentsPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-fluid-lg py-fluid-md border-b border-glass-border">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-4 md:px-fluid-lg py-fluid-md border-b border-glass-border">
+        <div className="flex items-center gap-3 md:gap-4">
+          <button
+            onClick={openSidebar}
+            className="md:hidden p-1 -ml-1 text-ink/60 hover:text-ink transition-colors"
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <h1 className="font-display text-fluid-2xl text-ink font-semibold">
             Documents
           </h1>
@@ -188,7 +197,7 @@ export function DocumentsPage() {
             )}
           </div>
         ) : (
-          <div className="px-fluid-lg py-fluid-md space-y-fluid-md">
+          <div className="px-4 md:px-fluid-lg py-fluid-md space-y-fluid-md">
             {documents.map(doc => {
               const uploadDate = formatDistanceToNow(new Date(doc.upload_date), { addSuffix: true })
               const isDeleting = deletingId === doc.doc_id

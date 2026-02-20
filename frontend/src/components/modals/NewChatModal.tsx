@@ -1,18 +1,37 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
 
-interface Props {
+interface BaseProps {
   onClose: () => void
-  onChatCreated: (chatId: string) => void
 }
 
-export function NewChatModal({ onClose, onChatCreated }: Props) {
+interface CreateModeProps extends BaseProps {
+  mode?: 'create'
+  onChatCreated: (chatId: string) => void
+  initialSelectedDocs?: never
+  onDocsSelected?: never
+}
+
+interface PickDocsModeProps extends BaseProps {
+  mode: 'pick-docs'
+  onDocsSelected: (docIds: string[]) => void
+  initialSelectedDocs?: string[]
+  onChatCreated?: never
+}
+
+type Props = CreateModeProps | PickDocsModeProps
+
+export function NewChatModal(props: Props) {
+  const { onClose, mode = 'create' } = props
   const { documents, createChat, uploadDocument, loadDocuments } = useAppStore()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [name, setName] = useState('')
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([])
+  const [selectedDocs, setSelectedDocs] = useState<string[]>(
+    props.mode === 'pick-docs' ? (props.initialSelectedDocs ?? []) : []
+  )
   const [autoRoute, setAutoRoute] = useState(true)
   const [loading, setLoading] = useState(false)
 
@@ -26,6 +45,11 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (mode === 'pick-docs') {
+      props.onDocsSelected!(selectedDocs)
+      return
+    }
+
     setLoading(true)
     const chatName = name.trim() || 'New Chat'
     const useAutoRoute = selectedDocs.length === 0 && autoRoute && documents.length > 0
@@ -33,7 +57,7 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
     setLoading(false)
 
     if (chat) {
-      onChatCreated(chat.id)
+      props.onChatCreated!(chat.id)
     }
   }
 
@@ -90,12 +114,17 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
     }
   }
 
-  return (
+  const title = mode === 'pick-docs' ? 'Add Knowledge' : 'Create New Chat'
+  const submitLabel = mode === 'pick-docs'
+    ? (selectedDocs.length > 0 ? `Done (${selectedDocs.length})` : 'Done')
+    : (loading ? 'Creating...' : 'Create Chat')
+
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-cream-dark/95 backdrop-blur-2xl border border-glass-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-fluid-lg border-b border-glass-border">
-          <h2 className="font-sans text-fluid-xl text-ink">Create New Chat</h2>
+          <h2 className="font-sans text-fluid-xl text-ink">{title}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-glass-hover rounded-lg transition-colors"
@@ -107,20 +136,22 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-fluid-lg space-y-fluid-lg">
-            {/* Chat name */}
-            <div>
-              <label className="block font-sans text-fluid-sm text-ink/70 mb-2">
-                Chat Name <span className="text-ink/40">(optional — auto-named from first question)</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Research on ML algorithms"
-                className="w-full px-fluid-md py-fluid-sm border border-glass-border bg-glass rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy/30 font-sans text-fluid-base text-ink"
-                autoFocus
-              />
-            </div>
+            {/* Chat name — create mode only */}
+            {mode === 'create' && (
+              <div>
+                <label className="block font-sans text-fluid-sm text-ink/70 mb-2">
+                  Chat Name <span className="text-ink/40">(optional — auto-named from first question)</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Research on ML algorithms"
+                  className="w-full px-fluid-md py-fluid-sm border border-glass-border bg-glass rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy/30 font-sans text-fluid-base text-ink"
+                  autoFocus
+                />
+              </div>
+            )}
 
             {/* Document selection */}
             <div>
@@ -183,8 +214,8 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
                 }
               </p>
 
-              {/* Auto-route option — shown when no docs manually selected */}
-              {selectedDocs.length === 0 && documents.length > 0 && (
+              {/* Auto-route option — create mode, no docs selected */}
+              {mode === 'create' && selectedDocs.length === 0 && documents.length > 0 && (
                 <label className="flex items-center gap-2 mt-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -292,11 +323,12 @@ export function NewChatModal({ onClose, onChatCreated }: Props) {
               disabled={loading}
               className="px-fluid-lg py-fluid-sm bg-burgundy text-cream rounded-lg hover:bg-burgundy/90 transition-colors font-sans text-fluid-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating...' : 'Create Chat'}
+              {submitLabel}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

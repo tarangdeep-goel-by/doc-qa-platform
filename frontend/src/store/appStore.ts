@@ -29,6 +29,7 @@ interface AppState {
   uploadDocument: (file: File) => Promise<void>
   deleteDocument: (docId: string) => Promise<void>
   removeChatDocument: (chatId: string, docId: string) => Promise<void>
+  updateChatDocuments: (chatId: string, docIds: string[]) => Promise<void>
   submitFeedback: (chatId: string, messageId: string, feedback: 'up' | 'down') => Promise<void>
   clearError: () => void
 }
@@ -377,6 +378,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Revert on failure
       set({ activeChat: prevActiveChat, chats: prevChats })
       toast.error('Failed to remove document from chat')
+    }
+  },
+
+  // Update chat documents (replace all doc_ids)
+  updateChatDocuments: async (chatId: string, docIds: string[]) => {
+    const prevActiveChat = get().activeChat
+    const prevChats = get().chats
+
+    // Optimistic update
+    const autoRoute = docIds.length === 0
+    set(state => ({
+      activeChat: state.activeChat?.id === chatId
+        ? { ...state.activeChat, doc_ids: docIds, auto_route: autoRoute }
+        : state.activeChat,
+      chats: state.chats.map(c =>
+        c.id === chatId ? { ...c, doc_ids: docIds, auto_route: autoRoute } : c
+      ),
+    }))
+
+    try {
+      await api.updateChatDocuments(chatId, docIds)
+    } catch (error) {
+      set({ activeChat: prevActiveChat, chats: prevChats })
+      toast.error('Failed to update chat documents')
     }
   },
 

@@ -4,8 +4,8 @@ import { Plus, FileText, Trash2, X, Check, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
+import { useUIStore } from '../../store/uiStore'
 import { ChatListItem } from './ChatListItem'
-import { NewChatModal } from '../modals/NewChatModal'
 import * as api from '../../api/client'
 
 export function AppSidebar() {
@@ -14,7 +14,7 @@ export function AppSidebar() {
   const { chatId } = useParams()
   const { chats, loadChats, loadDocuments } = useAppStore()
   const { user, logout, authRequired } = useAuthStore()
-  const [showNewChatModal, setShowNewChatModal] = useState(false)
+  const closeSidebar = useUIStore(s => s.closeSidebar)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedChats, setSelectedChats] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
@@ -31,12 +31,14 @@ export function AppSidebar() {
     if (selectionMode) {
       toggleSelection(id)
     } else {
+      closeSidebar()
       navigate(`/chat/${id}`)
     }
   }
 
   const handleNewChat = () => {
-    setShowNewChatModal(true)
+    closeSidebar()
+    navigate('/')
   }
 
   const toggleSelection = (chatId: string) => {
@@ -96,7 +98,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <aside className="w-80 bg-glass backdrop-blur-xl border-r border-glass-border flex flex-col">
+      <aside className="h-full w-full bg-glass backdrop-blur-xl border-r border-glass-border flex flex-col">
         {/* Header */}
         <div className="p-fluid-lg border-b border-glass-border">
           <h1 className="font-sans text-fluid-xl text-ink font-medium mb-fluid-md">
@@ -146,7 +148,7 @@ export function AppSidebar() {
         {canViewDocs && (
           <div className="p-fluid-sm border-b border-glass-border">
             <button
-              onClick={() => navigate('/documents')}
+              onClick={() => { closeSidebar(); navigate('/documents') }}
               className={`
                 w-full flex items-center gap-2 px-fluid-md py-fluid-sm rounded-lg transition-colors font-sans text-fluid-sm
                 ${location.pathname === '/documents'
@@ -214,16 +216,6 @@ export function AppSidebar() {
         </div>
       </aside>
 
-      {/* New Chat Modal */}
-      {showNewChatModal && (
-        <NewChatModal
-          onClose={() => setShowNewChatModal(false)}
-          onChatCreated={(chatId) => {
-            setShowNewChatModal(false)
-            navigate(`/chat/${chatId}`)
-          }}
-        />
-      )}
     </>
   )
 }

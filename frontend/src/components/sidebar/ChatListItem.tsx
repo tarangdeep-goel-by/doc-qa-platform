@@ -42,7 +42,8 @@ export function ChatListItem({
     }
   }
 
-  const timeAgo = formatDistanceToNow(new Date(chat.updated_at), { addSuffix: true })
+  const updatedAt = chat.updated_at.endsWith('Z') ? chat.updated_at : chat.updated_at + 'Z'
+  const timeAgo = formatDistanceToNow(new Date(updatedAt), { addSuffix: true })
 
   return (
     <div

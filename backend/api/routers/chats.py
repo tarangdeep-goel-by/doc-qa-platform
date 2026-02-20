@@ -250,6 +250,35 @@ async def bulk_delete_chats(request: Request, bulk_request: BulkDeleteChatsReque
     )
 
 
+@router.put("/{chat_id}/documents", response_model=ChatResponse)
+async def update_chat_documents(request: Request, chat_id: str, body: dict, user: User = Depends(get_current_user)):
+    """Replace a chat's doc_ids."""
+    chat_manager = request.app.state.chat_manager
+
+    chat, _ = chat_manager.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    _verify_chat_owner(chat, user)
+
+    doc_ids = body.get("doc_ids", [])
+    if not isinstance(doc_ids, list):
+        raise HTTPException(status_code=422, detail="doc_ids must be a list")
+
+    chat.doc_ids = doc_ids
+    chat.auto_route = len(doc_ids) == 0
+    chat_manager.save_chat(chat)
+
+    return ChatResponse(
+        id=chat.id,
+        name=chat.name,
+        doc_ids=chat.doc_ids,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        message_count=chat.message_count,
+        auto_route=chat.auto_route
+    )
+
+
 @router.delete("/{chat_id}/documents/{doc_id}", response_model=ChatResponse)
 async def remove_chat_document(request: Request, chat_id: str, doc_id: str, user: User = Depends(get_current_user)):
     """Remove a document from a chat's doc_ids."""
