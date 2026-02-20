@@ -1,37 +1,48 @@
 # Production overlay — use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Prerequisites:
-#   1. Set GEMINI_API_KEY and JWT_SECRET in .env
-#   2. Replace yourdomain.com with your actual domain
-#   3. Ensure DNS A record points to your VPS IP
+#   1. Copy .env.example to .env and fill in GEMINI_API_KEY
+#   2. (Optional) Set JWT_SECRET for SaaS mode
+#   3. (Optional) Point a domain to your VPS IP and update CORS_ORIGINS + Caddyfile
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: doc-qa-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: always
-
   qdrant:
+    ports:
+      - "127.0.0.1:6333:6333"  # Localhost only — not exposed to internet
+      - "127.0.0.1:6334:6334"
     restart: always
 
   backend:
-    ports: []  # Only expose via Caddy
+    ports:
+      - "80:8000"  # Expose on port 80 (no TLS without domain)
     environment:
-      CORS_ORIGINS: "https://yourdomain.com"
-      COOKIE_SECURE: "true"
+      CORS_ORIGINS: "*"  # Tighten to https://yourdomain.com when you add a domain
+      COOKIE_SECURE: "false"  # Set to true when you add HTTPS
       LOG_LEVEL: "WARNING"
     restart: always
 
-volumes:
-  caddy_data:
-  caddy_config:
+# --- HTTPS with domain (uncomment when ready) ---
+# 1. Uncomment caddy service below
+# 2. Change backend ports from "80:8000" to [] (remove the port mapping above)
+# 3. Update Caddyfile with your domain
+# 4. Set CORS_ORIGINS to https://yourdomain.com
+# 5. Set COOKIE_SECURE to true
+#
+#  caddy:
+#    image: caddy:2-alpine
+#    container_name: doc-qa-caddy
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+#      - caddy_data:/data
+#      - caddy_config:/config
+#    depends_on:
+#      backend:
+#        condition: service_healthy
+#    restart: always
+#
+#volumes:
+#  caddy_data:
+#  caddy_config:
