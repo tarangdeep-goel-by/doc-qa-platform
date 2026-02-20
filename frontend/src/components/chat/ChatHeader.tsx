@@ -69,7 +69,7 @@ export function ChatHeader({ chat }: Props) {
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-fluid-xs"
           >
             <BookPlus className="w-3.5 h-3.5" />
-            Add Knowledge
+            Add Document
           </button>
         </div>
       </div>

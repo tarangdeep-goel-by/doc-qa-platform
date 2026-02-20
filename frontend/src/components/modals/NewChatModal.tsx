@@ -114,7 +114,7 @@ export function NewChatModal(props: Props) {
     }
   }
 
-  const title = mode === 'pick-docs' ? 'Add Knowledge' : 'Create New Chat'
+  const title = mode === 'pick-docs' ? 'Add Document' : 'Create New Chat'
   const submitLabel = mode === 'pick-docs'
     ? (selectedDocs.length > 0 ? `Done (${selectedDocs.length})` : 'Done')
     : (loading ? 'Creating...' : 'Create Chat')

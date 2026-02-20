@@ -49,11 +49,11 @@ export function NewChatScreen() {
           What do you want to know?
         </h1>
         <p className="font-sans text-sm text-ink/40 text-center mb-8">
-          Ask a question about your documents
+          Ask about your documents, or upload a new one to get started
         </p>
         <MessageInput onSubmit={handleSend} disabled={sending} />
 
-        {/* Add Knowledge CTA + selected doc pills */}
+        {/* Add Document CTA + selected doc pills */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -61,7 +61,7 @@ export function NewChatScreen() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-ink/20 text-ink/50 hover:border-burgundy/40 hover:text-burgundy transition-colors font-sans text-fluid-xs"
           >
             <BookPlus className="w-3.5 h-3.5" />
-            Add Knowledge
+            Add Document
           </button>
           {selectedDocNames.map((name, i) => (
             <span
