@@ -513,6 +513,7 @@ async def submit_feedback(
         question=question_text,
         answer=target_msg.content,
         doc_ids=chat.doc_ids,
+        sources=target_msg.sources,
     )
 
     return FeedbackResponse(success=True)

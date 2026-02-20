@@ -22,6 +22,7 @@ class FeedbackStore:
         question: str,
         answer: str,
         doc_ids: List[str],
+        sources: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -31,6 +32,7 @@ class FeedbackStore:
             "question": question,
             "answer": answer,
             "doc_ids": doc_ids,
+            "sources": sources or [],
         }
         with self._lock:
             with open(self.file_path, "a") as f:
