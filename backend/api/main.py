@@ -19,7 +19,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
 from api.auth import AUTH_ENABLED
-from api.schemas import HealthResponse
 from src.embedder import Embedder
 from src.vector_store import VectorStore
 from src.qa_engine import QAEngine
@@ -206,17 +205,7 @@ async def root():
 
 
 # Health check
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    vector_store = getattr(app.state, "vector_store", None)
-
-    qdrant_connected = vector_store.check_connection() if vector_store else False
-    gemini_configured = os.getenv("GEMINI_API_KEY") is not None
-
-    return HealthResponse(
-        status="healthy" if qdrant_connected and gemini_configured else "unhealthy",
-        qdrant_connected=qdrant_connected,
-        gemini_configured=gemini_configured,
-        auth_required=AUTH_ENABLED,
-    )
+    return {"status": "ok"}
