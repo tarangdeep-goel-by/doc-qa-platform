@@ -1,5 +1,8 @@
 # Implementation Progress
 
+> **Historical, as of 2026-01-22.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md).
+
+
 **Last Updated**: 2026-01-22
 
 ---

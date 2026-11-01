@@ -1,5 +1,8 @@
 # Test Results Summary
 
+> **Historical, as of 2026-01-22.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md).
+
+
 ## ✅ Tests are Working!
 
 Based on the test runs, here's what's confirmed working:

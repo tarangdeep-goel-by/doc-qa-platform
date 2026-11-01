@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDFs, ask questions, get AI-powered answers with source citations. Supports two deployment modes: **B2C** (open access, no login) and **SaaS** (JWT auth, multi-user, role-based access).
+Full-stack RAG (Retrieval Augmented Generation) platform for document Q&A. Upload PDF, DOCX, HTML or TXT files, ask questions, get AI-powered answers with source citations. Supports two deployment modes: **B2C** (open access, no login) and **SaaS** (JWT auth, multi-user, role-based access).
 
 **Stack**: React + TypeScript frontend, FastAPI backend, Qdrant vector DB, Google Gemini LLM
 
@@ -70,7 +70,7 @@ docker exec doc-qa-backend python -m scripts.seed_admin \
 Controlled by `JWT_SECRET` env var in `docker-compose.yml`:
 
 - **B2C mode** (default, `JWT_SECRET` empty): All endpoints open, no login. Anonymous user gets admin role.
-- **SaaS mode** (`JWT_SECRET` set): JWT auth required. Roles: `admin` | `client`. Auth router registered at `/api/auth/`. User store in `data/users.db` (SQLite).
+- **SaaS mode** (`JWT_SECRET` set, at least 32 chars or startup fails): JWT auth required. Roles: `admin` | `client`. Auth router registered at `/api/auth/`. User store in `data/users.db` (SQLite).
 
 Auth dependency: `get_current_user` (returns `ANONYMOUS_USER` in B2C) and `require_admin` in `api/auth.py`.
 
@@ -79,20 +79,20 @@ Auth dependency: `get_current_user` (returns `ANONYMOUS_USER` in B2C) and `requi
 ```
 Question
   ↓
-Query Decomposition (optional, splits complex multi-part questions)
+Classify + Expand (one GEMINI_FAST_MODEL call: simple/complex, 2 paraphrases, sub-questions)
   ↓
-Query Expansion (optional, generates alternative phrasings via Gemini)
+Query Decomposition (complex questions: each sub-question runs the full pipeline, then a synthesis call)
   ↓
-Parallel Search: [Vector/Semantic] + [BM25/Keyword]
-  ↓
-Fusion: RRF (always on) + Weighted (adaptive alpha auto-adjusts per query type)
-  ↓
-Dynamic Score Cutoff (trims low-scoring chunks post-retrieval)
+Per query variant: [Vector top 20] + [BM25 top 20] → RRF fusion (k=60); variants summed, original weighted 2x
   ↓
 Cross-Encoder Reranking + Position-Aware Blending
   ↓
-Context Assembly → Gemini LLM → Streamed Answer with Source Citations
+Dedup → Noise filter → Dynamic Score Cutoff (3-15 chunks) → Structure boost → Neighbour chunks
+  ↓
+Context Assembly → GEMINI_FAST_MODEL (gemini-2.5-flash-lite) → Streamed Answer with [Source N] Citations
 ```
+
+There is no weighted fusion: RRF is the only fusion and ignores `alpha`. Adaptive alpha (`_search_with_alpha_selection`) runs three identical searches and has no effect on results. BM25 hits outside the vector top 20 are dropped. See `docs/NOTES.md` section 12 for known bugs.
 
 ### RAG Config — Single Source of Truth
 
@@ -109,21 +109,21 @@ When adding a new pipeline param: add to `RAGConfig` dataclass + `from_env()` �
 
 | Variable | Value | Notes |
 |----------|-------|-------|
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Main LLM |
-| `GEMINI_FAST_MODEL` | `gemini-2.5-flash-lite` | Fast model for titles, expansion |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Eval judge and `generate_dataset.py` only (not answer generation) |
+| `GEMINI_FAST_MODEL` | `gemini-2.5-flash-lite` | Answer generation, classify/expand, synthesis |
 | `EMBEDDING_MODEL` | `gemini-embedding-001` | Changing requires Qdrant rebuild |
 | `EMBEDDING_DIM` | `768` | Must match embedding model |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `2500` / `500` | Changing requires re-upload |
-| `TOP_K_RESULTS` | `12` | Initial fetch; dynamic cutoff trims further |
+| `TOP_K_RESULTS` | `12` | Base k (doubled to 24 before reranking); dynamic cutoff trims further |
 | `USE_HYBRID_SEARCH` | `true` | BM25 + vector fusion |
-| `USE_ADAPTIVE_ALPHA` | `true` | Auto-adjusts alpha per query type |
+| `USE_ADAPTIVE_ALPHA` | `true` | No effect beyond extra searches (RRF ignores alpha); same for `HYBRID_ALPHA` |
 | `USE_RERANKING` | `true` | Cross-encoder reranking |
 | `USE_QUERY_EXPANSION` | `true` | Generate alternative phrasings |
 | `USE_QUERY_DECOMPOSITION` | `true` | Split multi-part questions |
 | `USE_SEMANTIC_CHUNKING` | `false` | Alternative chunker |
 | `JWT_SECRET` | `${JWT_SECRET:-}` | Empty = B2C, set = SaaS |
 
-**Data-breaking changes**: Changing `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `CHUNK_SIZE`, or `CHUNK_OVERLAP` requires `docker-compose down -v` + re-upload all documents.
+**Data-breaking changes**: Changing `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `CHUNK_SIZE`, or `CHUNK_OVERLAP` requires re-ingesting. After rebuilding, run `run_evaluation.py --reingest` (drops the Qdrant collection and re-chunks/re-embeds every stored upload; structure-aware chunker only). `docker-compose down -v` does NOT clear data: Qdrant and `backend/data/` are bind mounts (`./qdrant_storage`, `./backend/data`), so a manual reset means deleting those directories' contents and re-uploading.
 
 ## Evaluation Framework
 
@@ -131,7 +131,8 @@ When adding a new pipeline param: add to `RAGConfig` dataclass + `from_env()` �
 - **Doc resolution**: Uses all doc_ids from `data/documents.json` (mirrors real user behavior)
 - **History ledger**: `evaluation/results/history.jsonl` — append-only JSONL
 - **Metrics**: LLM judge, semantic similarity, ROUGE-L, latency
-- **CLI flags**: `--use-judge` (LLM scoring), `--no-judge` (fast, metrics only), `--ablation` (feature ablation), `--conversational` (multi-turn)
+- **CLI flags**: `--dataset`, `--output`, `--doc-ids`, `--no-judge` (skip judge; the judge is on by default, `--use-judge` is a no-op), `--ablation` (retrieval metrics only, so all zeros without `expected_sources`), `--html`, `--label`, `--reingest`, `--compare A B`. Conversational datasets are auto-detected (no flag).
+- **Retrieval metrics** (precision/recall/NDCG/MRR) are zero because no bundled dataset has `expected_sources`
 
 **Eval gotcha**: Pipeline params must flow through `RAGConfig` — check `to_answer_kwargs()`, not just config logging.
 
@@ -147,16 +148,17 @@ When adding a new pipeline param: add to `RAGConfig` dataclass + `from_env()` �
 ```
 data/
 ├── documents.json       # DocumentStore metadata
-├── chats/{chat_id}.json # Chat sessions + messages
-├── uploads/{doc_id}.pdf # Uploaded PDFs
+├── chats/{chat_id}/     # metadata.json + messages.json per chat
+├── uploads/{doc_id}.{ext} # Uploaded originals (pdf/docx/html/htm/txt)
 ├── bm25/                # BM25 index cache (pickle)
-├── interactions.jsonl   # InteractionLogger (every Q&A logged)
+├── interactions.jsonl   # InteractionLogger (completed chat SSE answers only, not /api/query/ask)
 ├── feedback.jsonl       # FeedbackStore (thumbs up/down)
 └── users.db             # SQLite user store (SaaS mode only)
 ```
 
 ## Detailed Guides
 
-- **Frontend**: `frontend/CLAUDE.md` — dark glass design system, Zustand, auth components
+- **Frontend**: `frontend/CLAUDE.md` — design system (warm amber palette), Zustand, auth components
 - **Backend**: `backend/CLAUDE.md` — RAG pipeline, RAGConfig, streaming, testing, auth
-- **Project status**: `PROJECT_STATUS.md` — recent changes, metrics, roadmap
+- **Current design notes, eval history, known bugs**: `docs/NOTES.md`
+- **Project status (historical log)**: `PROJECT_STATUS.md`

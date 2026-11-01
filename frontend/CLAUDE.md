@@ -37,7 +37,7 @@ Auth components:
 - `src/components/auth/RequireAuth.tsx` — route guard, redirects to login
 - `src/components/auth/RequireRole.tsx` — role-based access (admin/client)
 
-Auth state lives in `appStore` — `user`, `isAuthenticated`, `login()`, `logout()`, `refreshToken()`.
+Auth state lives in `src/store/authStore.ts` (not `appStore`) — `user`, `isAuthenticated`, `login()`, `logout()`, `refresh()`. Auth API calls are in `src/api/authClient.ts`. UI state is in `src/store/uiStore.ts`.
 
 ### API Client
 
@@ -48,10 +48,11 @@ In SaaS mode, client attaches `Authorization: Bearer <token>` header and handles
 ### Routing — React Router v7
 
 ```
+/login            (LoginPage)
 / (AppLayout)
-├── /              (WelcomeScreen) — chat list + new chat
+├── /              (NewChatScreen) — first question creates a chat (auto-routed if no docs selected)
 ├── /chat/:chatId  (ChatInterface) — chat conversation
-└── /documents     (DocumentsPage) — document management
+└── /documents     (DocumentsPage) — document management (admin, or client with CLIENT_DOCUMENT_VIEW)
 ```
 
 `AppLayout` loads chats and documents on mount, renders sidebar + outlet.
@@ -69,24 +70,25 @@ src/
 │   └── welcome/    — WelcomeScreen
 ├── layouts/        — AppLayout
 ├── pages/          — DocumentsPage
-├── store/          — appStore.ts
-├── api/            — client.ts
+├── store/          — appStore.ts, authStore.ts, uiStore.ts
+├── api/            — client.ts, authClient.ts
+├── utils/          — citationParser.ts
 └── types/          — index.ts
 ```
 
-## Design System — Dark Glass
+## Design System — Dark, Warm Amber
 
-Dark theme with glass morphism surfaces and purple/cyan accents.
+Dark theme with glass surfaces and amber/teal accents (the purple "dark glass" palette was replaced by a warm amber one on 2026-02-21).
 
 **Color tokens** (in `tailwind.config.js`, semantic names kept from legacy):
-- `cream` → `#09090b` (page background, near-black)
-- `cream-dark` → `#18181b` (surface/card background)
-- `ink` → `#f0f0f0` (primary text, light)
-- `ink-light` → `#a1a1aa` (secondary text)
-- `burgundy` → `#a78bfa` (accents/CTAs — actually purple/violet)
-- `burgundy-light/dark` → `#c4b5fd` / `#8b5cf6`
-- `cyan` → `#67e8f9` (secondary accent)
-- `glass` → `rgba(255,255,255, 0.04-0.10)` (glass surfaces, borders, hovers)
+- `cream` → `#0c0a09` (page background, near-black)
+- `cream-dark` → `#1c1917` (surface/card background)
+- `ink` → `#f5f0ea` (primary text, light)
+- `ink-light` → `#a8a29e` (secondary text)
+- `burgundy` → `#d97706` (accents/CTAs — actually amber)
+- `burgundy-light/dark` → `#f59e0b` / `#b45309`
+- `cyan` → `#5eead4` (secondary accent — actually teal)
+- `glass` → `rgba(245,240,234, 0.03-0.10)` (glass surfaces, borders, hovers)
 
 **Typography**:
 - `font-serif` (Fraunces) — display headings
@@ -104,10 +106,10 @@ Uses `@tailwindcss/typography` plugin with `prose-invert` for dark markdown rend
 ## Key Patterns
 
 ### Chat Flow
-Each chat has fixed `doc_ids` set at creation. All questions in that chat search only those documents.
+Each chat has `doc_ids` (empty = all documents). If created with `auto_route` and no documents selected, the backend picks documents by BM25 on the first question and saves them to the chat. Documents can be changed later via `PUT /api/chats/{id}/documents`.
 
 ### Streaming Responses
-`POST /api/chats/{chat_id}/ask` returns SSE stream. Frontend reads `EventSource`-style and appends chunks to the message in real-time.
+`POST /api/chats/{chat_id}/ask` returns SSE stream. Frontend reads the stream with `fetch` + `response.body.getReader()` (in `src/api/client.ts`) and appends chunks to the message in real-time.
 
 ### Document Filtering
 New chat modal shows multi-select document picker. Missing documents (deleted after chat creation) show warnings.

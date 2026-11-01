@@ -1,5 +1,8 @@
 # TODO - Multi-Chat Interface Implementation
 
+> **Historical, as of 2026-01-21.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md).
+
+
 **Status**: Sprint 3 - Frontend Implementation
 **Last Updated**: 2026-01-21
 

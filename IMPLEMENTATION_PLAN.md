@@ -1,5 +1,8 @@
 # Multi-Chat Interface Implementation Plan
 
+> **Historical, as of 2026-01-22.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md).
+
+
 ## Overview
 Transform doc-qa-platform from single-chat to multi-session interface with improved citations and two deployment variants (B2B SaaS and D2C).
 

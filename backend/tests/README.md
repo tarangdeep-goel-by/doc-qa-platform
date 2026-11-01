@@ -146,7 +146,7 @@ Unit tests for BM25 keyword-based search:
 - Score ordering and ranking
 - Index rebuilding
 
-**Coverage**: ~25 tests, >95% BM25Index coverage
+**Coverage**: 16 test functions, >95% BM25Index coverage
 
 ### test_reranker.py - Cross-Encoder Reranker Tests
 Unit tests for reranking with cross-encoder:
@@ -160,7 +160,7 @@ Unit tests for reranking with cross-encoder:
 - Different query types
 - Alternative chunk structures
 
-**Coverage**: ~15 tests, >90% Reranker coverage
+**Coverage**: 21 test functions, >90% Reranker coverage
 
 ### test_hybrid_search.py - Hybrid Search Integration Tests
 Integration tests for vector + BM25 hybrid search:
@@ -174,7 +174,7 @@ Integration tests for vector + BM25 hybrid search:
 - Score normalization
 - Cache persistence
 
-**Coverage**: ~15 tests, hybrid search functionality
+**Coverage**: 18 test functions, hybrid search functionality
 
 ### test_qa_guardrails.py - QA Engine Guardrails Tests
 Tests for production safety features:
@@ -189,7 +189,7 @@ Tests for production safety features:
 - Alpha parameter variations
 - Document filtering with guardrails
 
-**Coverage**: ~12 tests, QA engine safety features
+**Coverage**: 12 test functions, QA engine safety features
 
 ### test_deleted_documents.py - Deleted Documents API Tests
 Tests for deleted document edge cases:
@@ -203,7 +203,7 @@ Tests for deleted document edge cases:
 - Deletion message accuracy
 - ChatDetailResponse schema validation
 
-**Coverage**: ~15 tests, deleted document handling
+**Coverage**: 14 test functions, deleted document handling
 
 ### test_rag_pipeline_integration.py - Full Pipeline Integration Tests
 End-to-end tests for complete RAG pipeline:
@@ -220,7 +220,7 @@ End-to-end tests for complete RAG pipeline:
 - Performance baseline testing
 - BM25 index persistence
 
-**Coverage**: ~15 tests, full pipeline integration
+**Coverage**: 16 test functions, full pipeline integration
 
 ---
 

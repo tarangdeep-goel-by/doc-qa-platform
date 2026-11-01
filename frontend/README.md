@@ -10,7 +10,8 @@ Editorial-inspired interface with refined typography and sophisticated spacing. 
 
 - **Chat Interface**: Clean conversation flow with questions and AI-generated answers
 - **Document Filtering**: Select specific documents or search across all
-- **Source Citations**: Every answer includes relevant source excerpts with relevance scores
+- **Source Citations**: Inline `[Source N]` citations rendered as numbered links to source excerpts (with relevance scores)
+- **Streaming Answers**: Answers stream over SSE; chats are persisted by the backend
 - **Editorial Typography**: Fraunces (display), Literata (body), Inter (UI)
 - **Responsive Design**: Fluid typography and spacing that adapts to screen size
 
@@ -33,7 +34,9 @@ The dev server runs on `http://localhost:3000` and proxies API requests to `http
 
 - **React 18** + TypeScript
 - **Vite** - Fast build tool
-- **Tailwind CSS** - Utility-first styling
+- **Tailwind CSS** - Utility-first styling (+ `@tailwindcss/typography`)
+- **Zustand** - State (`appStore`, `authStore`, `uiStore`)
+- **React Router 7**, **react-markdown** + remark-gfm, **react-hot-toast**
 - **Google Fonts** - Fraunces, Literata, Inter
 
 ## Project Structure
@@ -41,33 +44,41 @@ The dev server runs on `http://localhost:3000` and proxies API requests to `http
 ```
 src/
 ├── components/
-│   ├── ChatMessage.tsx       # Question and answer display
-│   ├── DocumentSelector.tsx  # Multi-select document filter
+│   ├── auth/                 # LoginPage, RequireAuth, RequireRole
+│   ├── chat/                 # ChatInterface, ChatMessageItem, ChatHeader, NewChatScreen
+│   ├── sidebar/              # AppSidebar, ChatListItem
+│   ├── modals/               # NewChatModal, UploadModal
+│   ├── markdown/             # MarkdownContent, CitationLink
+│   ├── welcome/              # WelcomeScreen
 │   ├── MessageInput.tsx      # Question input with submit
-│   └── SourceCitation.tsx    # Individual source display
+│   └── SourcesBadge.tsx      # Source list for an answer
+├── layouts/                  # AppLayout
+├── pages/                    # DocumentsPage
+├── store/                    # Zustand stores (app, auth, ui)
+├── utils/                    # citationParser.ts
 ├── types/
 │   └── index.ts              # TypeScript definitions
 ├── api/
-│   └── client.ts             # API client functions
-├── App.tsx                   # Main application
+│   ├── client.ts             # API client functions (incl. SSE streaming)
+│   └── authClient.ts         # Auth API calls
+├── App.tsx                   # Routes
 ├── main.tsx                  # Entry point
 └── index.css                 # Global styles + Tailwind
 ```
 
 ## API Integration
 
-Connects to backend API at `/api`:
-
-- `GET /api/query/documents` - List available documents
-- `POST /api/query/ask` - Submit question with optional doc_ids filter
+Connects to backend API at `/api` (mainly `/api/chats`, `/api/admin/documents`, `/api/auth`); chat answers stream from `POST /api/chats/{id}/ask`. See the root `README.md` for the endpoint list.
 
 ## Design System
 
 ### Colors
 
-- **Cream** (`#faf9f7`) - Background
-- **Ink** (`#1a1a2e`) - Primary text
-- **Burgundy** (`#8b4049`) - Accents and CTAs
+Dark theme; token names are legacy (see `tailwind.config.js` and `CLAUDE.md`):
+
+- **Cream** (`#0c0a09`) - Background (near-black)
+- **Ink** (`#f5f0ea`) - Primary text
+- **Burgundy** (`#d97706`) - Accents and CTAs (amber)
 
 ### Typography Scale
 
@@ -140,9 +151,9 @@ npm run preview
 
 ## Future Enhancements
 
-- [ ] Conversation history persistence
+- [x] Conversation history persistence
 - [ ] Export conversation to PDF/Markdown
 - [ ] Keyboard shortcuts
-- [ ] Dark mode
-- [ ] Streaming responses
+- [x] Dark mode (the UI is dark-only)
+- [x] Streaming responses
 - [ ] Highlight matching text in sources

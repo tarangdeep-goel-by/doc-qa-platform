@@ -312,7 +312,7 @@ docker-compose build backend && docker-compose run --rm test
 - **requirements.txt** - Combined app + test dependencies
 - **run_tests.sh** - Helper script for running tests
 - **test_api.sh** - Bash script for manual testing
-- **tests/test_api.py** - Pytest test suite (19 tests)
+- **tests/test_api.py** - Pytest test suite (26 tests)
 
 ---
 

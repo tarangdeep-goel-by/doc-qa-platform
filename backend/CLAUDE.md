@@ -28,7 +28,7 @@ docker-compose run --rm api-tests
 docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
   --dataset evaluation/datasets/real_world_multi_doc.json \
   --output evaluation/results/output.json \
-  --label "description" --use-judge
+  --label "description"   # judge runs by default; --no-judge skips it
 
 # View eval history
 docker exec doc-qa-backend python evaluation/view_history.py --detail --last 5
@@ -83,22 +83,24 @@ Two main methods:
 Both accept the same kwargs (from `RAGConfig.to_answer_kwargs()`).
 
 Pipeline stages:
-1. Query decomposition (splits multi-part questions into sub-questions)
-2. Query expansion (Gemini generates alternative phrasings)
-3. Parallel search: vector (Qdrant) + BM25 keyword
-4. RRF fusion (always on) + adaptive alpha weighting
-5. Dynamic score cutoff (trims low-scoring chunks)
-6. Cross-encoder reranking + position-aware blending
-7. Context assembly → Gemini LLM → answer with citations
+1. Classify + expand: one `GEMINI_FAST_MODEL` call labels simple/complex, writes 2 paraphrases and (if complex) 2-4 sub-questions
+2. Query decomposition: complex questions run each sub-question through the full pipeline, then a synthesis call
+3. Per variant: vector (Qdrant, top 20) + BM25 (top 20), RRF fusion; variant scores summed, original weighted 2x
+4. Adaptive alpha runs this search three times, but RRF ignores alpha, so it has no effect (see `docs/NOTES.md` B1)
+5. Cross-encoder reranking + position-aware blending
+6. Dedup, noise filter, dynamic score cutoff (3-15 chunks), structure boost, neighbour-chunk fetch
+7. Context assembly → `GEMINI_FAST_MODEL` (gemini-2.5-flash-lite) → answer with `[Source N]` citations
+
+`GEMINI_MODEL` (gemini-2.5-flash) is passed to `QAEngine` but not used for generation; only the eval judge and dataset generator use it.
 
 ### Document Processing Pipeline
 
 Upload flow (`api/routers/admin.py`):
-1. File validation (size, MIME, magic bytes)
-2. Save PDF to `data/uploads/{doc_id}.pdf`
-3. Extract text (pdfplumber for tables, PyPDF2 fallback)
-4. Chunk text (standard or semantic chunking)
-5. Generate embeddings via Gemini
+1. File validation (extension allow-list `.pdf .docx .html .htm .txt`, size, magic bytes; 409 on duplicate filename)
+2. Save original to `data/uploads/{doc_id}.{ext}`
+3. Extract text (PDF: pdfplumber when `USE_PDFPLUMBER=true`, tables appended as Markdown; PyPDF2 only when `USE_PDFPLUMBER` is off or pdfplumber isn't installed, with no per-file fallback if pdfplumber fails. DOCX ~3000-char pseudo-pages; HTML/TXT one page)
+4. Chunk text (structure-aware by default, or semantic with `USE_SEMANTIC_CHUNKING=true`), prefix `[Document | Page | Section]` enriched text
+5. Generate embeddings of the enriched text via Gemini
 6. Store vectors + payloads in Qdrant
 7. Rebuild BM25 index
 8. Save metadata to `data/documents.json`
@@ -122,7 +124,7 @@ Seed admin: `python -m scripts.seed_admin --email admin@example.com --password s
 
 ### Observability
 
-- **InteractionLogger** (`src/interaction_logger.py`): Appends to `data/interactions.jsonl` on every Q&A. Records question, answer, sources, latency, RAG config.
+- **InteractionLogger** (`src/interaction_logger.py`): Appends to `data/interactions.jsonl` for each completed chat answer (`POST /api/chats/{id}/ask`); `/api/query/ask` is not logged. Records question, answer, sources, latency, RAG config.
 - **FeedbackStore** (`src/feedback_store.py`): Appends to `data/feedback.jsonl` for thumbs up/down.
 - Admin endpoints: `GET /api/admin/interactions`, `GET /api/admin/feedback`
 
@@ -153,19 +155,23 @@ Persistent index (`src/bm25_index.py`): cached to `data/bm25/` as pickle. Rebuil
 ## Evaluation Framework
 
 ```bash
-# Standard eval with LLM judge
+# Standard eval (LLM judge is on by default; --use-judge is accepted but a no-op)
 docker exec -t doc-qa-backend python evaluation/run_evaluation.py \
   --dataset evaluation/datasets/real_world_multi_doc.json \
-  --output evaluation/results/output.json --label "desc" --use-judge
+  --output evaluation/results/output.json --label "desc"
 
 # Fast eval (skip judge)
 ... --no-judge
 
-# Feature ablation (one feature off at a time)
+# Feature ablation (one feature off at a time; scores retrieval metrics only,
+# which are zero because no dataset has expected_sources)
 ... --ablation
 
-# Multi-turn conversational eval
-... --conversational
+# Re-chunk and re-embed every stored upload into a fresh collection first
+... --reingest
+
+# Multi-turn conversational eval: no flag, auto-detected from the dataset format
+... --dataset evaluation/datasets/conversational_multi_doc.json
 
 # Generate dataset from PDF using Gemini oracle
 docker exec -t doc-qa-backend python evaluation/generate_dataset.py \
@@ -181,10 +187,10 @@ Eval uses `RAGConfig.from_env()` — same single source of truth as the API.
 
 ## Environment Variables
 
-All set in `docker-compose.yml` via `x-env-common` anchor. Fast-fail (`os.environ["KEY"]`) — missing vars raise KeyError immediately.
+All set in `docker-compose.yml` via `x-env-common` anchor. Core pipeline vars fast-fail (`os.environ["KEY"]`) — missing vars raise KeyError immediately. Some ops vars have code fallbacks: `GEMINI_FAST_MODEL`, `CORS_ORIGINS`, `COOKIE_SECURE`, `MAX_UPLOAD_SIZE_MB`, `UPLOAD_RATE_LIMIT` (not in compose; default `10/minute`), `USE_PDFPLUMBER` (code default `false`, compose sets `true`), `LOG_LEVEL`.
 
 Required: `GEMINI_API_KEY`
 
-Auth: `JWT_SECRET` (empty = B2C), `JWT_ACCESS_EXPIRY_MINUTES` (15), `JWT_REFRESH_EXPIRY_DAYS` (7), `CLIENT_DOCUMENT_VIEW` (feature flag)
+Auth: `JWT_SECRET` (empty = B2C, otherwise min 32 chars), `JWT_ACCESS_EXPIRY_MINUTES` (15), `JWT_REFRESH_EXPIRY_DAYS` (7), `CLIENT_DOCUMENT_VIEW` (feature flag)
 
 See root `CLAUDE.md` for full RAG config table.

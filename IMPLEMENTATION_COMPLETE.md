@@ -1,5 +1,8 @@
 # Implementation Complete - Multi-Chat Interface
 
+> **Historical, as of 2026-01-21.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md).
+
+
 **Date**: 2026-01-21
 **Status**: ✅ All Sprints Complete - Ready for Testing
 

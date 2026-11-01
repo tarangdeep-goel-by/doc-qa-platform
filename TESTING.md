@@ -35,13 +35,11 @@ docker-compose run --rm test
 docker-compose run --rm unit-tests
 ```
 
-**Runs**:
-- `test_bm25_index.py` (~25 tests)
-- `test_reranker.py` (~15 tests)
+**Runs** (207 test functions, 13 files): `test_bm25_index.py`, `test_reranker.py`, `test_models.py`, `test_structure_detector.py`, `test_chunker.py`, `test_chat_manager.py`, `test_rag_config.py`, `test_observability.py`, `test_user_store.py`, `test_auth.py`, `test_embedder.py`, `test_semantic_chunker.py`, `test_doc_router.py`
 
 **Time**: ~30-60 seconds
 **Requires**: Nothing (no external services)
-**Best for**: Quick validation of BM25 and Reranker logic
+**Best for**: Quick validation of BM25, reranker, chunking, models, config, auth and stores
 
 ---
 
@@ -51,9 +49,9 @@ docker-compose run --rm integration-tests
 ```
 
 **Runs**:
-- `test_hybrid_search.py` (~15 tests)
-- `test_qa_guardrails.py` (~12 tests)
-- `test_rag_pipeline_integration.py` (~15 tests)
+- `test_hybrid_search.py` (18 tests)
+- `test_qa_guardrails.py` (12 tests)
+- `test_rag_pipeline_integration.py` (16 tests)
 
 **Time**: ~1-2 minutes
 **Requires**: Qdrant only
@@ -67,8 +65,9 @@ docker-compose run --rm api-tests
 ```
 
 **Runs**:
-- `test_api.py` (existing API tests)
-- `test_deleted_documents.py` (~15 tests)
+- `test_api.py` (26 tests)
+- `test_deleted_documents.py` (14 tests)
+- `test_api_extended.py` (21 tests)
 
 **Time**: ~1-2 minutes
 **Requires**: Backend + Qdrant
@@ -120,19 +119,21 @@ pytest tests/test_bm25_index.py::TestBM25Index::test_search_basic -v
 
 ## Test Categories Explained
 
-### Unit Tests (40 tests)
+### Unit Tests (207 test functions)
 **What**: Test individual components in isolation
-**Files**: `test_bm25_index.py`, `test_reranker.py`
+**Files**: `test_bm25_index.py`, `test_reranker.py`, `test_models.py`, `test_structure_detector.py`, `test_chunker.py`, `test_chat_manager.py`, `test_rag_config.py`, `test_observability.py`, `test_user_store.py`, `test_auth.py`, `test_embedder.py`, `test_semantic_chunker.py`, `test_doc_router.py`
 **No external dependencies**: Can run anywhere
 
-### Integration Tests (42 tests)
+### Integration Tests (46 test functions)
 **What**: Test components working together
 **Files**: `test_hybrid_search.py`, `test_qa_guardrails.py`, `test_rag_pipeline_integration.py`
 **Requires**: Qdrant vector database
 
-### API Tests (40+ tests)
+### API Tests (61 test functions)
 **What**: Test REST API endpoints end-to-end
-**Files**: `test_api.py`, `test_deleted_documents.py`
+**Files**: `test_api.py`, `test_deleted_documents.py`, `test_api_extended.py`
+
+`test_document_formats.py`, `test_gemini_retry.py` and `test_query_expansion.py` (34 test functions) only run in the full `test` profile. Total: 348 test functions in 22 files.
 **Requires**: Backend server + Qdrant
 
 ---
@@ -198,7 +199,8 @@ export GEMINI_API_KEY=your_key_here
 **Problem**: Test data from previous runs
 **Solution**:
 ```bash
-# Clear test collections
+# Clear test collections (note: `down -v` does not clear Qdrant data,
+# which is a bind mount at ./qdrant_storage)
 docker-compose down -v
 docker-compose up -d
 ```

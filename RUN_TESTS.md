@@ -12,7 +12,7 @@ docker-compose run --rm test
 **What happens:**
 1. Starts Qdrant and Backend containers
 2. Waits for backend to be ready (~30 seconds max)
-3. Runs all 107 tests
+3. Runs all 348 test functions (22 files in `backend/tests/`)
 4. Takes ~10 minutes total
 
 ### Option 2: Unit Tests Only (Fast)
@@ -76,10 +76,10 @@ docker-compose run --rm test pytest tests/test_bm25_index.py -v
 
 | Command | Time | What It Does |
 |---------|------|--------------|
-| `docker-compose run --rm unit-tests` | ~1 min | Fast unit tests (31 tests) |
-| `docker-compose run --rm integration-tests` | ~5 min | RAG pipeline tests (43 tests) |
-| `docker-compose run --rm api-tests` | ~2 min | API endpoint tests |
-| `docker-compose run --rm test` | ~10 min | All 107 tests |
+| `docker-compose run --rm unit-tests` | ~1 min | Fast unit tests (207 test functions) |
+| `docker-compose run --rm integration-tests` | ~5 min | RAG pipeline tests (46 test functions) |
+| `docker-compose run --rm api-tests` | ~2 min | API endpoint tests (61 test functions) |
+| `docker-compose run --rm test` | ~10 min | All 348 test functions |
 
 ---
 
@@ -220,6 +220,7 @@ docker-compose down
 ### Unit Tests (No Dependencies)
 - `test_bm25_index.py` - BM25 keyword search
 - `test_reranker.py` - Cross-encoder reranking
+- `test_models.py`, `test_structure_detector.py`, `test_chunker.py`, `test_chat_manager.py`, `test_rag_config.py`, `test_observability.py`, `test_user_store.py`, `test_auth.py`, `test_embedder.py`, `test_semantic_chunker.py`, `test_doc_router.py`
 
 ### Integration Tests (Needs Qdrant)
 - `test_hybrid_search.py` - Vector + BM25 hybrid search
@@ -229,6 +230,10 @@ docker-compose down
 ### API Tests (Needs Backend + Qdrant)
 - `test_api.py` - REST API endpoints
 - `test_deleted_documents.py` - Deleted document handling
+- `test_api_extended.py` - Additional API endpoint coverage
+
+### Full Suite Only
+- `test_document_formats.py`, `test_gemini_retry.py`, `test_query_expansion.py` (run only by `docker-compose run --rm test`)
 
 ---
 

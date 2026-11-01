@@ -1,5 +1,7 @@
 # Project Status - Document Q&A Platform
 
+> **Historical, as of 2026-02-18.** Current state: see [README.md](README.md) and [docs/NOTES.md](docs/NOTES.md). Commit hashes below were corrected on 2026-11-01 to match the git history.
+
 **Last Updated**: February 18, 2026
 
 This document tracks implementation progress, recent changes, and next steps for the Document Q&A Platform.
@@ -36,7 +38,7 @@ Structure-aware chunking pipeline with enriched text, neighbor chunk retrieval, 
 - [x] Question embedding
 - [x] Semantic search in Qdrant
 - [x] Context retrieval with relevance scores
-- [x] Answer generation using Google Gemini 2.0 Flash
+- [x] Answer generation using Google Gemini (now `gemini-2.5-flash-lite` via `GEMINI_FAST_MODEL`)
 - [x] Source citation in responses
 - [x] Document filtering (search specific docs or all docs)
 - [x] Hybrid search (vector + BM25 keyword search)
@@ -132,7 +134,7 @@ Structure-aware chunking pipeline with enriched text, neighbor chunk retrieval, 
 
 **Key insight:** Separation letter score jumped from 2.50 to 4.67 primarily because the PDF was finally uploaded to the system. Structure-aware chunking contributed incremental gains across all datasets.
 
-**Commits:** `7561732` (structure-aware chunking), `86b76e5` (BM25 point_id + Chat.from_dict), `361a320` (dark glass UI)
+**Commits:** `ffadc1b` (structure-aware chunking), `aeea6d3` (BM25 point_id + Chat.from_dict), `2568d0a` (dark glass UI)
 
 ---
 
@@ -245,7 +247,7 @@ Structure-aware chunking pipeline with enriched text, neighbor chunk retrieval, 
 
 **Round 2 — Dynamic score cutoff + prompt engineering:**
 - Dynamic score cutoff replacing hardcoded top_k (score-range-based filtering)
-- Top-and-tail reordering (best chunks at start/end, weakest in middle — lost-in-the-middle mitigation)
+- Top-and-tail reordering (best chunks at start/end, weakest in middle — lost-in-the-middle mitigation; later removed, not in the current code)
 - Few-shot prompt with detailed extraction instructions
 - Temperature bump to 0.4 for more thorough answers
 
@@ -329,7 +331,7 @@ Ran a systematic chunk size experiment to find optimal chunking for answer quali
 
 ### Config Cleanup (February 1, 2026)
 
-All `os.getenv()` defaults removed from Python code. `docker-compose.yml` is single source of truth for all configuration. Committed as `6e8c5ed`.
+All `os.getenv()` defaults removed from Python code. `docker-compose.yml` is single source of truth for all configuration. Committed as `47e38f2`.
 
 ### Clean Eval Baseline (February 1, 2026)
 
@@ -655,7 +657,7 @@ POST /api/chats/{chat_id}/ask
 ## 🚧 Known Limitations
 
 1. ~~**PDF-only**: No support for DOCX, HTML, TXT yet~~ ✅ **Multi-format support added** (PDF, DOCX, HTML, TXT)
-2. **No authentication**: Open API endpoints
+2. ~~**No authentication**: Open API endpoints~~ ✅ **Optional JWT auth added** (open when `JWT_SECRET` is unset)
 3. **Synchronous uploads**: User waits for processing to complete
 4. **JSON metadata store**: Not suitable for high concurrency
 5. ~~**No frontend UI**: API-only currently~~ ✅ **React frontend implemented**
@@ -691,11 +693,11 @@ POST /api/chats/{chat_id}/ask
 **Estimated Effort**: Remaining items ~4-6 hours
 
 ### Phase 4: Production Readiness (Medium Priority)
-- [ ] User authentication (JWT)
+- [x] User authentication (JWT, optional) - **DONE**
 - [ ] PostgreSQL for metadata (replace JSON store)
 - [ ] Redis caching for frequent queries
 - [ ] Async document processing with status polling
-- [ ] Rate limiting
+- [x] Rate limiting (slowapi) - **DONE**
 - [ ] Structured logging (JSON logs)
 - [ ] Health checks for all dependencies
 - [ ] Prometheus metrics
@@ -817,15 +819,15 @@ None currently! 🎉
    - 4 documents uploaded: FX5U manual, Atomic Habits, Separation Letter, Insurance doc
    - Eval history tracking live: `view_history.py --detail --last 5`
 3. **Current state**: System healthy, main branch up to date, frontend + backend running
-4. **Benchmark datasets**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q), `real_world_multi_doc.json` (77q), `conversational.json` (18q)
+4. **Benchmark datasets**: `fx5u_qa_benchmark.json` (24q), `atomic habits.json` (28q), `separation-letter.json` (28q), `real_world_multi_doc.json` (77q), `conversational_multi_doc.json` (18 turns)
 5. **Test Suite**: 136 tests
 6. **No blockers**: System stable
 
 **Suggested next steps (prioritized by expected impact):**
-- Streaming responses for better UX (currently waits for full response)
+- ~~Streaming responses for better UX~~ (done: chat answers stream over SSE)
 - FX5U table-heavy questions still weakest — consider table-specific retrieval boost
 - Populate `expected_sources` in benchmark datasets to enable retrieval metrics (NDCG, MRR)
-- Authentication (JWT) for production readiness
+- ~~Authentication (JWT) for production readiness~~ (done: optional JWT auth)
 
 **Run evaluation:**
 
